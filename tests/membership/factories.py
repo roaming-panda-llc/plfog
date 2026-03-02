@@ -4,9 +4,10 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import factory
+from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 
-from membership.models import Lease, Member, MembershipPlan, Space
+from membership.models import Guild, GuildVote, Lease, Member, MembershipPlan, Space
 
 
 class MembershipPlanFactory(factory.django.DjangoModelFactory):
@@ -35,13 +36,33 @@ class SpaceFactory(factory.django.DjangoModelFactory):
     space_id = factory.Sequence(lambda n: f"S-{n:03d}")
     space_type = Space.SpaceType.STUDIO
     status = Space.Status.AVAILABLE
+    sublet_guild = None
+
+
+class GuildFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = Guild
+
+    name = factory.Sequence(lambda n: f"Guild {n}")
+
+
+class GuildVoteFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = GuildVote
+
+    member = factory.SubFactory(MemberFactory)
+    guild = factory.SubFactory(GuildFactory)
+    priority = 1
 
 
 class LeaseFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Lease
+        exclude = ["tenant_obj"]
 
-    member = factory.SubFactory(MemberFactory)
+    tenant_obj = factory.SubFactory(MemberFactory)
+    content_type = factory.LazyAttribute(lambda o: ContentType.objects.get_for_model(o.tenant_obj))
+    object_id = factory.LazyAttribute(lambda o: o.tenant_obj.pk)
     space = factory.SubFactory(SpaceFactory)
     lease_type = Lease.LeaseType.MONTH_TO_MONTH
     base_price = Decimal("200.00")

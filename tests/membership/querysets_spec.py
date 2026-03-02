@@ -102,13 +102,13 @@ def describe_member_queryset():
 
             # Two active leases
             LeaseFactory(
-                member=member,
+                tenant_obj=member,
                 space=space1,
                 start_date=today - timedelta(days=30),
                 monthly_rent=Decimal("300.00"),
             )
             LeaseFactory(
-                member=member,
+                tenant_obj=member,
                 space=space2,
                 start_date=today - timedelta(days=10),
                 monthly_rent=Decimal("200.00"),
@@ -117,7 +117,7 @@ def describe_member_queryset():
             # One ended lease - should not count
             space3 = SpaceFactory(space_id="S-003")
             LeaseFactory(
-                member=member,
+                tenant_obj=member,
                 space=space3,
                 start_date=today - timedelta(days=90),
                 end_date=today - timedelta(days=1),
@@ -136,13 +136,13 @@ def describe_member_queryset():
             space2 = SpaceFactory(space_id="S-002")
 
             LeaseFactory(
-                member=member,
+                tenant_obj=member,
                 space=space1,
                 start_date=today - timedelta(days=30),
                 monthly_rent=Decimal("300.00"),
             )
             LeaseFactory(
-                member=member,
+                tenant_obj=member,
                 space=space2,
                 start_date=today - timedelta(days=10),
                 monthly_rent=Decimal("200.00"),
@@ -189,7 +189,7 @@ def describe_space_queryset():
             today = timezone.now().date()
 
             LeaseFactory(
-                member=member,
+                tenant_obj=member,
                 space=space,
                 start_date=today - timedelta(days=30),
                 monthly_rent=Decimal("750.00"),
@@ -215,7 +215,7 @@ def describe_lease_queryset():
             today = timezone.now().date()
 
             active_lease = LeaseFactory(
-                member=member,
+                tenant_obj=member,
                 space=space,
                 start_date=today - timedelta(days=30),
                 end_date=today + timedelta(days=30),
@@ -230,7 +230,7 @@ def describe_lease_queryset():
             space = SpaceFactory(space_id="S-001")
 
             lease = LeaseFactory(
-                member=member,
+                tenant_obj=member,
                 space=space,
                 start_date=date(2024, 3, 1),
                 end_date=date(2024, 6, 30),
@@ -251,7 +251,7 @@ def describe_lease_queryset():
             today = timezone.now().date()
 
             LeaseFactory(
-                member=member,
+                tenant_obj=member,
                 space=space,
                 start_date=today - timedelta(days=90),
                 end_date=today - timedelta(days=1),
@@ -266,7 +266,7 @@ def describe_lease_queryset():
             today = timezone.now().date()
 
             LeaseFactory(
-                member=member,
+                tenant_obj=member,
                 space=space,
                 start_date=today + timedelta(days=30),
                 end_date=today + timedelta(days=90),
@@ -281,7 +281,7 @@ def describe_lease_queryset():
             today = timezone.now().date()
 
             ongoing = LeaseFactory(
-                member=member,
+                tenant_obj=member,
                 space=space,
                 start_date=today - timedelta(days=60),
                 end_date=None,

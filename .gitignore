@@ -35,3 +35,6 @@ htmlcov/
 # Virtual environments
 .venv/
 venv/
+
+# Fixtures with personal data - load manually, never commit
+membership/fixtures/*.json

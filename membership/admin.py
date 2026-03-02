@@ -3,20 +3,21 @@ from __future__ import annotations
 from django.contrib import admin
 from django.db.models import Count, QuerySet
 from django.http import HttpRequest
-from unfold.admin import ModelAdmin, TabularInline
+from unfold.admin import GenericTabularInline, ModelAdmin, TabularInline
 
-from .models import Lease, Member, MembershipPlan, Space
+from .models import Guild, GuildVote, Lease, Member, MembershipPlan, Space
 
 # ---------------------------------------------------------------------------
 # Inlines
 # ---------------------------------------------------------------------------
 
 
-class LeaseInlineMember(TabularInline):
-    """Lease inline for MemberAdmin — shows space, hides member."""
+class LeaseInlineMember(GenericTabularInline):
+    """Lease inline for MemberAdmin — shows space, hides tenant fields."""
 
     model = Lease
-    fk_name = "member"
+    ct_field = "content_type"
+    ct_fk_field = "object_id"
     fields = [
         "space",
         "lease_type",
@@ -34,12 +35,38 @@ class LeaseInlineMember(TabularInline):
 
 
 class LeaseInlineSpace(TabularInline):
-    """Lease inline for SpaceAdmin — shows member, hides space."""
+    """Lease inline for SpaceAdmin — shows tenant, hides space."""
 
     model = Lease
     fk_name = "space"
     fields = [
-        "member",
+        "tenant_display",
+        "lease_type",
+        "monthly_rent",
+        "start_date",
+        "end_date",
+        "is_active_display",
+    ]
+    readonly_fields = ["tenant_display", "is_active_display"]
+    extra = 0
+
+    @admin.display(description="Tenant")
+    def tenant_display(self, obj: Lease) -> str:
+        return str(obj.tenant) if obj.tenant else "-"
+
+    @admin.display(boolean=True, description="Active")
+    def is_active_display(self, obj: Lease) -> bool:
+        return obj.is_active
+
+
+class LeaseInlineGuild(GenericTabularInline):
+    """Lease inline for GuildAdmin."""
+
+    model = Lease
+    ct_field = "content_type"
+    ct_fk_field = "object_id"
+    fields = [
+        "space",
         "lease_type",
         "monthly_rent",
         "start_date",
@@ -52,6 +79,32 @@ class LeaseInlineSpace(TabularInline):
     @admin.display(boolean=True, description="Active")
     def is_active_display(self, obj: Lease) -> bool:
         return obj.is_active
+
+
+class SubletInline(TabularInline):
+    """Read-only inline on GuildAdmin showing spaces sublet by the guild."""
+
+    model = Space
+    fk_name = "sublet_guild"
+    fields = ["space_id", "name", "space_type", "full_price_display"]
+    readonly_fields = ["space_id", "name", "space_type", "full_price_display"]
+    extra = 0
+
+    def has_add_permission(self, request: HttpRequest, obj: Guild | None = None) -> bool:
+        return False
+
+    def has_change_permission(self, request: HttpRequest, obj: Guild | None = None) -> bool:
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj: Guild | None = None) -> bool:
+        return False
+
+    @admin.display(description="Full Price")
+    def full_price_display(self, obj: Space) -> str:
+        price = obj.full_price
+        if price is None:
+            return "-"
+        return f"${price:.2f}"
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +155,7 @@ class MemberAdmin(ModelAdmin):
                     "preferred_name",
                     "email",
                     "phone",
+                    "billing_name",
                 ],
             },
         ),
@@ -151,6 +205,43 @@ class MemberAdmin(ModelAdmin):
 
 
 # ---------------------------------------------------------------------------
+# GuildAdmin
+# ---------------------------------------------------------------------------
+
+
+@admin.register(Guild)
+class GuildAdmin(ModelAdmin):
+    list_display = ["name", "guild_lead", "sublet_count", "notes_preview"]
+    search_fields = ["name"]
+    inlines = [SubletInline, LeaseInlineGuild]
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Guild]:
+        qs = super().get_queryset(request)
+        return qs.annotate(sublet_count=Count("sublets"))
+
+    @admin.display(description="Sublets", ordering="sublet_count")
+    def sublet_count(self, obj: Guild) -> int:
+        return obj.sublet_count
+
+    @admin.display(description="Notes")
+    def notes_preview(self, obj: Guild) -> str:
+        if len(obj.notes) > 80:
+            return obj.notes[:80] + "..."
+        return obj.notes
+
+
+# ---------------------------------------------------------------------------
+# GuildVoteAdmin
+# ---------------------------------------------------------------------------
+
+
+@admin.register(GuildVote)
+class GuildVoteAdmin(ModelAdmin):
+    list_display = ["member", "guild", "priority"]
+    list_filter = ["guild", "priority"]
+
+
+# ---------------------------------------------------------------------------
 # SpaceAdmin (N+1 fix: use .with_revenue() annotation)
 # ---------------------------------------------------------------------------
 
@@ -165,15 +256,17 @@ class SpaceAdmin(ModelAdmin):
         "full_price_display",
         "actual_revenue_display",
         "vacancy_value_display",
+        "is_rentable",
         "status",
+        "sublet_guild",
     ]
-    list_filter = ["space_type", "status"]
+    list_filter = ["space_type", "status", "is_rentable", "sublet_guild"]
     search_fields = ["space_id", "name"]
     inlines = [LeaseInlineSpace]
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Space]:
         qs = super().get_queryset(request)
-        return qs.with_revenue()
+        return qs.select_related("sublet_guild").with_revenue()
 
     @admin.display(description="Full Price")
     def full_price_display(self, obj: Space) -> str:
@@ -202,7 +295,7 @@ class SpaceAdmin(ModelAdmin):
 @admin.register(Lease)
 class LeaseAdmin(ModelAdmin):
     list_display = [
-        "member",
+        "tenant_display",
         "space",
         "lease_type",
         "monthly_rent",
@@ -211,7 +304,11 @@ class LeaseAdmin(ModelAdmin):
         "is_active_display",
     ]
     list_filter = ["lease_type"]
-    search_fields = ["member__full_legal_name", "space__space_id"]
+    search_fields = ["space__space_id"]
+
+    @admin.display(description="Tenant")
+    def tenant_display(self, obj: Lease) -> str:
+        return str(obj.tenant) if obj.tenant else "-"
 
     @admin.display(boolean=True, description="Active")
     def is_active_display(self, obj: Lease) -> bool:

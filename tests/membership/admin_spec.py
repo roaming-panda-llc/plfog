@@ -8,15 +8,21 @@ from django.test import Client, RequestFactory
 from django.utils import timezone
 
 from membership.admin import (
+    GuildAdmin,
+    GuildVoteAdmin,
     LeaseAdmin,
+    LeaseInlineGuild,
     LeaseInlineMember,
     LeaseInlineSpace,
     MemberAdmin,
     MembershipPlanAdmin,
     SpaceAdmin,
+    SubletInline,
 )
-from membership.models import Lease, Member, MembershipPlan, Space
+from membership.models import Guild, GuildVote, Lease, Member, MembershipPlan, Space
 from tests.membership.factories import (
+    GuildFactory,
+    GuildVoteFactory,
     LeaseFactory,
     MemberFactory,
     MembershipPlanFactory,
@@ -42,6 +48,14 @@ def describe_admin_registration():
     def it_registers_lease():
         assert Lease in admin.site._registry
         assert isinstance(admin.site._registry[Lease], LeaseAdmin)
+
+    def it_registers_guild():
+        assert Guild in admin.site._registry
+        assert isinstance(admin.site._registry[Guild], GuildAdmin)
+
+    def it_registers_guild_vote():
+        assert GuildVote in admin.site._registry
+        assert isinstance(admin.site._registry[GuildVote], GuildVoteAdmin)
 
 
 def describe_MemberAdmin():
@@ -89,8 +103,18 @@ def describe_SpaceAdmin():
             "full_price_display",
             "actual_revenue_display",
             "vacancy_value_display",
+            "is_rentable",
             "status",
+            "sublet_guild",
         ]
+
+    def it_has_sublet_guild_in_list_filter():
+        space_admin = admin.site._registry[Space]
+        assert "sublet_guild" in space_admin.list_filter
+
+    def it_has_expected_list_filter():
+        space_admin = admin.site._registry[Space]
+        assert space_admin.list_filter == ["space_type", "status", "is_rentable", "sublet_guild"]
 
     def it_has_expected_search_fields():
         space_admin = admin.site._registry[Space]
@@ -101,7 +125,7 @@ def describe_LeaseAdmin():
     def it_has_expected_list_display():
         lease_admin = admin.site._registry[Lease]
         assert lease_admin.list_display == [
-            "member",
+            "tenant_display",
             "space",
             "lease_type",
             "monthly_rent",
@@ -113,7 +137,6 @@ def describe_LeaseAdmin():
     def it_has_expected_search_fields():
         lease_admin = admin.site._registry[Lease]
         assert lease_admin.search_fields == [
-            "member__full_legal_name",
             "space__space_id",
         ]
 
@@ -156,7 +179,7 @@ def describe_admin_member_computed_fields():
         )
         today = timezone.now().date()
         LeaseFactory(
-            member=member,
+            tenant_obj=member,
             space=space,
             lease_type=Lease.LeaseType.MONTH_TO_MONTH,
             base_price=Decimal("200.00"),
@@ -264,7 +287,7 @@ def describe_admin_space_computed_fields():
         )
         today = timezone.now().date()
         LeaseFactory(
-            member=member,
+            tenant_obj=member,
             space=space,
             lease_type=Lease.LeaseType.MONTH_TO_MONTH,
             base_price=Decimal("300.00"),
@@ -325,7 +348,7 @@ def describe_admin_space_computed_fields():
         )
         today = timezone.now().date()
         LeaseFactory(
-            member=member,
+            tenant_obj=member,
             space=space,
             lease_type=Lease.LeaseType.MONTH_TO_MONTH,
             base_price=Decimal("200.00"),
@@ -359,7 +382,7 @@ def describe_admin_lease_and_inline_fields():
             status=Space.Status.OCCUPIED,
         )
         lease = LeaseFactory(
-            member=member,
+            tenant_obj=member,
             space=space,
             lease_type=Lease.LeaseType.MONTH_TO_MONTH,
             base_price=Decimal("200.00"),
@@ -387,7 +410,7 @@ def describe_admin_lease_and_inline_fields():
             status=Space.Status.AVAILABLE,
         )
         lease = LeaseFactory(
-            member=member,
+            tenant_obj=member,
             space=space,
             lease_type=Lease.LeaseType.ANNUAL,
             base_price=Decimal("100.00"),
@@ -416,7 +439,7 @@ def describe_admin_lease_and_inline_fields():
             status=Space.Status.OCCUPIED,
         )
         lease = LeaseFactory(
-            member=member,
+            tenant_obj=member,
             space=space,
             lease_type=Lease.LeaseType.MONTH_TO_MONTH,
             base_price=Decimal("200.00"),
@@ -444,7 +467,7 @@ def describe_admin_lease_and_inline_fields():
             status=Space.Status.OCCUPIED,
         )
         lease = LeaseFactory(
-            member=member,
+            tenant_obj=member,
             space=space,
             lease_type=Lease.LeaseType.MONTH_TO_MONTH,
             base_price=Decimal("250.00"),
@@ -510,7 +533,7 @@ def sample_space():
 @pytest.fixture()
 def sample_lease(sample_member, sample_space):
     return LeaseFactory(
-        member=sample_member,
+        tenant_obj=sample_member,
         space=sample_space,
         lease_type=Lease.LeaseType.MONTH_TO_MONTH,
         base_price=Decimal("300.00"),
@@ -568,6 +591,7 @@ def describe_admin_member_views():
                 "preferred_name": "",
                 "email": "postcreated@example.com",
                 "phone": "",
+                "billing_name": "",
                 "membership_plan": sample_plan.pk,
                 "status": Member.Status.ACTIVE,
                 "role": Member.Role.STANDARD,
@@ -576,11 +600,11 @@ def describe_admin_member_views():
                 "emergency_contact_name": "",
                 "emergency_contact_phone": "",
                 "emergency_contact_relationship": "",
-                # Inline management form (required for inlines)
-                "leases-TOTAL_FORMS": "0",
-                "leases-INITIAL_FORMS": "0",
-                "leases-MIN_NUM_FORMS": "0",
-                "leases-MAX_NUM_FORMS": "1000",
+                # GenericTabularInline management form
+                "membership-lease-content_type-object_id-TOTAL_FORMS": "0",
+                "membership-lease-content_type-object_id-INITIAL_FORMS": "0",
+                "membership-lease-content_type-object_id-MIN_NUM_FORMS": "0",
+                "membership-lease-content_type-object_id-MAX_NUM_FORMS": "1000",
             },
         )
         assert resp.status_code == 302
@@ -611,6 +635,7 @@ def describe_admin_space_views():
                 "status": Space.Status.AVAILABLE,
                 "floorplan_ref": "",
                 "notes": "",
+                "sublet_guild": "",
                 # Inline management form (required for inlines)
                 "leases-TOTAL_FORMS": "0",
                 "leases-INITIAL_FORMS": "0",
@@ -620,6 +645,29 @@ def describe_admin_space_views():
         )
         assert resp.status_code == 302
         assert Space.objects.filter(space_id="POST-S1").exists()
+
+    def it_creates_via_post_with_sublet_guild(admin_client):
+        guild = GuildFactory(name="Sublet POST Guild")
+        resp = admin_client.post(
+            "/admin/membership/space/add/",
+            {
+                "space_id": "POST-S2",
+                "name": "Sublet Space",
+                "space_type": Space.SpaceType.STUDIO,
+                "status": Space.Status.AVAILABLE,
+                "floorplan_ref": "",
+                "notes": "",
+                "sublet_guild": guild.pk,
+                # Inline management form (required for inlines)
+                "leases-TOTAL_FORMS": "0",
+                "leases-INITIAL_FORMS": "0",
+                "leases-MIN_NUM_FORMS": "0",
+                "leases-MAX_NUM_FORMS": "1000",
+            },
+        )
+        assert resp.status_code == 302
+        space = Space.objects.get(space_id="POST-S2")
+        assert space.sublet_guild == guild
 
 
 @pytest.mark.django_db
@@ -637,10 +685,14 @@ def describe_admin_lease_views():
         assert resp.status_code == 200
 
     def it_creates_via_post(admin_client, sample_member, sample_space):
+        from django.contrib.contenttypes.models import ContentType
+
+        ct = ContentType.objects.get_for_model(Member)
         resp = admin_client.post(
             "/admin/membership/lease/add/",
             {
-                "member": sample_member.pk,
+                "content_type": ct.pk,
+                "object_id": sample_member.pk,
                 "space": sample_space.pk,
                 "lease_type": Lease.LeaseType.MONTH_TO_MONTH,
                 "base_price": "400.00",
@@ -651,3 +703,227 @@ def describe_admin_lease_views():
         )
         assert resp.status_code == 302
         assert Lease.objects.filter(base_price=Decimal("400.00")).exists()
+
+
+# ---------------------------------------------------------------------------
+# GuildAdmin
+# ---------------------------------------------------------------------------
+
+
+def describe_GuildAdmin():
+    def it_has_expected_list_display():
+        guild_admin = admin.site._registry[Guild]
+        assert guild_admin.list_display == [
+            "name",
+            "guild_lead",
+            "sublet_count",
+            "notes_preview",
+        ]
+
+    def it_has_expected_search_fields():
+        guild_admin = admin.site._registry[Guild]
+        assert guild_admin.search_fields == ["name"]
+
+    def it_has_lease_inline():
+        guild_admin = admin.site._registry[Guild]
+        assert LeaseInlineGuild in guild_admin.inlines
+
+    def it_has_sublet_inline():
+        guild_admin = admin.site._registry[Guild]
+        assert SubletInline in guild_admin.inlines
+
+    def it_has_sublet_inline_before_lease_inline():
+        guild_admin = admin.site._registry[Guild]
+        sublet_idx = guild_admin.inlines.index(SubletInline)
+        lease_idx = guild_admin.inlines.index(LeaseInlineGuild)
+        assert sublet_idx < lease_idx
+
+
+@pytest.mark.django_db
+def describe_admin_guild_computed_fields():
+    def it_displays_notes_preview_short():
+        guild = GuildFactory(name="Short Notes Guild", notes="Brief note")
+        guild_admin = admin.site._registry[Guild]
+        result = guild_admin.notes_preview(guild)
+        assert result == "Brief note"
+
+    def it_displays_notes_preview_truncated():
+        long_notes = "A" * 100
+        guild = GuildFactory(name="Long Notes Guild", notes=long_notes)
+        guild_admin = admin.site._registry[Guild]
+        result = guild_admin.notes_preview(guild)
+        assert result == "A" * 80 + "..."
+        assert len(result) == 83
+
+    def it_displays_notes_preview_empty():
+        guild = GuildFactory(name="No Notes Guild", notes="")
+        guild_admin = admin.site._registry[Guild]
+        result = guild_admin.notes_preview(guild)
+        assert result == ""
+
+    def it_displays_sublet_count():
+        guild = GuildFactory(name="Sublet Count Guild")
+        SpaceFactory(space_id="SC-001", sublet_guild=guild)
+        SpaceFactory(space_id="SC-002", sublet_guild=guild)
+        guild_admin = admin.site._registry[Guild]
+        rf = RequestFactory()
+        request = rf.get("/admin/membership/guild/")
+        annotated_guild = guild_admin.get_queryset(request).get(pk=guild.pk)
+        result = guild_admin.sublet_count(annotated_guild)
+        assert result == 2
+
+    def it_displays_sublet_count_zero_when_no_sublets():
+        guild = GuildFactory(name="No Sublets Guild")
+        guild_admin = admin.site._registry[Guild]
+        rf = RequestFactory()
+        request = rf.get("/admin/membership/guild/")
+        annotated_guild = guild_admin.get_queryset(request).get(pk=guild.pk)
+        result = guild_admin.sublet_count(annotated_guild)
+        assert result == 0
+
+
+@pytest.mark.django_db
+def describe_SubletInline():
+    def it_displays_full_price_with_manual_price():
+        space = SpaceFactory(
+            space_id="SUB-001",
+            manual_price=Decimal("750.00"),
+        )
+        inline = SubletInline(Guild, admin.site)
+        result = inline.full_price_display(space)
+        assert result == "$750.00"
+
+    def it_displays_full_price_calculated_from_sqft():
+        space = SpaceFactory(
+            space_id="SUB-002",
+            size_sqft=Decimal("200.00"),
+        )
+        inline = SubletInline(Guild, admin.site)
+        result = inline.full_price_display(space)
+        assert result == "$750.00"
+
+    def it_displays_full_price_dash_when_none():
+        space = SpaceFactory(
+            space_id="SUB-003",
+            space_type=Space.SpaceType.OTHER,
+        )
+        inline = SubletInline(Guild, admin.site)
+        result = inline.full_price_display(space)
+        assert result == "-"
+
+    def it_denies_add_permission():
+        inline = SubletInline(Guild, admin.site)
+        rf = RequestFactory()
+        request = rf.get("/admin/membership/guild/add/")
+        assert inline.has_add_permission(request) is False
+
+    def it_denies_change_permission():
+        inline = SubletInline(Guild, admin.site)
+        rf = RequestFactory()
+        request = rf.get("/admin/membership/guild/1/change/")
+        assert inline.has_change_permission(request) is False
+
+    def it_denies_delete_permission():
+        inline = SubletInline(Guild, admin.site)
+        rf = RequestFactory()
+        request = rf.get("/admin/membership/guild/1/change/")
+        assert inline.has_delete_permission(request) is False
+
+
+@pytest.mark.django_db
+def describe_SpaceAdmin_sublet_guild_queryset():
+    def it_select_relates_sublet_guild():
+        guild = GuildFactory(name="Select Related Guild")
+        SpaceFactory(space_id="SR-001", sublet_guild=guild)
+        space_admin = admin.site._registry[Space]
+        rf = RequestFactory()
+        request = rf.get("/admin/membership/space/")
+        qs = space_admin.get_queryset(request)
+        space = qs.get(space_id="SR-001")
+        # Accessing sublet_guild should not trigger additional query
+        # because select_related was used
+        assert space.sublet_guild == guild
+
+
+@pytest.mark.django_db
+def describe_admin_guild_views():
+    def it_loads_changelist(admin_client):
+        GuildFactory(name="View Test Guild")
+        resp = admin_client.get("/admin/membership/guild/")
+        assert resp.status_code == 200
+
+    def it_loads_add_form(admin_client):
+        resp = admin_client.get("/admin/membership/guild/add/")
+        assert resp.status_code == 200
+
+    def it_loads_change_form(admin_client):
+        guild = GuildFactory(name="Change Test Guild")
+        resp = admin_client.get(f"/admin/membership/guild/{guild.pk}/change/")
+        assert resp.status_code == 200
+
+    def it_creates_via_post(admin_client):
+        resp = admin_client.post(
+            "/admin/membership/guild/add/",
+            {
+                "name": "POST Created Guild",
+                "notes": "",
+                # SubletInline management form
+                "sublets-TOTAL_FORMS": "0",
+                "sublets-INITIAL_FORMS": "0",
+                "sublets-MIN_NUM_FORMS": "0",
+                "sublets-MAX_NUM_FORMS": "1000",
+                # GenericTabularInline management form
+                "membership-lease-content_type-object_id-TOTAL_FORMS": "0",
+                "membership-lease-content_type-object_id-INITIAL_FORMS": "0",
+                "membership-lease-content_type-object_id-MIN_NUM_FORMS": "0",
+                "membership-lease-content_type-object_id-MAX_NUM_FORMS": "1000",
+            },
+        )
+        assert resp.status_code == 302
+        assert Guild.objects.filter(name="POST Created Guild").exists()
+
+
+# ---------------------------------------------------------------------------
+# GuildVoteAdmin
+# ---------------------------------------------------------------------------
+
+
+def describe_GuildVoteAdmin():
+    def it_has_expected_list_display():
+        vote_admin = admin.site._registry[GuildVote]
+        assert vote_admin.list_display == ["member", "guild", "priority"]
+
+    def it_has_expected_list_filter():
+        vote_admin = admin.site._registry[GuildVote]
+        assert vote_admin.list_filter == ["guild", "priority"]
+
+
+@pytest.mark.django_db
+def describe_admin_guild_vote_views():
+    def it_loads_changelist(admin_client):
+        GuildVoteFactory()
+        resp = admin_client.get("/admin/membership/guildvote/")
+        assert resp.status_code == 200
+
+    def it_loads_add_form(admin_client):
+        resp = admin_client.get("/admin/membership/guildvote/add/")
+        assert resp.status_code == 200
+
+    def it_loads_change_form(admin_client):
+        vote = GuildVoteFactory()
+        resp = admin_client.get(f"/admin/membership/guildvote/{vote.pk}/change/")
+        assert resp.status_code == 200
+
+    def it_creates_via_post(admin_client):
+        member = MemberFactory()
+        guild = GuildFactory()
+        resp = admin_client.post(
+            "/admin/membership/guildvote/add/",
+            {
+                "member": member.pk,
+                "guild": guild.pk,
+                "priority": "1",
+            },
+        )
+        assert resp.status_code == 302
+        assert GuildVote.objects.filter(member=member, guild=guild).exists()

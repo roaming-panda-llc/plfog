@@ -4,6 +4,8 @@ from datetime import date as date_type
 from decimal import Decimal
 
 from django.conf import settings
+from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models import DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce
@@ -101,8 +103,9 @@ class Member(models.Model):
     )
     full_legal_name = models.CharField(max_length=255)
     preferred_name = models.CharField(max_length=255, blank=True)
-    email = models.EmailField()
+    email = models.EmailField(blank=True, default="")
     phone = models.CharField(max_length=20, blank=True)
+    billing_name = models.CharField(max_length=255, blank=True)
 
     # Emergency contact
     emergency_contact_name = models.CharField(max_length=255, blank=True)
@@ -120,11 +123,16 @@ class Member(models.Model):
         choices=Role.choices,
         default=Role.STANDARD,
     )
-    join_date = models.DateField()
+    join_date = models.DateField(null=True, blank=True)
     cancellation_date = models.DateField(null=True, blank=True)
     committed_until = models.DateField(null=True, blank=True)
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    leases = GenericRelation(
+        "Lease",
+        content_type_field="content_type",
+        object_id_field="object_id",
+    )
 
     objects = MemberQuerySet.as_manager()
 
@@ -166,6 +174,79 @@ class Member(models.Model):
     @property
     def total_monthly_spend(self) -> Decimal:
         return self.membership_monthly_dues + self.studio_storage_total
+
+
+# ---------------------------------------------------------------------------
+# Guild
+# ---------------------------------------------------------------------------
+
+
+class Guild(models.Model):
+    # Queryset annotation (set by GuildAdmin.get_queryset)
+    sublet_count: int
+
+    name = models.CharField(max_length=255, unique=True)
+    guild_lead = models.ForeignKey(
+        Member,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="led_guilds",
+    )
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    leases = GenericRelation(
+        "Lease",
+        content_type_field="content_type",
+        object_id_field="object_id",
+    )
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Guild"
+        verbose_name_plural = "Guilds"
+
+    def __str__(self) -> str:
+        return self.name
+
+    @property
+    def active_leases(self) -> models.QuerySet[Lease]:
+        return self.leases.filter(_active_lease_q())
+
+    @property
+    def sublet_revenue(self) -> Decimal:
+        """Sum of monthly_rent from active leases on spaces sublet to this guild."""
+        total = Lease.objects.filter(
+            _active_lease_q(),
+            space__sublet_guild=self,
+        ).aggregate(
+            total=Coalesce(
+                Sum("monthly_rent", output_field=DecimalField()),
+                Value(Decimal("0.00")),
+                output_field=DecimalField(),
+            ),
+        )["total"]
+        return total
+
+
+class GuildVote(models.Model):
+    """Members vote for 3 guilds in priority order."""
+
+    member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name="guild_votes")
+    guild = models.ForeignKey(Guild, on_delete=models.CASCADE, related_name="votes")
+    priority = models.PositiveSmallIntegerField(choices=[(1, "First"), (2, "Second"), (3, "Third")])
+
+    class Meta:
+        ordering = ["member", "priority"]
+        verbose_name = "Guild Vote"
+        verbose_name_plural = "Guild Votes"
+        constraints = [
+            models.UniqueConstraint(fields=["member", "priority"], name="unique_member_priority"),
+            models.UniqueConstraint(fields=["member", "guild"], name="unique_member_guild"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.member} → {self.guild} (#{self.priority})"
 
 
 # ---------------------------------------------------------------------------
@@ -215,6 +296,10 @@ class Space(models.Model):
         choices=SpaceType.choices,
     )
     size_sqft = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    width = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    depth = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    rate_per_sqft = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    is_rentable = models.BooleanField(default=True)
     manual_price = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     status = models.CharField(
         max_length=20,
@@ -223,6 +308,13 @@ class Space(models.Model):
     )
     photo = models.ImageField(upload_to="spaces/", blank=True)
     floorplan_ref = models.CharField(max_length=100, blank=True)
+    sublet_guild = models.ForeignKey(
+        "Guild",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="sublets",
+    )
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -243,12 +335,15 @@ class Space(models.Model):
         if self.manual_price is not None:
             return self.manual_price
         if self.size_sqft is not None:
-            return self.size_sqft * DEFAULT_PRICE_PER_SQFT
+            rate = self.rate_per_sqft if self.rate_per_sqft is not None else DEFAULT_PRICE_PER_SQFT
+            return self.size_sqft * rate
         return None
 
     @property
-    def current_occupants(self) -> models.QuerySet[Member]:
-        return Member.objects.filter(pk__in=self.leases.filter(_active_lease_q()).values("member"))
+    def current_occupants(self) -> list[Member | Guild]:
+        """Return all active tenants (Members and Guilds) for this space."""
+        active = self.leases.filter(_active_lease_q()).select_related("content_type")
+        return [lease.tenant for lease in active]
 
     @property
     def vacancy_value(self) -> Decimal:
@@ -290,7 +385,9 @@ class Lease(models.Model):
         MONTH_TO_MONTH = "month_to_month", "Month-to-Month"
         ANNUAL = "annual", "Annual"
 
-    member = models.ForeignKey(Member, on_delete=models.PROTECT, related_name="leases")
+    content_type = models.ForeignKey(ContentType, on_delete=models.PROTECT)
+    object_id = models.PositiveIntegerField()
+    tenant = GenericForeignKey("content_type", "object_id")
     space = models.ForeignKey(Space, on_delete=models.PROTECT, related_name="leases")
     lease_type = models.CharField(
         max_length=20,
@@ -307,6 +404,10 @@ class Lease(models.Model):
     deposit_paid_date = models.DateField(null=True, blank=True)
     deposit_paid_amount = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
 
+    discount_reason = models.TextField(blank=True)
+    is_split = models.BooleanField(default=False)
+    prepaid_through = models.DateField(null=True, blank=True)
+
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -316,9 +417,12 @@ class Lease(models.Model):
         ordering = ["-start_date"]
         verbose_name = "Lease"
         verbose_name_plural = "Leases"
+        indexes = [
+            models.Index(fields=["content_type", "object_id"]),
+        ]
 
     def __str__(self) -> str:
-        return f"{self.member} @ {self.space} ({self.start_date})"
+        return f"{self.tenant} @ {self.space} ({self.start_date})"
 
     @property
     def is_active(self) -> bool:
