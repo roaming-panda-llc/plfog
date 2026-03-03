@@ -38,3 +38,10 @@ venv/
 
 # Fixtures with personal data - load manually, never commit
 membership/fixtures/*.json
+
+# Test-generated media
+media/guild_covers/
+media/guild_icons/
+media/guild_documents/
+media/documents/
+media/class_images/

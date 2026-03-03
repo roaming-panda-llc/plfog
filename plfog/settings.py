@@ -52,6 +52,9 @@ INSTALLED_APPS = [
     # Project apps
     "core",
     "membership",
+    # Third-party (after project apps)
+    "guardian",
+    "djstripe",
 ]
 
 MIDDLEWARE = [
@@ -119,6 +122,10 @@ STORAGES = {
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 
+# Media files (user uploads)
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Django Sites
@@ -128,6 +135,7 @@ SITE_ID = 1
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
     "allauth.account.auth_backends.AuthenticationBackend",
+    "guardian.backends.ObjectPermissionBackend",
 ]
 
 # Allauth (v65+ format)
@@ -312,6 +320,26 @@ UNFOLD = {
                     },
                 ],
             },
+            {
+                "title": "Settings",
+                "items": [
+                    {
+                        "title": "Settings",
+                        "icon": "settings",
+                        "link": reverse_lazy("admin:core_setting_changelist"),
+                    },
+                ],
+            },
         ],
     },
 }
+
+# django-guardian
+ANONYMOUS_USER_NAME = None
+
+# Stripe (dj-stripe)
+STRIPE_LIVE_SECRET_KEY = os.environ.get("STRIPE_LIVE_SECRET_KEY", "")
+STRIPE_TEST_SECRET_KEY = os.environ.get("STRIPE_TEST_SECRET_KEY", "")
+STRIPE_LIVE_MODE = os.environ.get("STRIPE_LIVE_MODE", "False").lower() == "true"
+DJSTRIPE_WEBHOOK_SECRET = os.environ.get("DJSTRIPE_WEBHOOK_SECRET", "")
+DJSTRIPE_FOREIGN_KEY_TO_FIELD = "id"
