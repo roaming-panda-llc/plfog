@@ -877,6 +877,21 @@ def describe_admin_guild_views():
                 "membership-lease-content_type-object_id-INITIAL_FORMS": "0",
                 "membership-lease-content_type-object_id-MIN_NUM_FORMS": "0",
                 "membership-lease-content_type-object_id-MAX_NUM_FORMS": "1000",
+                # GuildMembershipInline management form
+                "memberships-TOTAL_FORMS": "0",
+                "memberships-INITIAL_FORMS": "0",
+                "memberships-MIN_NUM_FORMS": "0",
+                "memberships-MAX_NUM_FORMS": "1000",
+                # GuildDocumentInline management form
+                "documents-TOTAL_FORMS": "0",
+                "documents-INITIAL_FORMS": "0",
+                "documents-MIN_NUM_FORMS": "0",
+                "documents-MAX_NUM_FORMS": "1000",
+                # GuildWishlistItemInline management form
+                "wishlist_items-TOTAL_FORMS": "0",
+                "wishlist_items-INITIAL_FORMS": "0",
+                "wishlist_items-MIN_NUM_FORMS": "0",
+                "wishlist_items-MAX_NUM_FORMS": "1000",
             },
         )
         assert resp.status_code == 302

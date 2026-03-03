@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date as date_type
 from decimal import Decimal
+from typing import Any
 
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
@@ -10,6 +11,7 @@ from django.db import models
 from django.db.models import DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
+from django.utils.text import slugify
 
 DEFAULT_PRICE_PER_SQFT = Decimal("3.75")
 
@@ -186,6 +188,12 @@ class Guild(models.Model):
     sublet_count: int
 
     name = models.CharField(max_length=255, unique=True)
+    slug = models.SlugField(max_length=255, unique=True, blank=True)
+    intro = models.CharField(max_length=500, blank=True)
+    description = models.TextField(blank=True)
+    cover_image = models.ImageField(upload_to="guilds/", blank=True)
+    icon = models.CharField(max_length=100, blank=True)
+    is_active = models.BooleanField(default=True)
     guild_lead = models.ForeignKey(
         Member,
         null=True,
@@ -208,6 +216,11 @@ class Guild(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
 
     @property
     def active_leases(self) -> models.QuerySet[Lease]:
@@ -247,6 +260,145 @@ class GuildVote(models.Model):
 
     def __str__(self) -> str:
         return f"{self.member} → {self.guild} (#{self.priority})"
+
+
+# ---------------------------------------------------------------------------
+# GuildMembership
+# ---------------------------------------------------------------------------
+
+
+class GuildMembership(models.Model):
+    """M2M through table for Guild ↔ User membership."""
+
+    guild = models.ForeignKey(Guild, on_delete=models.CASCADE, related_name="memberships")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="guild_memberships",
+    )
+    is_lead = models.BooleanField(default=False)
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ["guild", "user"]
+        ordering = ["guild", "user"]
+        verbose_name = "Guild Membership"
+        verbose_name_plural = "Guild Memberships"
+
+    def __str__(self) -> str:
+        role = "Lead" if self.is_lead else "Member"
+        return f"{self.user} - {self.guild} ({role})"
+
+
+# ---------------------------------------------------------------------------
+# GuildDocument
+# ---------------------------------------------------------------------------
+
+
+class GuildDocument(models.Model):
+    guild = models.ForeignKey(Guild, on_delete=models.CASCADE, related_name="documents")
+    name = models.CharField(max_length=255)
+    file_path = models.FileField(upload_to="guild_docs/")
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["guild", "name"]
+        verbose_name = "Guild Document"
+        verbose_name_plural = "Guild Documents"
+
+    def __str__(self) -> str:
+        return self.name
+
+
+# ---------------------------------------------------------------------------
+# GuildWishlistItem
+# ---------------------------------------------------------------------------
+
+
+class GuildWishlistItem(models.Model):
+    guild = models.ForeignKey(Guild, on_delete=models.CASCADE, related_name="wishlist_items")
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    image = models.ImageField(upload_to="wishlist/", blank=True)
+    link = models.URLField(blank=True)
+    estimated_cost = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    is_fulfilled = models.BooleanField(default=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["guild", "-created_at"]
+        verbose_name = "Guild Wishlist Item"
+        verbose_name_plural = "Guild Wishlist Items"
+
+    def __str__(self) -> str:
+        return self.name
+
+
+# ---------------------------------------------------------------------------
+# MemberSchedule
+# ---------------------------------------------------------------------------
+
+
+class MemberSchedule(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="member_schedule",
+    )
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["user"]
+        verbose_name = "Member Schedule"
+        verbose_name_plural = "Member Schedules"
+
+    def __str__(self) -> str:
+        return f"Schedule for {self.user}"
+
+
+# ---------------------------------------------------------------------------
+# ScheduleBlock
+# ---------------------------------------------------------------------------
+
+
+class ScheduleBlock(models.Model):
+    DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+
+    member_schedule = models.ForeignKey(MemberSchedule, on_delete=models.CASCADE, related_name="blocks")
+    day_of_week = models.IntegerField(
+        choices=[
+            (i, name)
+            for i, name in enumerate(["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"])
+        ]
+    )
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    is_recurring = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["member_schedule", "day_of_week", "start_time"]
+        verbose_name = "Schedule Block"
+        verbose_name_plural = "Schedule Blocks"
+
+    def __str__(self) -> str:
+        return f"{self.day_name} {self.start_time}-{self.end_time}"
+
+    @property
+    def day_name(self) -> str:
+        return self.DAY_NAMES[self.day_of_week]
 
 
 # ---------------------------------------------------------------------------
