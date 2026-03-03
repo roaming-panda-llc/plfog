@@ -50,6 +50,7 @@ def home(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def dashboard(request: HttpRequest) -> HttpResponse:
+    assert request.user.is_authenticated  # guaranteed by @login_required
     user = request.user
     now = timezone.now()
     two_weeks_ahead = now + timedelta(days=14)
