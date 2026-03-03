@@ -8,7 +8,7 @@ DJANGO_SETTINGS_MODULE = "plfog.settings"
 python_files = ["*_spec.py", "test_*.py"]
 python_classes = ["Describe*"]
 python_functions = ["it_*", "test_*", "describe_*"]
-addopts = "-v --tb=short --cov=plfog --cov=core --cov=membership --cov-report=term-missing"
+addopts = "-v --tb=short --cov=plfog --cov=core --cov=membership --cov=billing --cov-report=term-missing"
 
 [tool.ruff]
 target-version = "py313"
@@ -30,6 +30,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "membership.*"
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = "billing.*"
 disallow_untyped_defs = true
 
 [tool.django-stubs]

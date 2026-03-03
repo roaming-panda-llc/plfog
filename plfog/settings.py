@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     # Project apps
     "core",
     "membership",
+    "billing",
     # Third-party (after project apps)
     "guardian",
     "djstripe",
@@ -317,6 +318,41 @@ UNFOLD = {
                         "title": "Leases",
                         "icon": "description",
                         "link": reverse_lazy("admin:membership_lease_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Billing",
+                "items": [
+                    {
+                        "title": "Orders",
+                        "icon": "receipt_long",
+                        "link": reverse_lazy("admin:billing_order_changelist"),
+                    },
+                    {
+                        "title": "Invoices",
+                        "icon": "request_quote",
+                        "link": reverse_lazy("admin:billing_invoice_changelist"),
+                    },
+                    {
+                        "title": "Revenue Splits",
+                        "icon": "pie_chart",
+                        "link": reverse_lazy("admin:billing_revenuesplit_changelist"),
+                    },
+                    {
+                        "title": "Subscription Plans",
+                        "icon": "loyalty",
+                        "link": reverse_lazy("admin:billing_subscriptionplan_changelist"),
+                    },
+                    {
+                        "title": "Subscriptions",
+                        "icon": "autorenew",
+                        "link": reverse_lazy("admin:billing_membersubscription_changelist"),
+                    },
+                    {
+                        "title": "Payouts",
+                        "icon": "payments",
+                        "link": reverse_lazy("admin:billing_payout_changelist"),
                     },
                 ],
             },
