@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "core",
     "membership",
     "billing",
+    "tools",
     # Third-party (after project apps)
     "guardian",
     "djstripe",
@@ -333,6 +334,31 @@ UNFOLD = {
                         "title": "Leases",
                         "icon": "description",
                         "link": reverse_lazy("admin:membership_lease_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Tools & Equipment",
+                "items": [
+                    {
+                        "title": "Tools",
+                        "icon": "build",
+                        "link": reverse_lazy("admin:tools_tool_changelist"),
+                    },
+                    {
+                        "title": "Reservations",
+                        "icon": "event_available",
+                        "link": reverse_lazy("admin:tools_toolreservation_changelist"),
+                    },
+                    {
+                        "title": "Rentables",
+                        "icon": "shopping_cart",
+                        "link": reverse_lazy("admin:tools_rentable_changelist"),
+                    },
+                    {
+                        "title": "Rentals",
+                        "icon": "receipt",
+                        "link": reverse_lazy("admin:tools_rental_changelist"),
                     },
                 ],
             },
