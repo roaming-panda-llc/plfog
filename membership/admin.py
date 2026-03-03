@@ -5,7 +5,19 @@ from django.db.models import Count, QuerySet
 from django.http import HttpRequest
 from unfold.admin import GenericTabularInline, ModelAdmin, TabularInline
 
-from .models import Guild, GuildVote, Lease, Member, MembershipPlan, Space
+from .models import (
+    Guild,
+    GuildDocument,
+    GuildMembership,
+    GuildVote,
+    GuildWishlistItem,
+    Lease,
+    Member,
+    MemberSchedule,
+    MembershipPlan,
+    ScheduleBlock,
+    Space,
+)
 
 # ---------------------------------------------------------------------------
 # Inlines
@@ -105,6 +117,41 @@ class SubletInline(TabularInline):
         if price is None:
             return "-"
         return f"${price:.2f}"
+
+
+class GuildMembershipInline(TabularInline):
+    """Inline for managing guild memberships directly on GuildAdmin."""
+
+    model = GuildMembership
+    fields = ["user", "is_lead", "joined_at"]
+    readonly_fields = ["joined_at"]
+    extra = 0
+
+
+class GuildDocumentInline(TabularInline):
+    """Inline for managing guild documents directly on GuildAdmin."""
+
+    model = GuildDocument
+    fields = ["name", "file_path", "uploaded_by", "created_at"]
+    readonly_fields = ["created_at"]
+    extra = 0
+
+
+class GuildWishlistItemInline(TabularInline):
+    """Inline for managing guild wishlist items directly on GuildAdmin."""
+
+    model = GuildWishlistItem
+    fields = ["name", "estimated_cost", "is_fulfilled", "created_by", "created_at"]
+    readonly_fields = ["created_at"]
+    extra = 0
+
+
+class ScheduleBlockInline(TabularInline):
+    """Inline for managing schedule blocks on MemberScheduleAdmin."""
+
+    model = ScheduleBlock
+    fields = ["day_of_week", "start_time", "end_time", "is_recurring"]
+    extra = 0
 
 
 # ---------------------------------------------------------------------------
@@ -213,7 +260,7 @@ class MemberAdmin(ModelAdmin):
 class GuildAdmin(ModelAdmin):
     list_display = ["name", "guild_lead", "sublet_count", "notes_preview"]
     search_fields = ["name"]
-    inlines = [SubletInline, LeaseInlineGuild]
+    inlines = [SubletInline, LeaseInlineGuild, GuildMembershipInline, GuildDocumentInline, GuildWishlistItemInline]
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Guild]:
         qs = super().get_queryset(request)
@@ -313,3 +360,62 @@ class LeaseAdmin(ModelAdmin):
     @admin.display(boolean=True, description="Active")
     def is_active_display(self, obj: Lease) -> bool:
         return obj.is_active
+
+
+# ---------------------------------------------------------------------------
+# GuildMembershipAdmin
+# ---------------------------------------------------------------------------
+
+
+@admin.register(GuildMembership)
+class GuildMembershipAdmin(ModelAdmin):
+    list_display = ["guild", "user", "is_lead", "joined_at"]
+    list_filter = ["is_lead", "guild"]
+    search_fields = ["guild__name", "user__username"]
+
+
+# ---------------------------------------------------------------------------
+# GuildDocumentAdmin
+# ---------------------------------------------------------------------------
+
+
+@admin.register(GuildDocument)
+class GuildDocumentAdmin(ModelAdmin):
+    list_display = ["name", "guild", "uploaded_by", "created_at"]
+    list_filter = ["guild"]
+    search_fields = ["name", "guild__name"]
+
+
+# ---------------------------------------------------------------------------
+# GuildWishlistItemAdmin
+# ---------------------------------------------------------------------------
+
+
+@admin.register(GuildWishlistItem)
+class GuildWishlistItemAdmin(ModelAdmin):
+    list_display = ["name", "guild", "estimated_cost", "is_fulfilled", "created_at"]
+    list_filter = ["is_fulfilled", "guild"]
+    search_fields = ["name", "guild__name"]
+
+
+# ---------------------------------------------------------------------------
+# MemberScheduleAdmin
+# ---------------------------------------------------------------------------
+
+
+@admin.register(MemberSchedule)
+class MemberScheduleAdmin(ModelAdmin):
+    list_display = ["user", "created_at"]
+    search_fields = ["user__username"]
+    inlines = [ScheduleBlockInline]
+
+
+# ---------------------------------------------------------------------------
+# ScheduleBlockAdmin
+# ---------------------------------------------------------------------------
+
+
+@admin.register(ScheduleBlock)
+class ScheduleBlockAdmin(ModelAdmin):
+    list_display = ["member_schedule", "day_of_week", "start_time", "end_time", "is_recurring"]
+    list_filter = ["day_of_week", "is_recurring"]

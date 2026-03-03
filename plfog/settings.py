@@ -278,7 +278,7 @@ UNFOLD = {
                 ],
             },
             {
-                "title": "Makerspace",
+                "title": "Members",
                 "items": [
                     {
                         "title": "Members",
@@ -291,6 +291,16 @@ UNFOLD = {
                         "link": reverse_lazy("admin:membership_membershipplan_changelist"),
                     },
                     {
+                        "title": "Schedules",
+                        "icon": "calendar_month",
+                        "link": reverse_lazy("admin:membership_memberschedule_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Guilds",
+                "items": [
+                    {
                         "title": "Guilds",
                         "icon": "groups",
                         "link": reverse_lazy("admin:membership_guild_changelist"),
@@ -300,6 +310,11 @@ UNFOLD = {
                         "icon": "how_to_vote",
                         "link": reverse_lazy("admin:membership_guildvote_changelist"),
                     },
+                ],
+            },
+            {
+                "title": "Spaces & Leases",
+                "items": [
                     {
                         "title": "Spaces",
                         "icon": "meeting_room",

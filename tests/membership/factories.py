@@ -7,7 +7,20 @@ import factory
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 
-from membership.models import Guild, GuildVote, Lease, Member, MembershipPlan, Space
+from membership.models import (
+    Guild,
+    GuildDocument,
+    GuildMembership,
+    GuildVote,
+    GuildWishlistItem,
+    Lease,
+    Member,
+    MemberSchedule,
+    MembershipPlan,
+    ScheduleBlock,
+    Space,
+)
+from tests.core.factories import UserFactory
 
 
 class MembershipPlanFactory(factory.django.DjangoModelFactory):
@@ -68,3 +81,50 @@ class LeaseFactory(factory.django.DjangoModelFactory):
     base_price = Decimal("200.00")
     monthly_rent = Decimal("200.00")
     start_date = factory.LazyFunction(lambda: timezone.now().date() - timedelta(days=30))
+
+
+class GuildMembershipFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = GuildMembership
+
+    guild = factory.SubFactory(GuildFactory)
+    user = factory.SubFactory(UserFactory)
+    is_lead = False
+
+
+class GuildDocumentFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = GuildDocument
+
+    guild = factory.SubFactory(GuildFactory)
+    name = factory.Sequence(lambda n: f"Document {n}")
+    file_path = factory.django.FileField(filename="doc.pdf")
+    uploaded_by = factory.SubFactory(UserFactory)
+
+
+class GuildWishlistItemFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = GuildWishlistItem
+
+    guild = factory.SubFactory(GuildFactory)
+    name = factory.Sequence(lambda n: f"Wishlist Item {n}")
+    is_fulfilled = False
+
+
+class MemberScheduleFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = MemberSchedule
+
+    user = factory.SubFactory(UserFactory)
+    notes = ""
+
+
+class ScheduleBlockFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = ScheduleBlock
+
+    member_schedule = factory.SubFactory(MemberScheduleFactory)
+    day_of_week = 1
+    start_time = "09:00"
+    end_time = "17:00"
+    is_recurring = True
