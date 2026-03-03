@@ -16,7 +16,9 @@
     <header class="site-header">
         <nav class="site-nav" aria-label="Main navigation">
             <a href="{% url 'home' %}" class="site-nav__brand">Past Lives</a>
+            <a href="{% url 'guild_list' %}" class="site-nav__link">Guilds</a>
             {% if user.is_authenticated %}
+                <a href="{% url 'dashboard' %}" class="site-nav__link">Dashboard</a>
                 <span class="site-nav__user">{{ user.email }}</span>
                 <a href="{% url 'account_logout' %}" class="site-nav__link">Log out</a>
             {% endif %}

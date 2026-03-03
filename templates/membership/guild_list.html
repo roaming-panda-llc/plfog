@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Guilds — Past Lives Makerspace{% endblock %}
+{% block content %}
+<section class="guild-list">
+    <h1>Our Guilds</h1>
+    <div class="guild-grid">
+        {% for guild in guilds %}
+        <div class="guild-card">
+            <h2>{{ guild.name }}</h2>
+            <p>{{ guild.intro }}</p>
+            <a href="{% url 'guild_detail' guild.slug %}">View Guild</a>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}
