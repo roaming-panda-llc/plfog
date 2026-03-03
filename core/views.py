@@ -5,10 +5,11 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.contenttypes.models import ContentType
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from education.models import ClassSession, ScheduledOrientation
-from membership.models import FavoriteEvent, Guild
+from membership.models import FavoriteEvent, Guild, GuildVote
 from outreach.models import Event
 
 GUILD_COLOR_PALETTE = [
@@ -49,7 +50,66 @@ def home(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def dashboard(request: HttpRequest) -> HttpResponse:
-    return render(request, "membership/dashboard.html")
+    user = request.user
+    now = timezone.now()
+    two_weeks_ahead = now + timedelta(days=14)
+
+    my_votes = GuildVote.objects.filter(member__user=user).select_related("guild").order_by("priority")
+
+    my_favorites = FavoriteEvent.objects.filter(user=user).order_by("-created_at")[:10]
+
+    upcoming_events = (
+        Event.objects.filter(starts_at__gte=now, starts_at__lte=two_weeks_ahead, is_published=True)
+        .select_related("guild")
+        .order_by("starts_at")[:5]
+    )
+
+    upcoming_classes = (
+        ClassSession.objects.filter(
+            starts_at__gte=now,
+            starts_at__lte=two_weeks_ahead,
+            maker_class__status="published",
+        )
+        .select_related("maker_class__guild")
+        .order_by("starts_at")[:5]
+    )
+
+    upcoming_orientations = (
+        ScheduledOrientation.objects.filter(
+            scheduled_at__gte=now,
+            scheduled_at__lte=two_weeks_ahead,
+        )
+        .exclude(status="cancelled")
+        .select_related("orientation__guild")
+        .order_by("scheduled_at")[:5]
+    )
+
+    notifications: list[dict] = []
+    for event in Event.objects.filter(
+        starts_at__gte=now, starts_at__lte=two_weeks_ahead, is_published=True
+    ).select_related("guild")[:10]:
+        notifications.append(
+            {
+                "message": f"Upcoming: {event.name}",
+                "timestamp": event.starts_at,
+                "guild_name": event.guild.name if event.guild else "Past Lives",
+                "type": "event",
+            }
+        )
+    notifications.sort(key=lambda x: x["timestamp"])
+
+    return render(
+        request,
+        "membership/dashboard.html",
+        {
+            "my_votes": my_votes,
+            "my_favorites": my_favorites,
+            "upcoming_events": upcoming_events,
+            "upcoming_classes": upcoming_classes,
+            "upcoming_orientations": upcoming_orientations,
+            "notifications": notifications,
+        },
+    )
 
 
 def calendar_events(request: HttpRequest) -> JsonResponse:

@@ -1,8 +1,106 @@
 {% extends "base.html" %}
+{% load static %}
+
 {% block title %}Dashboard — Past Lives Makerspace{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/guilds.css' %}">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css">
+{% endblock %}
+
 {% block content %}
-<section class="dashboard">
-    <h1>Dashboard</h1>
-    <p>Welcome back, {{ user.first_name }}.</p>
-</section>
+<div class="dashboard">
+
+    <aside class="dashboard__sidebar">
+
+        <div class="sidebar-section">
+            <h3 class="sidebar-section__title">My Guilds</h3>
+            {% for vote in my_votes %}
+            <a href="{% url 'guild_detail' vote.guild.slug %}" class="sidebar-guild">
+                <span class="material-icons sidebar-guild__icon">{{ vote.guild.icon|default:"groups" }}</span>
+                <span class="sidebar-guild__name">{{ vote.guild.name }}</span>
+            </a>
+            {% empty %}
+            <p class="sidebar-empty">No guild votes yet.</p>
+            {% endfor %}
+        </div>
+
+        <div class="sidebar-section">
+            <h3 class="sidebar-section__title">Upcoming</h3>
+            {% for event in upcoming_events %}
+            <div class="sidebar-upcoming">
+                <span class="material-icons sidebar-upcoming__icon">event</span>
+                <div class="sidebar-upcoming__info">
+                    <span class="sidebar-upcoming__name">{{ event.name }}</span>
+                    <time class="sidebar-upcoming__time">{{ event.starts_at|date:"M j, g:i A" }}</time>
+                </div>
+            </div>
+            {% endfor %}
+            {% for session in upcoming_classes %}
+            <div class="sidebar-upcoming">
+                <span class="material-icons sidebar-upcoming__icon">school</span>
+                <div class="sidebar-upcoming__info">
+                    <span class="sidebar-upcoming__name">{{ session.maker_class.name }}</span>
+                    <time class="sidebar-upcoming__time">{{ session.starts_at|date:"M j, g:i A" }}</time>
+                </div>
+            </div>
+            {% endfor %}
+            {% for so in upcoming_orientations %}
+            <div class="sidebar-upcoming">
+                <span class="material-icons sidebar-upcoming__icon">how_to_reg</span>
+                <div class="sidebar-upcoming__info">
+                    <span class="sidebar-upcoming__name">{{ so.orientation.name }}</span>
+                    <time class="sidebar-upcoming__time">{{ so.scheduled_at|date:"M j, g:i A" }}</time>
+                </div>
+            </div>
+            {% endfor %}
+            {% if not upcoming_events and not upcoming_classes and not upcoming_orientations %}
+            <p class="sidebar-empty">Nothing scheduled in the next two weeks.</p>
+            {% endif %}
+        </div>
+
+        <div class="sidebar-section">
+            <h3 class="sidebar-section__title">My Favorites</h3>
+            {% for fav in my_favorites %}
+            <div class="sidebar-favorite">
+                <span class="material-icons sidebar-favorite__icon">star</span>
+                <span class="sidebar-favorite__label">{{ fav.content_object }}</span>
+            </div>
+            {% empty %}
+            <p class="sidebar-empty">No favorites yet.</p>
+            {% endfor %}
+        </div>
+
+    </aside>
+
+    <main class="dashboard__main">
+        <h1 class="dashboard__heading">Dashboard</h1>
+        <p class="dashboard__welcome">Welcome back, {{ user.first_name|default:user.email }}.</p>
+
+        <div class="dashboard-calendar-wrap guild-section">
+            <h2 class="guild-section__heading">Calendar</h2>
+            <div id="dashboard-calendar" class="dashboard-calendar guild-calendar"></div>
+        </div>
+
+        <div class="notification-feed guild-section">
+            <h2 class="guild-section__heading">Activity Feed</h2>
+            {% for notif in notifications %}
+            <div class="notification-item notification-item--{{ notif.type }}">
+                <span class="notification-item__guild">{{ notif.guild_name }}</span>
+                <span class="notification-item__message">{{ notif.message }}</span>
+                <time class="notification-item__time">{{ notif.timestamp|timesince }} ago</time>
+            </div>
+            {% empty %}
+            <p class="notification-empty">No upcoming activity in the next two weeks.</p>
+            {% endfor %}
+        </div>
+    </main>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script src="{% static 'js/calendar.js' %}"></script>
 {% endblock %}

@@ -642,3 +642,269 @@
         max-width: 100%;
     }
 }
+
+/* ========================================
+   Dashboard Layout
+   ======================================== */
+.dashboard {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 24px;
+    align-items: start;
+}
+
+.dashboard__sidebar {
+    position: sticky;
+    top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.dashboard__main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    min-width: 0;
+}
+
+.dashboard__heading {
+    font-family: var(--font-heading);
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--color-text);
+    margin-bottom: 0;
+    letter-spacing: -0.02em;
+}
+
+.dashboard__welcome {
+    font-size: 1rem;
+    font-weight: 300;
+    color: var(--color-text-muted);
+    margin-bottom: 0;
+}
+
+/* ========================================
+   Dashboard Sidebar Sections
+   ======================================== */
+.sidebar-section {
+    background-color: var(--color-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.sidebar-section__title {
+    font-family: var(--font-heading);
+    font-size: 0.875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    margin-bottom: var(--spacing-xs);
+    padding-bottom: var(--spacing-xs);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.sidebar-empty {
+    font-size: 0.875rem;
+    font-style: italic;
+    color: var(--color-text-muted);
+    margin-bottom: 0;
+}
+
+/* ========================================
+   Sidebar — Guilds
+   ======================================== */
+.sidebar-guild {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+    font-size: 0.9rem;
+    font-weight: 400;
+    transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.sidebar-guild:hover {
+    background-color: var(--color-bg);
+    color: var(--color-accent);
+}
+
+.sidebar-guild__icon {
+    font-size: 1.25rem;
+    color: var(--color-accent);
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.sidebar-guild__name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ========================================
+   Sidebar — Upcoming
+   ======================================== */
+.sidebar-upcoming {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) 0;
+}
+
+.sidebar-upcoming__icon {
+    font-size: 1rem;
+    color: var(--color-accent);
+    flex-shrink: 0;
+    margin-top: 2px;
+    line-height: 1;
+}
+
+.sidebar-upcoming__info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.sidebar-upcoming__name {
+    font-size: 0.875rem;
+    font-weight: 400;
+    color: var(--color-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sidebar-upcoming__time {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    font-weight: 300;
+}
+
+/* ========================================
+   Sidebar — Favorites
+   ======================================== */
+.sidebar-favorite {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) 0;
+}
+
+.sidebar-favorite__icon {
+    font-size: 1rem;
+    color: var(--color-accent);
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.sidebar-favorite__label {
+    font-size: 0.875rem;
+    color: var(--color-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ========================================
+   Dashboard Calendar
+   ======================================== */
+.dashboard-calendar-wrap {
+    margin-bottom: 0;
+}
+
+.dashboard-calendar {
+    background-color: var(--color-bg);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+/* Reuse .guild-calendar FullCalendar theme overrides already defined above */
+.dashboard-calendar.guild-calendar .fc {
+    --fc-border-color: var(--border-subtle);
+}
+
+/* ========================================
+   Notification Feed
+   ======================================== */
+.notification-feed {
+    margin-bottom: 0;
+}
+
+.notification-empty {
+    font-size: 0.9rem;
+    font-style: italic;
+    color: var(--color-text-muted);
+    margin-bottom: 0;
+}
+
+.notification-item {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) 0;
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: 0.9rem;
+}
+
+.notification-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.notification-item__guild {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--radius-sm);
+    background-color: rgba(238, 180, 75, 0.12);
+    color: var(--color-accent);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+
+.notification-item__message {
+    flex: 1;
+    color: var(--color-text);
+    font-weight: 300;
+    min-width: 0;
+}
+
+.notification-item__time {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* ========================================
+   Dashboard Responsive
+   ======================================== */
+@media (max-width: 1024px) {
+    .dashboard {
+        grid-template-columns: 240px 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard__sidebar {
+        position: static;
+    }
+}
