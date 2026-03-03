@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "membership",
     "billing",
     "tools",
+    "education",
     "outreach",
     # Third-party (after project apps)
     "guardian",
@@ -360,6 +361,31 @@ UNFOLD = {
                         "title": "Rentals",
                         "icon": "receipt",
                         "link": reverse_lazy("admin:tools_rental_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Education",
+                "items": [
+                    {
+                        "title": "Classes",
+                        "icon": "school",
+                        "link": reverse_lazy("admin:education_makerclass_changelist"),
+                    },
+                    {
+                        "title": "Students",
+                        "icon": "person",
+                        "link": reverse_lazy("admin:education_student_changelist"),
+                    },
+                    {
+                        "title": "Discount Codes",
+                        "icon": "sell",
+                        "link": reverse_lazy("admin:education_classdiscountcode_changelist"),
+                    },
+                    {
+                        "title": "Orientations",
+                        "icon": "explore",
+                        "link": reverse_lazy("admin:education_orientation_changelist"),
                     },
                 ],
             },
