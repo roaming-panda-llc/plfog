@@ -9,6 +9,7 @@
     {% load static %}
     <link rel="icon" type="image/png" href="{% static 'img/favicon.png' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -35,5 +36,7 @@
         <p class="site-footer__tagline">Do It Together</p>
         <p class="site-footer__copy">&copy; 2026 Past Lives Makerspace</p>
     </footer>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    {% block extra_js %}{% endblock %}
 </body>
 </html>
