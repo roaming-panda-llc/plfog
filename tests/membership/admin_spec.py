@@ -715,6 +715,8 @@ def describe_GuildAdmin():
         guild_admin = admin.site._registry[Guild]
         assert guild_admin.list_display == [
             "name",
+            "slug",
+            "is_active",
             "guild_lead",
             "sublet_count",
             "notes_preview",
@@ -866,6 +868,12 @@ def describe_admin_guild_views():
             "/admin/membership/guild/add/",
             {
                 "name": "POST Created Guild",
+                "slug": "post-created-guild",
+                "intro": "",
+                "description": "",
+                "icon": "",
+                "is_active": "on",
+                "links": "[]",
                 "notes": "",
                 # SubletInline management form
                 "sublets-TOTAL_FORMS": "0",
@@ -877,6 +885,21 @@ def describe_admin_guild_views():
                 "membership-lease-content_type-object_id-INITIAL_FORMS": "0",
                 "membership-lease-content_type-object_id-MIN_NUM_FORMS": "0",
                 "membership-lease-content_type-object_id-MAX_NUM_FORMS": "1000",
+                # GuildMembershipInline
+                "memberships-TOTAL_FORMS": "0",
+                "memberships-INITIAL_FORMS": "0",
+                "memberships-MIN_NUM_FORMS": "0",
+                "memberships-MAX_NUM_FORMS": "1000",
+                # GuildWishlistItemInline
+                "wishlist_items-TOTAL_FORMS": "0",
+                "wishlist_items-INITIAL_FORMS": "0",
+                "wishlist_items-MIN_NUM_FORMS": "0",
+                "wishlist_items-MAX_NUM_FORMS": "1000",
+                # BuyableInline
+                "buyables-TOTAL_FORMS": "0",
+                "buyables-INITIAL_FORMS": "0",
+                "buyables-MIN_NUM_FORMS": "0",
+                "buyables-MAX_NUM_FORMS": "1000",
             },
         )
         assert resp.status_code == 302

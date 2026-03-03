@@ -5,7 +5,18 @@ from django.db.models import Count, QuerySet
 from django.http import HttpRequest
 from unfold.admin import GenericTabularInline, ModelAdmin, TabularInline
 
-from .models import Guild, GuildVote, Lease, Member, MembershipPlan, Space
+from .models import (
+    Buyable,
+    Guild,
+    GuildMembership,
+    GuildVote,
+    GuildWishlistItem,
+    Lease,
+    Member,
+    MembershipPlan,
+    Order,
+    Space,
+)
 
 # ---------------------------------------------------------------------------
 # Inlines
@@ -105,6 +116,27 @@ class SubletInline(TabularInline):
         if price is None:
             return "-"
         return f"${price:.2f}"
+
+
+class GuildMembershipInline(TabularInline):
+    model = GuildMembership
+    fields = ["user", "is_lead", "joined_at"]
+    readonly_fields = ["joined_at"]
+    extra = 0
+
+
+class GuildWishlistItemInline(TabularInline):
+    model = GuildWishlistItem
+    fields = ["name", "estimated_cost", "is_fulfilled", "created_by", "created_at"]
+    readonly_fields = ["created_at"]
+    extra = 0
+
+
+class BuyableInline(TabularInline):
+    model = Buyable
+    fields = ["name", "slug", "unit_price", "is_active", "created_at"]
+    readonly_fields = ["slug", "created_at"]
+    extra = 0
 
 
 # ---------------------------------------------------------------------------
@@ -211,9 +243,11 @@ class MemberAdmin(ModelAdmin):
 
 @admin.register(Guild)
 class GuildAdmin(ModelAdmin):
-    list_display = ["name", "guild_lead", "sublet_count", "notes_preview"]
+    list_display = ["name", "slug", "is_active", "guild_lead", "sublet_count", "notes_preview"]
+    list_filter = ["is_active"]
     search_fields = ["name"]
-    inlines = [SubletInline, LeaseInlineGuild]
+    prepopulated_fields = {"slug": ("name",)}
+    inlines = [SubletInline, LeaseInlineGuild, GuildMembershipInline, GuildWishlistItemInline, BuyableInline]
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Guild]:
         qs = super().get_queryset(request)
@@ -313,3 +347,53 @@ class LeaseAdmin(ModelAdmin):
     @admin.display(boolean=True, description="Active")
     def is_active_display(self, obj: Lease) -> bool:
         return obj.is_active
+
+
+# ---------------------------------------------------------------------------
+# GuildMembershipAdmin
+# ---------------------------------------------------------------------------
+
+
+@admin.register(GuildMembership)
+class GuildMembershipAdmin(ModelAdmin):
+    list_display = ["guild", "user", "is_lead", "joined_at"]
+    list_filter = ["is_lead", "guild"]
+    search_fields = ["guild__name", "user__username"]
+
+
+# ---------------------------------------------------------------------------
+# GuildWishlistItemAdmin
+# ---------------------------------------------------------------------------
+
+
+@admin.register(GuildWishlistItem)
+class GuildWishlistItemAdmin(ModelAdmin):
+    list_display = ["name", "guild", "estimated_cost", "is_fulfilled", "created_at"]
+    list_filter = ["is_fulfilled", "guild"]
+    search_fields = ["name", "guild__name"]
+
+
+# ---------------------------------------------------------------------------
+# BuyableAdmin
+# ---------------------------------------------------------------------------
+
+
+@admin.register(Buyable)
+class BuyableAdmin(ModelAdmin):
+    list_display = ["name", "guild", "unit_price", "is_active", "created_at"]
+    list_filter = ["is_active", "guild"]
+    search_fields = ["name", "guild__name"]
+    prepopulated_fields = {"slug": ("name",)}
+
+
+# ---------------------------------------------------------------------------
+# OrderAdmin
+# ---------------------------------------------------------------------------
+
+
+@admin.register(Order)
+class OrderAdmin(ModelAdmin):
+    list_display = ["__str__", "buyable", "user", "email", "quantity", "amount", "status", "is_fulfilled", "created_at"]
+    list_filter = ["status", "is_fulfilled"]
+    search_fields = ["buyable__name", "user__username", "email"]
+    readonly_fields = ["stripe_checkout_session_id", "created_at", "paid_at"]

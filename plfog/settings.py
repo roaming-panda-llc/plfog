@@ -119,6 +119,10 @@ STORAGES = {
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 
+# Media files (user uploads)
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Django Sites
@@ -278,7 +282,7 @@ UNFOLD = {
                 ],
             },
             {
-                "title": "Makerspace",
+                "title": "Members",
                 "items": [
                     {
                         "title": "Members",
@@ -290,6 +294,11 @@ UNFOLD = {
                         "icon": "card_membership",
                         "link": reverse_lazy("admin:membership_membershipplan_changelist"),
                     },
+                ],
+            },
+            {
+                "title": "Guilds",
+                "items": [
                     {
                         "title": "Guilds",
                         "icon": "groups",
@@ -300,6 +309,21 @@ UNFOLD = {
                         "icon": "how_to_vote",
                         "link": reverse_lazy("admin:membership_guildvote_changelist"),
                     },
+                    {
+                        "title": "Buyables",
+                        "icon": "storefront",
+                        "link": reverse_lazy("admin:membership_buyable_changelist"),
+                    },
+                    {
+                        "title": "Orders",
+                        "icon": "receipt_long",
+                        "link": reverse_lazy("admin:membership_order_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Spaces & Leases",
+                "items": [
                     {
                         "title": "Spaces",
                         "icon": "meeting_room",
@@ -315,3 +339,7 @@ UNFOLD = {
         ],
     },
 }
+
+# Stripe
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
