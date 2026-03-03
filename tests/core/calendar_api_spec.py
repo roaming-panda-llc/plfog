@@ -126,3 +126,19 @@ def describe_calendar_events_api():
         assert response.status_code == 200
         data = json.loads(response.content)
         assert data == []
+
+    def it_handles_naive_date_params(client, guild, now):
+        Event.objects.create(
+            name="Naive Date Event",
+            description="x",
+            starts_at=now,
+            ends_at=now + timezone.timedelta(hours=1),
+            location="Studio",
+            guild=guild,
+            created_by=User.objects.create_user(username="naive_user", password="test"),
+        )
+        response = client.get(
+            reverse("calendar_events"),
+            {"start": "2020-01-01", "end": "2030-12-31"},
+        )
+        assert response.status_code == 200

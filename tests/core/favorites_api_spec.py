@@ -58,3 +58,21 @@ def describe_favorites_toggle():
         data = json.loads(response.content)
         assert data["favorited"] is False
         assert FavoriteEvent.objects.filter(user=user).count() == 0
+
+    def it_returns_400_for_invalid_json(client, user):
+        client.login(username="favuser", password="test")
+        response = client.post(
+            reverse("favorites_toggle"),
+            "not json",
+            content_type="application/json",
+        )
+        assert response.status_code == 400
+
+    def it_returns_400_for_missing_fields(client, user):
+        client.login(username="favuser", password="test")
+        response = client.post(
+            reverse("favorites_toggle"),
+            json.dumps({"object_id": 1}),
+            content_type="application/json",
+        )
+        assert response.status_code == 400

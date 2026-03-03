@@ -59,11 +59,12 @@ def dashboard(request: HttpRequest) -> HttpResponse:
 
     my_favorites = FavoriteEvent.objects.filter(user=user).order_by("-created_at")[:10]
 
-    upcoming_events = (
+    all_upcoming_events = list(
         Event.objects.filter(starts_at__gte=now, starts_at__lte=two_weeks_ahead, is_published=True)
         .select_related("guild")
-        .order_by("starts_at")[:5]
+        .order_by("starts_at")[:10]
     )
+    upcoming_events = all_upcoming_events[:5]
 
     upcoming_classes = (
         ClassSession.objects.filter(
@@ -86,9 +87,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     )
 
     notifications: list[dict] = []
-    for event in Event.objects.filter(
-        starts_at__gte=now, starts_at__lte=two_weeks_ahead, is_published=True
-    ).select_related("guild")[:10]:
+    for event in all_upcoming_events:
         notifications.append(
             {
                 "message": f"Upcoming: {event.name}",
@@ -124,6 +123,10 @@ def calendar_events(request: HttpRequest) -> JsonResponse:
 
     start_dt = datetime.fromisoformat(start)
     end_dt = datetime.fromisoformat(end)
+    if timezone.is_naive(start_dt):
+        start_dt = timezone.make_aware(start_dt)
+    if timezone.is_naive(end_dt):
+        end_dt = timezone.make_aware(end_dt)
 
     guild_colors = _build_guild_colors()
     events_out: list[dict] = []
@@ -204,9 +207,12 @@ def favorites_toggle(request: HttpRequest) -> JsonResponse:
     Creates the FavoriteEvent if it does not exist; deletes it if it does.
     Returns ``{"favorited": true/false}``.
     """
-    data = json_module.loads(request.body)
-    ct = ContentType.objects.get(pk=data["content_type_id"])
-    obj_id = data["object_id"]
+    try:
+        data = json_module.loads(request.body)
+        ct = ContentType.objects.get(pk=data["content_type_id"])
+        obj_id = data["object_id"]
+    except (json_module.JSONDecodeError, KeyError, ContentType.DoesNotExist):
+        return JsonResponse({"error": "Invalid request"}, status=400)
 
     fav, created = FavoriteEvent.objects.get_or_create(
         user=request.user,
