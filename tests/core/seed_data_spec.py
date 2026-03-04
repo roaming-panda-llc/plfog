@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.core.management import call_command
+from django.core.management import call_command, get_commands, load_command_class
 
 from membership.models import (
+    Buyable,
     Guild,
-    GuildVote,
+    GuildMembership,
+    GuildWishlistItem,
     Lease,
     Member,
     MembershipPlan,
+    Order,
     Space,
 )
 
@@ -44,6 +47,10 @@ def describe_seed_data_counts():
         _seed()
         assert MembershipPlan.objects.count() == 3
 
+    def it_creates_13_buyables() -> None:
+        _seed()
+        assert Buyable.objects.count() == 13
+
     def it_creates_4_spaces() -> None:
         _seed()
         assert Space.objects.count() == 4
@@ -52,9 +59,13 @@ def describe_seed_data_counts():
         _seed()
         assert Lease.objects.count() == 3
 
-    def it_creates_guild_votes() -> None:
+    def it_creates_3_wishlist_items() -> None:
         _seed()
-        assert GuildVote.objects.count() > 0
+        assert GuildWishlistItem.objects.count() == 3
+
+    def it_creates_3_orders() -> None:
+        _seed()
+        assert Order.objects.count() == 3
 
 
 @pytest.mark.django_db
@@ -71,6 +82,26 @@ def describe_seed_data_roles():
         _seed()
         for guild in Guild.objects.all():
             assert guild.guild_lead is not None, f"{guild.name} has no guild lead"
+            assert GuildMembership.objects.filter(guild=guild, is_lead=True).exists()
+
+    def it_assigns_2_co_leads_to_prison_outreach() -> None:
+        _seed()
+        prison = Guild.objects.get(name="Prison Outreach")
+        co_leads = GuildMembership.objects.filter(guild=prison, is_lead=True)
+        assert co_leads.count() == 2
+
+    def it_creates_guild_memberships_for_regular_members() -> None:
+        _seed()
+        regular = Member.objects.filter(role=Member.Role.STANDARD)
+        assert regular.count() == 8
+        for member in regular:
+            assert GuildMembership.objects.filter(user=member.user).exists()
+
+    def it_applies_guild_links() -> None:
+        _seed()
+        woodworking = Guild.objects.get(name="Woodworking")
+        assert len(woodworking.links) == 2
+        assert woodworking.links[0]["name"] == "Instagram"
 
 
 @pytest.mark.django_db
@@ -114,3 +145,14 @@ def describe_seed_data_idempotency():
         admin_pk = admin.pk
         _seed(flush=True)
         assert User.objects.filter(email=ADMIN_EMAIL, pk=admin_pk).exists()
+
+
+@pytest.mark.django_db
+def describe_seed_data_edge_cases():
+    def it_handles_create_orders_with_no_buyables() -> None:
+        """_create_orders returns early when no buyables exist."""
+        app_name = get_commands()["seed_data"]
+        cmd = load_command_class(app_name, "seed_data")
+        # No buyables in DB, should not raise
+        cmd._create_orders([], [])
+        assert Order.objects.count() == 0

@@ -16,11 +16,14 @@ from django.core.management.base import BaseCommand
 from faker import Faker
 
 from membership.models import (
+    Buyable,
     Guild,
-    GuildVote,
+    GuildMembership,
+    GuildWishlistItem,
     Lease,
     Member,
     MembershipPlan,
+    Order,
     Space,
 )
 
@@ -29,21 +32,110 @@ fake = Faker()
 
 ADMIN_EMAIL = "admin@pastlives.space"
 
-GUILD_DEFINITIONS: list[dict[str, str]] = [
-    {"name": "Woodworking"},
-    {"name": "Metalworking"},
-    {"name": "Ceramics"},
-    {"name": "Textiles & Fiber Arts"},
-    {"name": "Electronics"},
-    {"name": "3D Printing & CNC"},
-    {"name": "Screen Printing"},
-    {"name": "Photography"},
-    {"name": "Jewelry"},
-    {"name": "Leatherworking"},
-    {"name": "Glass Arts"},
-    {"name": "Prison Outreach"},
-    {"name": "Bicycle Workshop"},
-    {"name": "Community Kitchen"},
+GUILD_DEFINITIONS: list[dict[str, Any]] = [
+    {"name": "Woodworking", "icon": "carpenter", "intro": "Craft with wood from raw lumber to fine furniture."},
+    {"name": "Metalworking", "icon": "hardware", "intro": "Welding, forging, and fabrication."},
+    {"name": "Ceramics", "icon": "pottery", "intro": "Wheel throwing, hand-building, and kiln firing."},
+    {"name": "Textiles & Fiber Arts", "icon": "checkroom", "intro": "Sewing, weaving, dyeing, and embroidery."},
+    {"name": "Electronics", "icon": "memory", "intro": "Soldering, PCB design, and microcontrollers."},
+    {
+        "name": "3D Printing & CNC",
+        "icon": "precision_manufacturing",
+        "intro": "Additive and subtractive digital fabrication.",
+    },
+    {"name": "Screen Printing", "icon": "print", "intro": "Custom prints on fabric, paper, and more."},
+    {"name": "Photography", "icon": "photo_camera", "intro": "Darkroom, studio lighting, and digital workflows."},
+    {"name": "Jewelry", "icon": "diamond", "intro": "Silversmithing, stone setting, and metalwork."},
+    {"name": "Leatherworking", "icon": "design_services", "intro": "Tooling, stitching, and leather goods."},
+    {"name": "Glass Arts", "icon": "window", "intro": "Stained glass, fusing, and lampwork."},
+    {
+        "name": "Prison Outreach",
+        "icon": "volunteer_activism",
+        "intro": "Teaching maker skills to incarcerated individuals.",
+    },
+    {"name": "Bicycle Workshop", "icon": "pedal_bike", "intro": "Repair, maintenance, and custom builds."},
+    {"name": "Community Kitchen", "icon": "restaurant", "intro": "Shared commercial kitchen for food projects."},
+]
+
+BUYABLE_DEFINITIONS: list[dict[str, str | Decimal]] = [
+    {
+        "guild": "Woodworking",
+        "name": "Day Pass",
+        "unit_price": Decimal("25.00"),
+        "description": "Full-day access to the woodshop.",
+    },
+    {
+        "guild": "Woodworking",
+        "name": "Oak Board Foot",
+        "unit_price": Decimal("12.00"),
+        "description": "One board foot of kiln-dried red oak.",
+    },
+    {
+        "guild": "Ceramics",
+        "name": "Kiln Firing",
+        "unit_price": Decimal("15.00"),
+        "description": "Single cone 6 firing slot.",
+    },
+    {
+        "guild": "Ceramics",
+        "name": "Clay (25 lb)",
+        "unit_price": Decimal("30.00"),
+        "description": "25-pound bag of stoneware clay.",
+    },
+    {
+        "guild": "Screen Printing",
+        "name": "Screen Rental",
+        "unit_price": Decimal("10.00"),
+        "description": "One screen for a single print run.",
+    },
+    {
+        "guild": "Screen Printing",
+        "name": "Ink Set",
+        "unit_price": Decimal("20.00"),
+        "description": "Set of 4 water-based ink colors.",
+    },
+    {
+        "guild": "3D Printing & CNC",
+        "name": "3D Print Hour",
+        "unit_price": Decimal("8.00"),
+        "description": "One hour of FDM printer time.",
+    },
+    {
+        "guild": "3D Printing & CNC",
+        "name": "CNC Time (30 min)",
+        "unit_price": Decimal("25.00"),
+        "description": "30 minutes on the CNC router.",
+    },
+    {
+        "guild": "Photography",
+        "name": "Darkroom Session",
+        "unit_price": Decimal("20.00"),
+        "description": "Two-hour darkroom session with chemicals.",
+    },
+    {
+        "guild": "Electronics",
+        "name": "Soldering Station Rental",
+        "unit_price": Decimal("5.00"),
+        "description": "Bench rental with soldering iron and supplies.",
+    },
+    {
+        "guild": "Jewelry",
+        "name": "Silver Sheet (6x6)",
+        "unit_price": Decimal("45.00"),
+        "description": "6x6 inch sterling silver sheet, 20 gauge.",
+    },
+    {
+        "guild": "Community Kitchen",
+        "name": "Kitchen Rental (4hr)",
+        "unit_price": Decimal("60.00"),
+        "description": "Four-hour block in the commercial kitchen.",
+    },
+    {
+        "guild": "Bicycle Workshop",
+        "name": "Tune-Up Kit",
+        "unit_price": Decimal("15.00"),
+        "description": "Basic tune-up parts and consumables.",
+    },
 ]
 
 SPACE_DEFINITIONS: list[dict[str, Any]] = [
@@ -80,6 +172,41 @@ SPACE_DEFINITIONS: list[dict[str, Any]] = [
     },
 ]
 
+WISHLIST_DEFINITIONS: list[dict[str, Any]] = [
+    {
+        "guild": "Woodworking",
+        "name": "SawStop Table Saw",
+        "estimated_cost": Decimal("3500.00"),
+        "description": "Professional cabinet saw with flesh-detection safety.",
+    },
+    {
+        "guild": "Ceramics",
+        "name": "Skutt KM-1227 Kiln",
+        "estimated_cost": Decimal("2800.00"),
+        "description": "Large capacity kiln for bigger pieces.",
+    },
+    {
+        "guild": "Electronics",
+        "name": "Rigol DS1054Z Oscilloscope",
+        "estimated_cost": Decimal("350.00"),
+        "description": "4-channel digital oscilloscope for the electronics bench.",
+    },
+]
+
+GUILD_LINKS: dict[str, list[dict[str, str]]] = {
+    "Woodworking": [
+        {"name": "Instagram", "url": "https://instagram.com/example-woodshop"},
+        {"name": "Wiki", "url": "https://wiki.example.com/woodworking"},
+    ],
+    "Ceramics": [
+        {"name": "Instagram", "url": "https://instagram.com/example-ceramics"},
+    ],
+    "Prison Outreach": [
+        {"name": "Website", "url": "https://example.com/outreach"},
+        {"name": "Donate", "url": "https://example.com/outreach/donate"},
+    ],
+}
+
 # Guild lead assignments: index into members list (0-14 are guild leads)
 # 14 guilds, 15 leads => Prison Outreach gets 2 (indices 11 and 14)
 GUILD_LEAD_INDICES: list[list[int]] = [
@@ -97,6 +224,18 @@ GUILD_LEAD_INDICES: list[list[int]] = [
     [11, 14],  # Prison Outreach (2 co-leads)
     [12],  # Bicycle Workshop
     [13],  # Community Kitchen
+]
+
+# Regular member guild assignments (members 22-29)
+REGULAR_MEMBER_GUILDS: list[list[str]] = [
+    ["Woodworking", "Ceramics"],
+    ["Metalworking", "Electronics"],
+    ["Screen Printing", "Photography"],
+    ["3D Printing & CNC", "Jewelry"],
+    ["Textiles & Fiber Arts", "Leatherworking"],
+    ["Community Kitchen", "Bicycle Workshop"],
+    ["Glass Arts", "Prison Outreach"],
+    ["Woodworking", "Metalworking", "Electronics"],
 ]
 
 PLAN_DEFINITIONS: list[dict[str, Any]] = [
@@ -133,8 +272,11 @@ class Command(BaseCommand):
     def _flush(self) -> None:
         """Delete all seed data, preserving the admin superuser."""
         self.stdout.write("Flushing existing data...")
-        GuildVote.objects.all().delete()
+        Order.objects.all().delete()
         Lease.objects.all().delete()
+        GuildMembership.objects.all().delete()
+        GuildWishlistItem.objects.all().delete()
+        Buyable.objects.all().delete()
         Member.objects.all().delete()
         Guild.objects.all().delete()
         Space.objects.all().delete()
@@ -144,14 +286,18 @@ class Command(BaseCommand):
 
     def _seed(self) -> None:
         """Create all seed data."""
-        self._create_admin()
+        admin = self._create_admin()
         plans = self._create_plans()
         guilds = self._create_guilds()
         members = self._create_members(plans)
         self._assign_guild_leads(guilds, members)
+        self._assign_regular_members(guilds, members)
+        self._create_buyables(guilds)
         spaces = self._create_spaces()
         self._create_leases(members, spaces)
-        self._create_guild_votes(guilds, members)
+        self._create_wishlist_items(guilds, admin)
+        self._create_orders(guilds, members)
+        self._apply_guild_links(guilds)
 
     def _create_admin(self) -> Any:
         user, created = User.objects.get_or_create(
@@ -180,7 +326,10 @@ class Command(BaseCommand):
     def _create_guilds(self) -> list[Guild]:
         guilds = []
         for defn in GUILD_DEFINITIONS:
-            guild, _ = Guild.objects.get_or_create(name=defn["name"])
+            guild, _ = Guild.objects.get_or_create(
+                name=defn["name"],
+                defaults={"icon": defn["icon"], "intro": defn["intro"]},
+            )
             guilds.append(guild)
         return guilds
 
@@ -231,13 +380,49 @@ class Command(BaseCommand):
         return members
 
     def _assign_guild_leads(self, guilds: list[Guild], members: list[Member]) -> None:
-        """Assign guild leads (members 7-21) to guilds."""
+        """Assign guild leads (members 7-21) to guilds. Prison Outreach gets 2 co-leads."""
         lead_members = members[7:22]  # 15 guild leads
 
         for guild, lead_indices in zip(guilds, GUILD_LEAD_INDICES):
             primary_lead_idx = lead_indices[0]
             guild.guild_lead = lead_members[primary_lead_idx]
             guild.save()
+
+            for idx in lead_indices:
+                member = lead_members[idx]
+                GuildMembership.objects.get_or_create(
+                    guild=guild,
+                    user=member.user,
+                    defaults={"is_lead": True},
+                )
+
+    def _assign_regular_members(self, guilds: list[Guild], members: list[Member]) -> None:
+        """Assign regular members (22-29) to guilds."""
+        regular_members = members[22:]
+        guild_map = {g.name: g for g in guilds}
+
+        for member, guild_names in zip(regular_members, REGULAR_MEMBER_GUILDS):
+            for gname in guild_names:
+                GuildMembership.objects.get_or_create(
+                    guild=guild_map[gname],
+                    user=member.user,
+                    defaults={"is_lead": False},
+                )
+
+    def _create_buyables(self, guilds: list[Guild]) -> list[Buyable]:
+        guild_map = {g.name: g for g in guilds}
+        buyables = []
+        for defn in BUYABLE_DEFINITIONS:
+            buyable, _ = Buyable.objects.get_or_create(
+                guild=guild_map[str(defn["guild"])],
+                name=str(defn["name"]),
+                defaults={
+                    "unit_price": defn["unit_price"],
+                    "description": str(defn.get("description", "")),
+                },
+            )
+            buyables.append(buyable)
+        return buyables
 
     def _create_spaces(self) -> list[Space]:
         spaces = []
@@ -267,14 +452,41 @@ class Command(BaseCommand):
                 },
             )
 
-    def _create_guild_votes(self, guilds: list[Guild], members: list[Member]) -> None:
-        """Create sample guild votes: each regular member votes for 3 guilds."""
-        regular_members = members[22:]  # 8 regular members
-        for member in regular_members:
-            chosen = fake.random_elements(guilds, length=3, unique=True)
-            for priority, guild in enumerate(chosen, start=1):
-                GuildVote.objects.get_or_create(
-                    member=member,
-                    guild=guild,
-                    defaults={"priority": priority},
-                )
+    def _create_wishlist_items(self, guilds: list[Guild], admin_user: Any) -> None:
+        guild_map = {g.name: g for g in guilds}
+        for defn in WISHLIST_DEFINITIONS:
+            GuildWishlistItem.objects.get_or_create(
+                guild=guild_map[str(defn["guild"])],
+                name=str(defn["name"]),
+                defaults={
+                    "estimated_cost": defn.get("estimated_cost"),
+                    "description": str(defn.get("description", "")),
+                    "created_by": admin_user,
+                },
+            )
+
+    def _create_orders(self, guilds: list[Guild], members: list[Member]) -> None:
+        """Create a few sample orders across buyables."""
+        buyables = list(Buyable.objects.all()[:3])
+        if not buyables:
+            return
+
+        for i, buyable in enumerate(buyables):
+            member = members[22 + i]  # Regular members
+            Order.objects.get_or_create(
+                buyable=buyable,
+                user=member.user,
+                defaults={
+                    "email": member.email,
+                    "quantity": 1,
+                    "amount": int(buyable.unit_price * 100),
+                    "status": Order.Status.PAID,
+                },
+            )
+
+    def _apply_guild_links(self, guilds: list[Guild]) -> None:
+        guild_map = {g.name: g for g in guilds}
+        for guild_name, links in GUILD_LINKS.items():
+            guild = guild_map[guild_name]
+            guild.links = links
+            guild.save()
