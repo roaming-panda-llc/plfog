@@ -717,6 +717,7 @@ def describe_GuildAdmin():
             "slug",
             "is_active",
             "guild_lead",
+            "view_page_link",
             "notes_preview",
         ]
 

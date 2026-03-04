@@ -3,6 +3,8 @@ from __future__ import annotations
 from django.contrib import admin
 from django.db.models import Count, QuerySet
 from django.http import HttpRequest
+from django.urls import reverse
+from django.utils.html import format_html
 from unfold.admin import GenericTabularInline, ModelAdmin, TabularInline
 
 from .models import (
@@ -217,11 +219,16 @@ class MemberAdmin(ModelAdmin):
 
 @admin.register(Guild)
 class GuildAdmin(ModelAdmin):
-    list_display = ["name", "slug", "is_active", "guild_lead", "notes_preview"]
+    list_display = ["name", "slug", "is_active", "guild_lead", "view_page_link", "notes_preview"]
     list_filter = ["is_active"]
     search_fields = ["name"]
     prepopulated_fields = {"slug": ("name",)}
     inlines = [LeaseInlineGuild, GuildMembershipInline, GuildWishlistItemInline, BuyableInline]
+
+    @admin.display(description="Page")
+    def view_page_link(self, obj: Guild) -> str:
+        url = reverse("guild_detail", kwargs={"slug": obj.slug})
+        return format_html('<a href="{}">View &rarr;</a>', url)
 
     @admin.display(description="Notes")
     def notes_preview(self, obj: Guild) -> str:
