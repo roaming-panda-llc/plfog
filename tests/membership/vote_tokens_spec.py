@@ -4,7 +4,12 @@ import pytest
 from django.core.signing import BadSignature, SignatureExpired
 from django.test import override_settings
 
-from membership.vote_tokens import generate_vote_token, verify_vote_token
+from membership.vote_tokens import DEFAULT_MAX_AGE, generate_vote_token, verify_vote_token
+
+
+def describe_default_max_age():
+    def it_equals_30_days_in_seconds():
+        assert DEFAULT_MAX_AGE == 60 * 60 * 24 * 30
 
 
 def describe_generate_vote_token():

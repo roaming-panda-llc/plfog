@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+from typing import Any
 
 from django import forms
 
@@ -14,15 +15,16 @@ class VoteForm(forms.Form):
     guild_2nd = forms.ChoiceField(label="2nd Choice")
     guild_3rd = forms.ChoiceField(label="3rd Choice")
 
-    def __init__(self, guild_choices: list[tuple[str, str]], *args, **kwargs):
+    def __init__(self, guild_choices: list[tuple[str, str]], *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         choices = [("", "-- Select a guild --")] + guild_choices
-        self.fields["guild_1st"].choices = choices
-        self.fields["guild_2nd"].choices = choices
-        self.fields["guild_3rd"].choices = choices
+        self.fields["guild_1st"].choices = choices  # type: ignore[attr-defined]
+        self.fields["guild_2nd"].choices = choices  # type: ignore[attr-defined]
+        self.fields["guild_3rd"].choices = choices  # type: ignore[attr-defined]
 
-    def clean(self):
+    def clean(self) -> dict[str, Any]:
         cleaned = super().clean()
+        assert cleaned is not None
         picks = [cleaned.get("guild_1st"), cleaned.get("guild_2nd"), cleaned.get("guild_3rd")]
         picks = [p for p in picks if p]
         if len(picks) != 3:
@@ -43,8 +45,9 @@ class CreateSessionForm(forms.Form):
         widget=forms.DateInput(attrs={"type": "date"}),
     )
 
-    def clean(self):
+    def clean(self) -> dict[str, Any]:
         cleaned = super().clean()
+        assert cleaned is not None
         if cleaned.get("open_date") and cleaned.get("close_date"):
             if cleaned["close_date"] <= cleaned["open_date"]:
                 raise forms.ValidationError("Close date must be after open date.")

@@ -57,7 +57,7 @@ def calculate_results(
     # Non-vote redistribution: money from non-voters distributed proportionally
     non_vote_dollars = total_pool - total_weighted
 
-    results = []
+    results: list[dict[str, Any]] = []
     for guild_name, scores in guild_scores.items():
         weighted = scores["weighted_amount"]
         # guild_scores only has entries with positive weights, so total_weighted > 0 here
