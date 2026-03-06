@@ -6,6 +6,7 @@ from django.conf import settings
 from django.core.signing import BadSignature, TimestampSigner
 
 SEPARATOR = "|"
+DEFAULT_MAX_AGE = 2592000  # 30 days in seconds
 
 
 def _signer() -> TimestampSigner:
@@ -24,7 +25,7 @@ def verify_vote_token(token: str) -> dict[str, str | int]:
     Returns dict with member_record_id and session_id.
     Raises BadSignature on failure (including expired tokens).
     """
-    max_age = getattr(settings, "VOTE_TOKEN_MAX_AGE", 60 * 60 * 24 * 30)
+    max_age = getattr(settings, "VOTE_TOKEN_MAX_AGE", DEFAULT_MAX_AGE)
     payload = _signer().unsign(token, max_age=max_age)
     parts = payload.rsplit(SEPARATOR, 1)
     if len(parts) != 2:

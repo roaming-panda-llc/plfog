@@ -97,7 +97,7 @@ def sync_session_to_airtable(
 ) -> str:
     """Create or update a voting session in Airtable. Returns the Airtable record ID."""
     table = _api().table(settings.AIRTABLE_NEW_BASE_ID, settings.AIRTABLE_SESSIONS_TABLE)
-    fields = {
+    fields: dict[str, Any] = {
         "Name": name,
         "Open Date": open_date.isoformat(),
         "Close Date": close_date.isoformat(),
@@ -110,10 +110,10 @@ def sync_session_to_airtable(
 
     try:
         if airtable_record_id:
-            table.update(airtable_record_id, fields)
+            table.update(airtable_record_id, fields)  # type: ignore[arg-type]
             return airtable_record_id
         else:
-            result = table.create(fields)
+            result = table.create(fields)  # type: ignore[arg-type]
             return result["id"]
     except Exception:
         logger.exception("Failed to sync session %s to Airtable", session_id)
@@ -135,7 +135,7 @@ def sync_vote_to_airtable(
 ) -> str:
     """Create a vote record in Airtable. Returns the Airtable record ID."""
     table = _api().table(settings.AIRTABLE_NEW_BASE_ID, settings.AIRTABLE_VOTES_TABLE)
-    fields = {
+    fields: dict[str, Any] = {
         "Member Name": member_name,
         "Member Airtable ID": member_airtable_id,
         "Guild 1st": guild_1st,
@@ -144,7 +144,7 @@ def sync_vote_to_airtable(
         "Session": session_name,
     }
     try:
-        result = table.create(fields)
+        result = table.create(fields)  # type: ignore[arg-type]
         return result["id"]
     except Exception:
         logger.exception("Failed to sync vote for %s to Airtable", member_name)
