@@ -170,9 +170,7 @@ if _admin_domains_raw.strip():
 else:
     ADMIN_DOMAINS = []
 
-EMAIL_BACKEND = (
-    "django.core.mail.backends.console.EmailBackend" if DEBUG else "anymail.backends.mailgun.EmailBackend"
-)
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend" if DEBUG else "anymail.backends.mailgun.EmailBackend"
 DEFAULT_FROM_EMAIL = os.environ.get("EMAIL_FROM", "voting@pastlives.space")
 EMAIL_FROM = DEFAULT_FROM_EMAIL
 
