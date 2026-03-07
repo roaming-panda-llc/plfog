@@ -207,7 +207,7 @@ def describe_debug_false():
             )
             assert settings_module.SESSION_COOKIE_SECURE is True
 
-    def it_uses_smtp_email_backend(monkeypatch):
+    def it_uses_resend_email_backend(monkeypatch):
         with patch("sentry_sdk.init"):
             settings_module = _reload_settings(
                 monkeypatch,
@@ -218,7 +218,7 @@ def describe_debug_false():
                     "SENTRY_DSN": None,
                 },
             )
-            assert settings_module.EMAIL_BACKEND == "django.core.mail.backends.smtp.EmailBackend"
+            assert settings_module.EMAIL_BACKEND == "anymail.backends.resend.EmailBackend"
 
     def it_sets_debug_to_false(monkeypatch):
         with patch("sentry_sdk.init"):
@@ -618,3 +618,39 @@ def describe_socialaccount_login_on_get():
                 {"DJANGO_DEBUG": "True", "SENTRY_DSN": None},
             )
             assert settings_module.SOCIALACCOUNT_LOGIN_ON_GET is True
+
+
+def describe_anymail():
+    def it_reads_resend_api_key_from_env(monkeypatch):
+        with patch("sentry_sdk.init"):
+            settings_module = _reload_settings(
+                monkeypatch,
+                {"DJANGO_DEBUG": "True", "SENTRY_DSN": None, "RESEND_API_KEY": "re_test_123"},
+            )
+            assert settings_module.ANYMAIL["RESEND_API_KEY"] == "re_test_123"
+
+    def it_defaults_resend_api_key_to_none(monkeypatch):
+        with patch("sentry_sdk.init"):
+            settings_module = _reload_settings(
+                monkeypatch,
+                {"DJANGO_DEBUG": "True", "SENTRY_DSN": None, "RESEND_API_KEY": None},
+            )
+            assert settings_module.ANYMAIL["RESEND_API_KEY"] is None
+
+
+def describe_default_from_email():
+    def it_reads_from_env(monkeypatch):
+        with patch("sentry_sdk.init"):
+            settings_module = _reload_settings(
+                monkeypatch,
+                {"DJANGO_DEBUG": "True", "SENTRY_DSN": None, "DEFAULT_FROM_EMAIL": "hello@example.com"},
+            )
+            assert settings_module.DEFAULT_FROM_EMAIL == "hello@example.com"
+
+    def it_defaults_to_noreply_pastlives(monkeypatch):
+        with patch("sentry_sdk.init"):
+            settings_module = _reload_settings(
+                monkeypatch,
+                {"DJANGO_DEBUG": "True", "SENTRY_DSN": None, "DEFAULT_FROM_EMAIL": None},
+            )
+            assert settings_module.DEFAULT_FROM_EMAIL == "noreply@pastlives.space"
