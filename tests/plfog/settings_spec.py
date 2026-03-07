@@ -629,13 +629,13 @@ def describe_anymail():
             )
             assert settings_module.ANYMAIL["RESEND_API_KEY"] == "re_test_123"
 
-    def it_defaults_resend_api_key_to_empty_string(monkeypatch):
+    def it_defaults_resend_api_key_to_none(monkeypatch):
         with patch("sentry_sdk.init"):
             settings_module = _reload_settings(
                 monkeypatch,
                 {"DJANGO_DEBUG": "True", "SENTRY_DSN": None, "RESEND_API_KEY": None},
             )
-            assert settings_module.ANYMAIL["RESEND_API_KEY"] == ""
+            assert settings_module.ANYMAIL["RESEND_API_KEY"] is None
 
 
 def describe_default_from_email():

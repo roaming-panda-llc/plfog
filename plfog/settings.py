@@ -176,7 +176,7 @@ else:
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend" if DEBUG else "anymail.backends.resend.EmailBackend"
 
 ANYMAIL = {
-    "RESEND_API_KEY": os.environ.get("RESEND_API_KEY", ""),
+    "RESEND_API_KEY": os.environ.get("RESEND_API_KEY"),
 }
 
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@pastlives.space")
