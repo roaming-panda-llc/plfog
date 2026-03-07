@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "allauth.socialaccount.providers.github",
     "allauth.socialaccount.providers.discord",
     "django_extensions",
+    "anymail",
     # Project apps
     "core",
     "membership",
@@ -172,9 +173,13 @@ if _admin_domains_raw.strip():
 else:
     ADMIN_DOMAINS = []
 
-EMAIL_BACKEND = (
-    "django.core.mail.backends.console.EmailBackend" if DEBUG else "django.core.mail.backends.smtp.EmailBackend"
-)
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend" if DEBUG else "anymail.backends.resend.EmailBackend"
+
+ANYMAIL = {
+    "RESEND_API_KEY": os.environ.get("RESEND_API_KEY", ""),
+}
+
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@pastlives.space")
 
 # OAuth providers (APP config pattern - no Django admin SocialApp needed)
 SOCIALACCOUNT_PROVIDERS = {
