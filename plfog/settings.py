@@ -146,12 +146,14 @@ ACCOUNT_EMAIL_VERIFICATION = "optional"
 ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_SESSION_REMEMBER = True
 
+LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
 
 SOCIALACCOUNT_ADAPTER = "plfog.adapters.AutoAdminSocialAccountAdapter"
 ACCOUNT_ADAPTER = "plfog.adapters.AdminRedirectAccountAdapter"
 SOCIALACCOUNT_LOGIN_ON_GET = True
+ALLAUTH_TRUSTED_PROXY_COUNT = int(os.environ.get("ALLAUTH_TRUSTED_PROXY_COUNT", "0"))
 
 # Auto-admin: comma-separated list of email domains that get admin privileges on social login.
 # Empty/unset means no auto-admin. Malformed values raise ValueError at startup.
@@ -180,6 +182,13 @@ ANYMAIL = {
 }
 
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@pastlives.space")
+
+# Airtable
+AIRTABLE_API_KEY = os.environ.get("AIRTABLE_API_KEY", "")
+AIRTABLE_NEW_BASE_ID = os.environ.get("AIRTABLE_NEW_BASE_ID", "appVix9sWo1Tfjm0s")
+AIRTABLE_MEMBERS_TABLE = os.environ.get("AIRTABLE_MEMBERS_TABLE", "tbllpqGB2XXuRt6lg")
+AIRTABLE_VOTES_TABLE = os.environ.get("AIRTABLE_VOTES_TABLE", "tblpefgQUIMdwbLZX")
+AIRTABLE_SESSIONS_TABLE = os.environ.get("AIRTABLE_SESSIONS_TABLE", "tblGW2Bo1Mb09qT2y")
 
 # OAuth providers (APP config pattern - no Django admin SocialApp needed)
 SOCIALACCOUNT_PROVIDERS = {
@@ -309,8 +318,18 @@ UNFOLD = {
                         "link": reverse_lazy("admin:membership_guild_changelist"),
                     },
                     {
-                        "title": "Guild Votes",
+                        "title": "Voting Dashboard",
                         "icon": "how_to_vote",
+                        "link": reverse_lazy("voting_dashboard"),
+                    },
+                    {
+                        "title": "Voting Sessions",
+                        "icon": "event",
+                        "link": reverse_lazy("admin:membership_votingsession_changelist"),
+                    },
+                    {
+                        "title": "Guild Votes",
+                        "icon": "ballot",
                         "link": reverse_lazy("admin:membership_guildvote_changelist"),
                     },
                     {

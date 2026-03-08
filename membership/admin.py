@@ -5,7 +5,15 @@ from django.db.models import Count, QuerySet
 from django.http import HttpRequest
 from unfold.admin import GenericTabularInline, ModelAdmin, TabularInline
 
-from .models import Guild, GuildVote, Lease, Member, MembershipPlan, Space
+from .models import (
+    Guild,
+    GuildVote,
+    Lease,
+    Member,
+    MembershipPlan,
+    Space,
+    VotingSession,
+)
 
 # ---------------------------------------------------------------------------
 # Inlines
@@ -79,32 +87,6 @@ class LeaseInlineGuild(GenericTabularInline):
     @admin.display(boolean=True, description="Active")
     def is_active_display(self, obj: Lease) -> bool:
         return obj.is_active
-
-
-class SubletInline(TabularInline):
-    """Read-only inline on GuildAdmin showing spaces sublet by the guild."""
-
-    model = Space
-    fk_name = "sublet_guild"
-    fields = ["space_id", "name", "space_type", "full_price_display"]
-    readonly_fields = ["space_id", "name", "space_type", "full_price_display"]
-    extra = 0
-
-    def has_add_permission(self, request: HttpRequest, obj: Guild | None = None) -> bool:
-        return False
-
-    def has_change_permission(self, request: HttpRequest, obj: Guild | None = None) -> bool:
-        return False
-
-    def has_delete_permission(self, request: HttpRequest, obj: Guild | None = None) -> bool:
-        return False
-
-    @admin.display(description="Full Price")
-    def full_price_display(self, obj: Space) -> str:
-        price = obj.full_price
-        if price is None:
-            return "-"
-        return f"${price:.2f}"
 
 
 # ---------------------------------------------------------------------------
@@ -209,6 +191,32 @@ class MemberAdmin(ModelAdmin):
 # ---------------------------------------------------------------------------
 
 
+class SubletInline(TabularInline):
+    """Read-only inline on GuildAdmin showing spaces sublet by the guild."""
+
+    model = Space
+    fk_name = "sublet_guild"
+    fields = ["space_id", "name", "space_type", "full_price_display"]
+    readonly_fields = ["space_id", "name", "space_type", "full_price_display"]
+    extra = 0
+
+    def has_add_permission(self, request: HttpRequest, obj: Guild | None = None) -> bool:
+        return False
+
+    def has_change_permission(self, request: HttpRequest, obj: Guild | None = None) -> bool:
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj: Guild | None = None) -> bool:
+        return False
+
+    @admin.display(description="Full Price")
+    def full_price_display(self, obj: Space) -> str:
+        price = obj.full_price
+        if price is None:
+            return "-"
+        return f"${price:.2f}"
+
+
 @admin.register(Guild)
 class GuildAdmin(ModelAdmin):
     list_display = ["name", "guild_lead", "sublet_count", "notes_preview"]
@@ -237,8 +245,17 @@ class GuildAdmin(ModelAdmin):
 
 @admin.register(GuildVote)
 class GuildVoteAdmin(ModelAdmin):
-    list_display = ["member", "guild", "priority"]
-    list_filter = ["guild", "priority"]
+    list_display = ["member", "guild", "priority", "session", "created_at"]
+    list_filter = ["guild", "priority", "session"]
+    search_fields = ["member__full_legal_name", "member__preferred_name"]
+
+
+@admin.register(VotingSession)
+class VotingSessionAdmin(ModelAdmin):
+    list_display = ["name", "status", "open_date", "close_date", "eligible_member_count", "votes_cast"]
+    list_filter = ["status"]
+    search_fields = ["name"]
+    readonly_fields = ["airtable_record_id", "created_at"]
 
 
 # ---------------------------------------------------------------------------

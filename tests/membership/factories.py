@@ -7,7 +7,15 @@ import factory
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
 
-from membership.models import Guild, GuildVote, Lease, Member, MembershipPlan, Space
+from membership.models import (
+    Guild,
+    GuildVote,
+    Lease,
+    Member,
+    MembershipPlan,
+    Space,
+    VotingSession,
+)
 
 
 class MembershipPlanFactory(factory.django.DjangoModelFactory):
@@ -46,10 +54,21 @@ class GuildFactory(factory.django.DjangoModelFactory):
     name = factory.Sequence(lambda n: f"Guild {n}")
 
 
+class VotingSessionFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = VotingSession
+
+    name = factory.Sequence(lambda n: f"Session {n}")
+    open_date = factory.LazyFunction(lambda: timezone.now().date())
+    close_date = factory.LazyFunction(lambda: timezone.now().date() + timedelta(days=7))
+    status = VotingSession.Status.DRAFT
+
+
 class GuildVoteFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = GuildVote
 
+    session = factory.SubFactory(VotingSessionFactory)
     member = factory.SubFactory(MemberFactory)
     guild = factory.SubFactory(GuildFactory)
     priority = 1
