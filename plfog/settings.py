@@ -142,6 +142,7 @@ ACCOUNT_EMAIL_VERIFICATION = "optional"
 ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_SESSION_REMEMBER = True
 
+LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
 
@@ -170,14 +171,13 @@ if _admin_domains_raw.strip():
 else:
     ADMIN_DOMAINS = []
 
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend" if DEBUG else "anymail.backends.mailgun.EmailBackend"
-DEFAULT_FROM_EMAIL = os.environ.get("EMAIL_FROM", "voting@pastlives.space")
-EMAIL_FROM = DEFAULT_FROM_EMAIL
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend" if DEBUG else "anymail.backends.resend.EmailBackend"
 
 ANYMAIL = {
-    "MAILGUN_API_KEY": os.environ.get("MAILGUN_API_KEY", ""),
-    "MAILGUN_SENDER_DOMAIN": os.environ.get("MAILGUN_SENDER_DOMAIN", "pastlives.space"),
+    "RESEND_API_KEY": os.environ.get("RESEND_API_KEY"),
 }
+
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@pastlives.space")
 
 # Airtable
 AIRTABLE_API_KEY = os.environ.get("AIRTABLE_API_KEY", "")

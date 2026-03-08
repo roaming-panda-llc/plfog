@@ -72,13 +72,13 @@ def vote(request: HttpRequest) -> HttpResponse:
         form = VoteForm(guild_choices, request.POST)
         if form.is_valid():
             # Race condition guard — concurrent vote inserted between initial check and save
-            if GuildVote.objects.filter(  # pragma: no cover
-                session=session, member=member
-            ).exists():
+            if GuildVote.objects.filter(session=session, member=member).exists():  # pragma: no cover
+                existing = GuildVote.objects.filter(session=session, member=member)
+                vote_names = {{1: "1st", 2: "2nd", 3: "3rd"}.get(v.priority, "?"): v.guild.name for v in existing}
                 return render(
                     request,
                     "membership/voting/already_voted.html",
-                    {"member": member, "session": session, "votes": {}},
+                    {"member": member, "session": session, "votes": vote_names},
                 )
 
             guild_names = [
@@ -120,7 +120,7 @@ def _save_votes(session: VotingSession, member: Member, guild_names: list[str]) 
     """Persist votes and update session count atomically."""
     with transaction.atomic():
         for priority, guild_name in enumerate(guild_names, start=1):
-            guild_obj = Guild.objects.get(name=guild_name)
+            guild_obj = get_object_or_404(Guild, name=guild_name)
             GuildVote.objects.create(
                 session=session,
                 member=member,
