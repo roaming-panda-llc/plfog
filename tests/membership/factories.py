@@ -36,6 +36,7 @@ class SpaceFactory(factory.django.DjangoModelFactory):
     space_id = factory.Sequence(lambda n: f"S-{n:03d}")
     space_type = Space.SpaceType.STUDIO
     status = Space.Status.AVAILABLE
+    sublet_guild = None
 
 
 class GuildFactory(factory.django.DjangoModelFactory):

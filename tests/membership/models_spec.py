@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from membership.models import DEFAULT_PRICE_PER_SQFT, Lease, Member, Space
 from tests.membership.factories import (
+    GuildFactory,
     LeaseFactory,
     MemberFactory,
     MembershipPlanFactory,
@@ -568,3 +569,102 @@ def describe_lease_is_active_end_date_boundary():
             end_date=today - timedelta(days=1),
         )
         assert lease.is_active is False
+
+
+# ---------------------------------------------------------------------------
+# Space.sublet_guild
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def describe_space_sublet():
+    def it_defaults_to_null_sublet_guild():
+        space = SpaceFactory()
+        assert space.sublet_guild is None
+
+    def it_assigns_and_persists_sublet_guild():
+        guild = GuildFactory(name="Ceramics Guild")
+        space = SpaceFactory(sublet_guild=guild)
+        space.refresh_from_db()
+        assert space.sublet_guild == guild
+
+    def it_sets_null_on_guild_deletion():
+        guild = GuildFactory(name="Temp Guild")
+        space = SpaceFactory(sublet_guild=guild)
+        guild.delete()
+        space.refresh_from_db()
+        assert space.sublet_guild is None
+
+
+# ---------------------------------------------------------------------------
+# Guild.sublet_revenue
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def describe_guild_sublet_revenue():
+    def it_returns_zero_when_guild_has_no_sublets():
+        guild = GuildFactory(name="No Sublets Guild")
+        assert guild.sublet_revenue == Decimal("0.00")
+
+    def it_returns_zero_when_guild_has_sublets_but_no_leases():
+        guild = GuildFactory(name="Empty Sublet Guild")
+        SpaceFactory(sublet_guild=guild)
+        assert guild.sublet_revenue == Decimal("0.00")
+
+    def it_calculates_revenue_from_single_active_lease():
+        guild = GuildFactory(name="Single Lease Guild")
+        space = SpaceFactory(sublet_guild=guild)
+        today = timezone.now().date()
+        LeaseFactory(
+            space=space,
+            monthly_rent=Decimal("350.00"),
+            start_date=today - timedelta(days=10),
+        )
+        assert guild.sublet_revenue == Decimal("350.00")
+
+    def it_sums_revenue_from_multiple_active_leases_on_multiple_sublets():
+        guild = GuildFactory(name="Multi Lease Guild")
+        space_a = SpaceFactory(sublet_guild=guild)
+        space_b = SpaceFactory(sublet_guild=guild)
+        today = timezone.now().date()
+        LeaseFactory(
+            space=space_a,
+            monthly_rent=Decimal("200.00"),
+            start_date=today - timedelta(days=10),
+        )
+        LeaseFactory(
+            space=space_b,
+            monthly_rent=Decimal("300.00"),
+            start_date=today - timedelta(days=5),
+        )
+        assert guild.sublet_revenue == Decimal("500.00")
+
+    def it_excludes_expired_leases():
+        guild = GuildFactory(name="Expired Lease Guild")
+        space = SpaceFactory(sublet_guild=guild)
+        today = timezone.now().date()
+        LeaseFactory(
+            space=space,
+            monthly_rent=Decimal("400.00"),
+            start_date=today - timedelta(days=60),
+            end_date=today - timedelta(days=1),
+        )
+        assert guild.sublet_revenue == Decimal("0.00")
+
+    def it_excludes_leases_on_non_sublet_spaces():
+        guild = GuildFactory(name="Non-Sublet Guild")
+        sublet_space = SpaceFactory(sublet_guild=guild)
+        non_sublet_space = SpaceFactory()  # no sublet_guild
+        today = timezone.now().date()
+        LeaseFactory(
+            space=sublet_space,
+            monthly_rent=Decimal("250.00"),
+            start_date=today - timedelta(days=10),
+        )
+        LeaseFactory(
+            space=non_sublet_space,
+            monthly_rent=Decimal("999.00"),
+            start_date=today - timedelta(days=10),
+        )
+        assert guild.sublet_revenue == Decimal("250.00")

@@ -7,7 +7,7 @@ import pytest
 from django.db import IntegrityError
 from django.utils import timezone
 
-from membership.models import Guild, GuildVote, Member
+from membership.models import Guild, GuildVote, Lease, Member, MembershipPlan, Space
 from tests.membership.factories import (
     GuildFactory,
     GuildVoteFactory,
@@ -232,3 +232,91 @@ def describe_lease_with_guild_tenant():
 
 
 # ---------------------------------------------------------------------------
+# Fixture loading (synthetic data)
+# ---------------------------------------------------------------------------
+
+
+def describe_fixture_loading():
+    def it_loads_initial_data(tmp_path):
+        """Create synthetic objects, serialize to fixture, flush, reload, and verify."""
+        from django.core import serializers
+        from django.core.management import call_command
+
+        # 1. Create synthetic objects via factories
+        guild_a = GuildFactory(name="Ceramics Guild")
+        guild_b = GuildFactory(name="Glass Guild")
+        space_a = SpaceFactory(space_id="A-100", name="Studio A", sublet_guild=guild_a)
+        space_b = SpaceFactory(space_id="B-200", name="Workshop B")
+        member = MemberFactory(full_legal_name="Fixture Test Member")
+        today = timezone.now().date()
+        lease = LeaseFactory(
+            tenant_obj=guild_a,
+            space=space_a,
+            start_date=today - timedelta(days=10),
+            monthly_rent=Decimal("350.00"),
+        )
+
+        # Collect PKs before flush
+        guild_a_pk = guild_a.pk
+        guild_b_pk = guild_b.pk
+        space_a_pk = space_a.pk
+        space_b_pk = space_b.pk
+        member_pk = member.pk
+        lease_pk = lease.pk
+        plan_pk = member.membership_plan_id
+
+        # 2. Serialize all relevant objects to JSON fixture
+        objects = list(MembershipPlan.objects.filter(pk=plan_pk))
+        objects += list(Guild.objects.filter(pk__in=[guild_a_pk, guild_b_pk]))
+        objects += list(Member.objects.filter(pk=member_pk))
+        objects += list(Space.objects.filter(pk__in=[space_a_pk, space_b_pk]))
+        objects += list(Lease.objects.filter(pk=lease_pk))
+
+        fixture_json = serializers.serialize("json", objects, indent=2)
+        fixture_path = tmp_path / "test_fixture.json"
+        fixture_path.write_text(fixture_json)
+
+        # 3. Delete all created objects (order matters for FK constraints)
+        Lease.objects.filter(pk=lease_pk).delete()
+        Guild.objects.filter(pk__in=[guild_a_pk, guild_b_pk]).delete()
+        Member.objects.filter(pk=member_pk).delete()
+        Space.objects.filter(pk__in=[space_a_pk, space_b_pk]).delete()
+        MembershipPlan.objects.filter(pk=plan_pk).delete()
+
+        # Verify they are gone
+        assert Guild.objects.filter(pk=guild_a_pk).count() == 0
+        assert Space.objects.filter(pk=space_a_pk).count() == 0
+        assert Member.objects.filter(pk=member_pk).count() == 0
+        assert Lease.objects.filter(pk=lease_pk).count() == 0
+
+        # 4. Load the fixture
+        call_command("loaddata", str(fixture_path), verbosity=0)
+
+        # 5. Verify objects were loaded correctly
+        loaded_guild_a = Guild.objects.get(pk=guild_a_pk)
+        assert loaded_guild_a.name == "Ceramics Guild"
+
+        loaded_guild_b = Guild.objects.get(pk=guild_b_pk)
+        assert loaded_guild_b.name == "Glass Guild"
+
+        loaded_space_a = Space.objects.get(pk=space_a_pk)
+        assert loaded_space_a.space_id == "A-100"
+        assert loaded_space_a.name == "Studio A"
+
+        loaded_space_b = Space.objects.get(pk=space_b_pk)
+        assert loaded_space_b.space_id == "B-200"
+        assert loaded_space_b.name == "Workshop B"
+
+        loaded_member = Member.objects.get(pk=member_pk)
+        assert loaded_member.full_legal_name == "Fixture Test Member"
+
+        loaded_lease = Lease.objects.get(pk=lease_pk)
+        assert loaded_lease.monthly_rent == Decimal("350.00")
+        assert loaded_lease.space_id == space_a_pk
+        assert loaded_lease.tenant == loaded_guild_a
+
+        # Verify sublet_guild FK survived the round-trip
+        assert loaded_space_a.sublet_guild == loaded_guild_a
+        assert loaded_space_b.sublet_guild is None
+        assert loaded_guild_a.sublets.count() == 1
+        assert loaded_guild_a.sublets.first() == loaded_space_a

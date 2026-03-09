@@ -23,6 +23,14 @@ if SENTRY_DSN:
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-dev-key-change-in-production")
 DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() == "true"
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+# Render.com sets RENDER_EXTERNAL_HOSTNAME automatically; include it when present.
+_render_hostname = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
+if _render_hostname:
+    ALLOWED_HOSTS.append(_render_hostname)
+    print(f"[plfog] RENDER_EXTERNAL_HOSTNAME={_render_hostname} added to ALLOWED_HOSTS")
+else:
+    print("[plfog] RENDER_EXTERNAL_HOSTNAME not set")
+print(f"[plfog] Final ALLOWED_HOSTS={ALLOWED_HOSTS}")
 
 CSRF_TRUSTED_ORIGINS = (
     os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",") if os.environ.get("CSRF_TRUSTED_ORIGINS") else []
@@ -49,6 +57,7 @@ INSTALLED_APPS = [
     "allauth.socialaccount.providers.github",
     "allauth.socialaccount.providers.discord",
     "django_extensions",
+    "anymail",
     # Project apps
     "core",
     "membership",
@@ -182,9 +191,13 @@ if _admin_domains_raw.strip():
 else:
     ADMIN_DOMAINS = []
 
-EMAIL_BACKEND = (
-    "django.core.mail.backends.console.EmailBackend" if DEBUG else "django.core.mail.backends.smtp.EmailBackend"
-)
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend" if DEBUG else "anymail.backends.resend.EmailBackend"
+
+ANYMAIL = {
+    "RESEND_API_KEY": os.environ.get("RESEND_API_KEY"),
+}
+
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@pastlives.space")
 
 # OAuth providers (APP config pattern - no Django admin SocialApp needed)
 SOCIALACCOUNT_PROVIDERS = {

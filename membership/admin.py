@@ -81,6 +81,32 @@ class LeaseInlineGuild(GenericTabularInline):
         return obj.is_active
 
 
+class SubletInline(TabularInline):
+    """Read-only inline on GuildAdmin showing spaces sublet by the guild."""
+
+    model = Space
+    fk_name = "sublet_guild"
+    fields = ["space_id", "name", "space_type", "full_price_display"]
+    readonly_fields = ["space_id", "name", "space_type", "full_price_display"]
+    extra = 0
+
+    def has_add_permission(self, request: HttpRequest, obj: Guild | None = None) -> bool:
+        return False
+
+    def has_change_permission(self, request: HttpRequest, obj: Guild | None = None) -> bool:
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj: Guild | None = None) -> bool:
+        return False
+
+    @admin.display(description="Full Price")
+    def full_price_display(self, obj: Space) -> str:
+        price = obj.full_price
+        if price is None:
+            return "-"
+        return f"${price:.2f}"
+
+
 # ---------------------------------------------------------------------------
 # MembershipPlanAdmin
 # ---------------------------------------------------------------------------
@@ -185,9 +211,17 @@ class MemberAdmin(ModelAdmin):
 
 @admin.register(Guild)
 class GuildAdmin(ModelAdmin):
-    list_display = ["name", "guild_lead", "notes_preview"]
+    list_display = ["name", "guild_lead", "sublet_count", "notes_preview"]
     search_fields = ["name"]
-    inlines = [LeaseInlineGuild]
+    inlines = [SubletInline, LeaseInlineGuild]
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Guild]:
+        qs = super().get_queryset(request)
+        return qs.annotate(sublet_count=Count("sublets"))
+
+    @admin.display(description="Sublets", ordering="sublet_count")
+    def sublet_count(self, obj: Guild) -> int:
+        return obj.sublet_count
 
     @admin.display(description="Notes")
     def notes_preview(self, obj: Guild) -> str:
@@ -224,14 +258,15 @@ class SpaceAdmin(ModelAdmin):
         "vacancy_value_display",
         "is_rentable",
         "status",
+        "sublet_guild",
     ]
-    list_filter = ["space_type", "status", "is_rentable"]
+    list_filter = ["space_type", "status", "is_rentable", "sublet_guild"]
     search_fields = ["space_id", "name"]
     inlines = [LeaseInlineSpace]
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Space]:
         qs = super().get_queryset(request)
-        return qs.with_revenue()
+        return qs.select_related("sublet_guild").with_revenue()
 
     @admin.display(description="Full Price")
     def full_price_display(self, obj: Space) -> str:
