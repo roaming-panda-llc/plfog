@@ -32,9 +32,7 @@ def describe_active_nav():
 
         guild = GuildFactory()
         request = rf.get(f"/guilds/{guild.pk}/")
-        template = Template(
-            "{%% load hub_tags %%}{%% active_nav 'hub_guild_detail' %d %%}" % guild.pk
-        )
+        template = Template("{%% load hub_tags %%}{%% active_nav 'hub_guild_detail' %d %%}" % guild.pk)
         context = Context({"request": request})
 
         result = template.render(context)
@@ -46,9 +44,7 @@ def describe_active_nav():
 
         guild = GuildFactory()
         request = rf.get("/settings/profile/")
-        template = Template(
-            "{%% load hub_tags %%}{%% active_nav 'hub_guild_detail' %d %%}" % guild.pk
-        )
+        template = Template("{%% load hub_tags %%}{%% active_nav 'hub_guild_detail' %d %%}" % guild.pk)
         context = Context({"request": request})
 
         result = template.render(context)

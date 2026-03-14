@@ -25,9 +25,7 @@ def describe_get_hub_context():
         assert list(response.context["guilds"]) == [g1, g2]
 
     def it_returns_initials_from_member(client: Client):
-        user = User.objects.create_user(
-            username="u2", password="pass", first_name="Jane", last_name="Doe"
-        )
+        user = User.objects.create_user(username="u2", password="pass", first_name="Jane", last_name="Doe")
         MemberFactory(user=user, full_legal_name="Jane Doe")
         client.login(username="u2", password="pass")
 
