@@ -53,11 +53,24 @@ def describe_get_hub_context():
 
 
 def describe_get_member():
-    """Tests for _get_member helper."""
+    """Tests for _get_member helper (callers are @login_required)."""
 
-    def it_returns_none_for_unauthenticated_user(rf: RequestFactory):
+    @pytest.mark.django_db
+    def it_returns_member_when_linked(rf: RequestFactory):
+        user = User.objects.create_user(username="has_member", password="pass")
+        member = MemberFactory(user=user, full_legal_name="Has Member")
         request = rf.get("/settings/profile/")
-        request.user = AnonymousUser()
+        request.user = user
+
+        result = _get_member(request)
+
+        assert result == member
+
+    @pytest.mark.django_db
+    def it_returns_none_when_no_member_linked(rf: RequestFactory):
+        user = User.objects.create_user(username="no_member", password="pass")
+        request = rf.get("/settings/profile/")
+        request.user = user
 
         result = _get_member(request)
 

@@ -28,11 +28,11 @@ def _get_hub_context(request: HttpRequest) -> dict[str, Any]:
 
 
 def _get_member(request: HttpRequest) -> Member | None:
-    """Get the Member for the logged-in user, or None."""
-    user = request.user
-    if not user.is_authenticated:
-        return None
-    member: Member | None = getattr(user, "member", None)
+    """Get the Member for the logged-in user, or None.
+
+    Callers must be decorated with @login_required.
+    """
+    member: Member | None = getattr(request.user, "member", None)
     return member
 
 
