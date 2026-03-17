@@ -12,10 +12,13 @@ class ProfileSettingsForm(forms.ModelForm):
 
     class Meta:
         model = Member
-        fields = ["preferred_name", "phone"]
+        fields = ["preferred_name", "phone", "show_in_directory"]
         widgets = {
             "preferred_name": forms.TextInput(attrs={"placeholder": "How should we call you?"}),
             "phone": forms.TextInput(attrs={"placeholder": "(optional)"}),
+        }
+        labels = {
+            "show_in_directory": "Show me in the member directory",
         }
 
 

@@ -99,11 +99,12 @@ def describe_member_directory():
         response = client.get("/members/")
         assert response.status_code == 302
 
-    def it_lists_active_members(client: Client):
+    def it_lists_active_opted_in_members(client: Client):
         User.objects.create_user(username="viewer", password="pass")
-        m1 = MemberFactory(full_legal_name="Alice", status="active")
-        m2 = MemberFactory(full_legal_name="Bob", status="active")
-        MemberFactory(full_legal_name="Former", status="former")
+        m1 = MemberFactory(full_legal_name="Alice", status="active", show_in_directory=True)
+        m2 = MemberFactory(full_legal_name="Bob", status="active", show_in_directory=True)
+        MemberFactory(full_legal_name="Hidden", status="active", show_in_directory=False)
+        MemberFactory(full_legal_name="Former", status="former", show_in_directory=True)
         client.login(username="viewer", password="pass")
 
         response = client.get("/members/")
@@ -112,7 +113,7 @@ def describe_member_directory():
         members = list(response.context["members"])
         assert m1 in members
         assert m2 in members
-        assert all(m.status == "active" for m in members)
+        assert len(members) == 2
 
 
 @pytest.mark.django_db

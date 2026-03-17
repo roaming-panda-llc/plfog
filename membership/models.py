@@ -125,6 +125,7 @@ class Member(models.Model):
     join_date = models.DateField(null=True, blank=True)
     cancellation_date = models.DateField(null=True, blank=True)
     committed_until = models.DateField(null=True, blank=True)
+    show_in_directory = models.BooleanField(default=False)
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     leases = GenericRelation(
