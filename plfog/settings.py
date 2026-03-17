@@ -39,6 +39,9 @@ CSRF_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_SECURE = not DEBUG
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
+# Allauth needs to know about the reverse proxy to resolve client IPs for rate limiting
+ALLAUTH_TRUSTED_PROXY_COUNT = int(os.environ.get("ALLAUTH_TRUSTED_PROXY_COUNT", "0"))
+
 INSTALLED_APPS = [
     "unfold",
     "unfold.contrib.forms",
