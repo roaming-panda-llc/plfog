@@ -125,6 +125,14 @@ def guild_voting(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+def member_directory(request: HttpRequest) -> HttpResponse:
+    """Member directory page — lists all active members."""
+    ctx = _get_hub_context(request)
+    members = Member.objects.filter(status=Member.Status.ACTIVE).select_related("membership_plan").order_by("full_legal_name")
+    return render(request, "hub/member_directory.html", {**ctx, "members": members})
+
+
+@login_required
 def snapshot_history(request: HttpRequest) -> HttpResponse:
     """Funding snapshot history page — lists all past snapshots."""
     ctx = _get_hub_context(request)

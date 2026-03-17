@@ -94,6 +94,28 @@ def describe_guild_voting():
 
 
 @pytest.mark.django_db
+def describe_member_directory():
+    def it_requires_login(client: Client):
+        response = client.get("/members/")
+        assert response.status_code == 302
+
+    def it_lists_active_members(client: Client):
+        User.objects.create_user(username="viewer", password="pass")
+        m1 = MemberFactory(full_legal_name="Alice", status="active")
+        m2 = MemberFactory(full_legal_name="Bob", status="active")
+        MemberFactory(full_legal_name="Former", status="former")
+        client.login(username="viewer", password="pass")
+
+        response = client.get("/members/")
+
+        assert response.status_code == 200
+        members = list(response.context["members"])
+        assert m1 in members
+        assert m2 in members
+        assert all(m.status == "active" for m in members)
+
+
+@pytest.mark.django_db
 def describe_guild_detail():
     def it_requires_login(client: Client):
         guild = GuildFactory()
