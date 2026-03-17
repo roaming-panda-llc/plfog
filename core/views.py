@@ -7,7 +7,7 @@ from pathlib import Path
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET, require_POST
 
 from .models import PushSubscription
@@ -22,6 +22,8 @@ def health_check(request):
 
 def home(request):
     """Home page view."""
+    if request.user.is_authenticated:
+        return redirect("hub_guild_voting")
     return render(request, "home.html")
 
 

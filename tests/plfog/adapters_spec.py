@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.contrib.auth.models import User
 from django.test import RequestFactory, override_settings
+from django.urls import reverse
 
 pytestmark = pytest.mark.django_db
 
@@ -501,9 +502,9 @@ def describe_AdminRedirectAccountAdapter():
 
             url = adapter.get_login_redirect_url(request)
 
-            assert url == "/admin/"
+            assert url == reverse("admin:index")
 
-        def it_redirects_non_staff_to_default(rf):
+        def it_redirects_non_staff_to_hub(rf):
             from plfog.adapters import AdminRedirectAccountAdapter
 
             adapter = AdminRedirectAccountAdapter()
@@ -511,7 +512,7 @@ def describe_AdminRedirectAccountAdapter():
 
             url = adapter.get_login_redirect_url(request)
 
-            assert url == "/"
+            assert url == reverse("hub_guild_voting")
 
         def it_redirects_staff_superuser_to_admin(rf):
             from plfog.adapters import AdminRedirectAccountAdapter
@@ -521,9 +522,9 @@ def describe_AdminRedirectAccountAdapter():
 
             url = adapter.get_login_redirect_url(request)
 
-            assert url == "/admin/"
+            assert url == reverse("admin:index")
 
-        def it_redirects_superuser_without_staff_to_default(rf):
+        def it_redirects_superuser_without_staff_to_hub(rf):
             from plfog.adapters import AdminRedirectAccountAdapter
 
             adapter = AdminRedirectAccountAdapter()
@@ -531,27 +532,15 @@ def describe_AdminRedirectAccountAdapter():
 
             url = adapter.get_login_redirect_url(request)
 
-            assert url == "/"
+            assert url == reverse("hub_guild_voting")
 
-        def describe_custom_login_redirect_url():
-            @override_settings(LOGIN_REDIRECT_URL="/dashboard/")
-            def it_respects_custom_url_for_non_staff(rf):
-                from plfog.adapters import AdminRedirectAccountAdapter
+        @override_settings(LOGIN_REDIRECT_URL="/dashboard/")
+        def it_ignores_custom_url_for_staff(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
 
-                adapter = AdminRedirectAccountAdapter()
-                request = _make_request_with_user(rf, is_staff=False, is_superuser=False)
+            adapter = AdminRedirectAccountAdapter()
+            request = _make_request_with_user(rf, is_staff=True, is_superuser=False)
 
-                url = adapter.get_login_redirect_url(request)
+            url = adapter.get_login_redirect_url(request)
 
-                assert url == "/dashboard/"
-
-            @override_settings(LOGIN_REDIRECT_URL="/dashboard/")
-            def it_ignores_custom_url_for_staff(rf):
-                from plfog.adapters import AdminRedirectAccountAdapter
-
-                adapter = AdminRedirectAccountAdapter()
-                request = _make_request_with_user(rf, is_staff=True, is_superuser=False)
-
-                url = adapter.get_login_redirect_url(request)
-
-                assert url == "/admin/"
+            assert url == reverse("admin:index")

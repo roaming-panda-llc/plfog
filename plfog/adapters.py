@@ -6,6 +6,7 @@ from allauth.account.adapter import DefaultAccountAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from django.conf import settings
 from django.http import HttpRequest
+from django.urls import reverse
 
 logger = logging.getLogger(__name__)
 
@@ -72,5 +73,5 @@ class AdminRedirectAccountAdapter(DefaultAccountAdapter):
 
     def get_login_redirect_url(self, request: HttpRequest) -> str:
         if request.user.is_staff:
-            return "/admin/"
-        return super().get_login_redirect_url(request)
+            return reverse("admin:index")
+        return reverse("hub_guild_voting")
