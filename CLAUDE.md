@@ -55,62 +55,67 @@ DJANGO_SETTINGS_MODULE: "plfog.settings"
 
 **WRONG — logic in views:**
 ```python
-class OrderView(APIView):
+class MembershipView(APIView):
     def post(self, request):
-        total = sum(item["price"] * item["qty"] for item in request.data["items"])
-        discount = total * 0.1 if request.data.get("coupon") else 0
-        order = Order.objects.create(total=total - discount, discount=discount)
-        return Response({"id": order.id, "total": order.total})
+        member = Member.objects.get(pk=request.data["member_id"])
+        if member.membership_end and member.membership_end > timezone.now():
+            return Response({"error": "Already active"}, status=400)
+        member.membership_start = timezone.now()
+        member.membership_end = timezone.now() + timedelta(days=365)
+        member.status = "active"
+        member.save()
+        send_mail("Welcome!", "Your membership is active.", None, [member.email])
+        return Response({"status": "activated"})
 ```
 
 **RIGHT — logic in models, validation in forms:**
 ```python
 # models.py
-class Order(models.Model):
-    def calculate_total(self) -> Decimal:
-        """Calculate order total with discounts and tax."""
-        subtotal_data = self.items.aggregate(subtotal=Sum(F("price") * F("quantity")))
-        subtotal = subtotal_data["subtotal"] or 0
-        return (subtotal - self.apply_discount(subtotal)) * self.tax_rate
+class Membership(models.Model):
+    member = models.ForeignKey(Member, on_delete=models.CASCADE, help_text="The member this belongs to.")
+    starts_at = models.DateTimeField(help_text="When the membership period begins.")
+    ends_at = models.DateTimeField(help_text="When the membership period expires.")
 
-    def place(self) -> None:
-        """Place the order — updates status and triggers notifications."""
-        self.status = "placed"
-        self.placed_at = timezone.now()
+    @property
+    def is_active(self) -> bool:
+        return self.starts_at <= timezone.now() < self.ends_at
+
+    def renew(self, duration_days: int = 365) -> None:
+        """Extend or create a new membership period."""
+        self.starts_at = max(self.ends_at, timezone.now())
+        self.ends_at = self.starts_at + timedelta(days=duration_days)
         self.save()
-        self.send_confirmation_email()
+        self.member.send_membership_confirmation()
 
 # forms.py — validation lives here, not in views
-class OrderForm(forms.ModelForm):
-    class Meta:
-        model = Order
-        fields = ["customer", "items"]
+class MembershipRenewalForm(forms.Form):
+    member = forms.ModelChoiceField(queryset=Member.objects.all())
 
-    def clean(self):
-        cleaned_data = super().clean()
-        errors = Order.validate_inventory(cleaned_data.get("items", []))
-        if errors:
-            raise ValidationError(errors)
-        return cleaned_data
+    def clean_member(self):
+        member = self.cleaned_data["member"]
+        active = member.membership_set.filter(ends_at__gt=timezone.now()).exists()
+        if active:
+            raise ValidationError("Member already has an active membership.")
+        return member
 
 # views.py (minimal — no business logic, no validation)
-class OrderViewSet(viewsets.ModelViewSet):
+class MembershipViewSet(viewsets.ModelViewSet):
     def create(self, request):
-        form = OrderForm(data=request.data)
+        form = MembershipRenewalForm(data=request.data)
         if not form.is_valid():
             return Response({"errors": form.errors}, status=400)
-        order = form.save()
-        order.place()
-        return Response(self.get_serializer(order).data, status=201)
+        membership = Membership.objects.create(member=form.cleaned_data["member"])
+        membership.renew()
+        return Response(self.get_serializer(membership).data, status=201)
 ```
 
 | Use Case | Location |
 |----------|----------|
-| Single object operations | Model methods (`order.place()`, `user.deactivate()`) |
-| Input validation | Forms (`OrderForm.clean()`) |
-| Querying/filtering | Manager (`Order.objects.pending()`) |
+| Single object operations | Model methods (`membership.renew()`, `member.deactivate()`) |
+| Input validation | Forms (`MembershipRenewalForm.clean_member()`) |
+| Querying/filtering | Manager (`Membership.objects.active()`) |
 | Aggregations across records | Manager |
-| Object-specific calculations | Model properties/methods |
+| Object-specific calculations | Model properties (`membership.is_active`) |
 | Cross-model orchestration | Service module (`services.py`) |
 
 **Signals:** Prefer model methods over signals. Use signals only for cross-app decoupling where the sender should not know about the receiver.
