@@ -1,0 +1,60 @@
+name: Auto-Approve on Copilot Review
+
+# Trigger when a pull request review is submitted
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  auto-approve:
+    runs-on: ubuntu-latest
+
+    # Only run when Copilot submits a review (not our bot, not humans)
+    if: >-
+      github.event.review.user.login == 'github-copilot[bot]'
+      && github.event.review.state == 'commented'
+
+    steps:
+      - name: Log review details
+        run: |
+          echo "Review by: ${{ github.event.review.user.login }}"
+          echo "Review state: ${{ github.event.review.state }}"
+          echo "PR #${{ github.event.pull_request.number }}"
+
+      - name: Check Copilot review body for issues
+        id: check
+        env:
+          REVIEW_BODY: ${{ github.event.review.body }}
+        run: |
+          echo "--- Copilot Review Body ---"
+          echo "$REVIEW_BODY"
+          echo "---"
+
+          # Reject if Copilot flagged concerns (adjust patterns to match Copilot's output)
+          if echo "$REVIEW_BODY" | grep -qiE '(security|vulnerability|bug|critical|error|issue found|concern)'; then
+            echo "approve=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Copilot flagged concerns — skipping auto-approve"
+          else
+            echo "approve=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Approve PR via Bot account
+        if: steps.check.outputs.approve == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.BOT_PAT }}
+        run: |
+          gh api \
+            --method POST \
+            repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews \
+            -f event='APPROVE' \
+            -f body='Automatically approved — Copilot review passed with no concerns flagged.'
+
+      - name: Post warning comment if not approved
+        if: steps.check.outputs.approve == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.BOT_PAT }}
+        run: |
+          gh api \
+            --method POST \
+            repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+            -f body='⚠️ **Auto-approve skipped** — Copilot flagged potential concerns in this PR. A human reviewer should take a look.'
