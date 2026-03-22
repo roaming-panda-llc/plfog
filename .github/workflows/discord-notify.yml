@@ -1,0 +1,31 @@
+name: Discord Notifications
+
+on:
+  pull_request:
+    types: [opened]
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Discord — PR Opened
+        if: github.event_name == 'pull_request'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -H "Content-Type: application/json" \
+            -d "{\"embeds\": [{\"title\": \"New PR: ${{ github.event.pull_request.title }}\", \"url\": \"${{ github.event.pull_request.html_url }}\", \"description\": \"Opened by ${{ github.event.pull_request.user.login }}\", \"color\": 5814783}]}" \
+            "$DISCORD_WEBHOOK_URL"
+
+      - name: Notify Discord — Merged to main
+        if: github.event_name == 'push'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          COMMIT_MSG=$(echo '${{ github.event.head_commit.message }}' | head -1)
+          curl -H "Content-Type: application/json" \
+            -d "{\"embeds\": [{\"title\": \"Merged to main\", \"url\": \"${{ github.event.head_commit.url }}\", \"description\": \"$COMMIT_MSG\", \"color\": 3066993}]}" \
+            "$DISCORD_WEBHOOK_URL"
