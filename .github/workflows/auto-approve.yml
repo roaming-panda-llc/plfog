@@ -1,4 +1,4 @@
-name: Auto-Approve on Copilot Review
+name: Bot Approve on AI Review
 
 # Trigger when a pull request review is submitted
 on:
@@ -6,12 +6,12 @@ on:
     types: [submitted]
 
 jobs:
-  auto-approve:
+  bot-approve:
     runs-on: ubuntu-latest
 
-    # Only run when Copilot submits a review (not our bot, not humans)
+    # Only run for known AI reviewer bots — never for our own bot or humans
     if: >-
-      github.event.review.user.login == 'github-copilot[bot]'
+      contains(fromJSON('["github-copilot[bot]","coderabbitai[bot]","cursor-bot[bot]"]'), github.event.review.user.login)
       && github.event.review.state == 'commented'
 
     steps:
@@ -21,19 +21,19 @@ jobs:
           echo "Review state: ${{ github.event.review.state }}"
           echo "PR #${{ github.event.pull_request.number }}"
 
-      - name: Check Copilot review body for issues
+      - name: Check review body for issues
         id: check
         env:
           REVIEW_BODY: ${{ github.event.review.body }}
         run: |
-          echo "--- Copilot Review Body ---"
+          echo "--- AI Review Body ---"
           echo "$REVIEW_BODY"
           echo "---"
 
-          # Reject if Copilot flagged concerns (adjust patterns to match Copilot's output)
+          # Reject if the AI reviewer flagged concerns
           if echo "$REVIEW_BODY" | grep -qiE '(security|vulnerability|bug|critical|error|issue found|concern)'; then
             echo "approve=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Copilot flagged concerns — skipping auto-approve"
+            echo "::warning::AI reviewer flagged concerns — skipping auto-approve"
           else
             echo "approve=true" >> "$GITHUB_OUTPUT"
           fi
@@ -47,7 +47,7 @@ jobs:
             --method POST \
             repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews \
             -f event='APPROVE' \
-            -f body='Automatically approved — Copilot review passed with no concerns flagged.'
+            -f body='Automatically approved — AI review by ${{ github.event.review.user.login }} passed with no concerns flagged.'
 
       - name: Post warning comment if not approved
         if: steps.check.outputs.approve == 'false'
@@ -57,4 +57,4 @@ jobs:
           gh api \
             --method POST \
             repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
-            -f body='⚠️ **Auto-approve skipped** — Copilot flagged potential concerns in this PR. A human reviewer should take a look.'
+            -f body='⚠️ **Auto-approve skipped** — ${{ github.event.review.user.login }} flagged potential concerns in this PR. A human reviewer should take a look.'
