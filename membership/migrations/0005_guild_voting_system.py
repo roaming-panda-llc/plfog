@@ -21,6 +21,12 @@ def backfill_session(apps: Any, schema_editor: Any) -> None:
     GuildVote.objects.filter(session__isnull=True).update(session=session)
 
 
+def reverse_backfill_session(apps: Any, schema_editor: Any) -> None:
+    """Remove the Legacy session created by the forward migration."""
+    VotingSession = apps.get_model("membership", "VotingSession")
+    VotingSession.objects.filter(name="Legacy").delete()
+
+
 class Migration(migrations.Migration):
     dependencies = [
         ("membership", "0004_space_sublet_guild"),
@@ -103,7 +109,7 @@ class Migration(migrations.Migration):
             ),
         ),
         # 7. Backfill session for existing votes
-        migrations.RunPython(backfill_session, migrations.RunPython.noop),
+        migrations.RunPython(backfill_session, reverse_backfill_session),
         # 8. Make session non-nullable
         migrations.AlterField(
             model_name="guildvote",

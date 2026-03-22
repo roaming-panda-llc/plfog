@@ -43,7 +43,7 @@ def calculate_results(
             ("guild_2nd", WEIGHTS["2nd"]),
             ("guild_3rd", WEIGHTS["3rd"]),
         ]:
-            guild_name = vote.get(rank_key, "")
+            guild_name = vote[rank_key]
             if guild_name:
                 guild_scores[guild_name]["total_points"] += weight
                 vote_count_key = rank_key.replace("guild_", "votes_")

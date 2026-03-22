@@ -26,8 +26,9 @@ def ensure_user_has_member(sender: type, instance: Any, **kwargs: Any) -> None:
     except Member.DoesNotExist:
         pass
 
-    plan = MembershipPlan.objects.first()
-    if plan is None:
+    try:
+        plan = MembershipPlan.objects.order_by("pk").earliest("pk")
+    except MembershipPlan.DoesNotExist:
         logger.warning(
             "Cannot auto-create Member for user %s: no MembershipPlan exists.",
             instance.username,
@@ -42,4 +43,4 @@ def ensure_user_has_member(sender: type, instance: Any, **kwargs: Any) -> None:
         membership_plan=plan,
         status=Member.Status.ACTIVE,
     )
-    logger.info("Auto-created Member for user %s.", instance.username)
+    logger.info("Auto-created Member for user %s with plan '%s'.", instance.username, plan.name)

@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-import calendar
 from typing import Any
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.utils import timezone
 
 from hub.forms import EmailPreferencesForm, ProfileSettingsForm, VotePreferenceForm
+from membership.cycle import get_cycle_context
 from membership.models import FundingSnapshot, Guild, Member, VotePreference
 
 
@@ -38,32 +37,12 @@ def _get_member(request: HttpRequest) -> Member | None:
     return member
 
 
-def _get_cycle_context() -> dict[str, Any]:
-    """Build voting cycle context variables for the current month."""
-    now = timezone.now()
-    current_cycle_label = now.strftime("%B %Y")
-    last_day = calendar.monthrange(now.year, now.month)[1]
-    cycle_closes_on = now.replace(day=last_day).strftime("%B %d, %Y").replace(" 0", " ")
-    if now.month == 12:
-        next_year = now.year + 1
-        next_month = 1
-    else:
-        next_year = now.year
-        next_month = now.month + 1
-    next_cycle_begins = now.replace(year=next_year, month=next_month, day=1).strftime("%B %d, %Y").replace(" 0", " ")
-    return {
-        "current_cycle_label": current_cycle_label,
-        "cycle_closes_on": cycle_closes_on,
-        "next_cycle_begins": next_cycle_begins,
-    }
-
-
 @login_required
 def guild_voting(request: HttpRequest) -> HttpResponse:
     """Guild voting page — members submit or update their persistent guild preferences."""
     member = _get_member(request)
     ctx = _get_hub_context(request)
-    cycle_ctx = _get_cycle_context()
+    cycle_ctx = get_cycle_context()
 
     preference: VotePreference | None = None
     if member is not None:

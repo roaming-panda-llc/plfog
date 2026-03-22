@@ -125,7 +125,9 @@ class Member(models.Model):
     join_date = models.DateField(null=True, blank=True)
     cancellation_date = models.DateField(null=True, blank=True)
     committed_until = models.DateField(null=True, blank=True)
-    show_in_directory = models.BooleanField(default=False)
+    show_in_directory = models.BooleanField(
+        default=False, help_text="Whether this member appears in the public member directory."
+    )
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     leases = GenericRelation(
@@ -248,11 +250,31 @@ class Guild(models.Model):
 class VotePreference(models.Model):
     """Persistent guild funding vote per member — updated anytime, one row per member."""
 
-    member = models.OneToOneField(Member, on_delete=models.CASCADE, related_name="vote_preference")
-    guild_1st = models.ForeignKey(Guild, on_delete=models.CASCADE, related_name="first_choice_votes")
-    guild_2nd = models.ForeignKey(Guild, on_delete=models.CASCADE, related_name="second_choice_votes")
-    guild_3rd = models.ForeignKey(Guild, on_delete=models.CASCADE, related_name="third_choice_votes")
-    updated_at = models.DateTimeField(auto_now=True)
+    member = models.OneToOneField(
+        Member,
+        on_delete=models.CASCADE,
+        related_name="vote_preference",
+        help_text="The member who cast this vote.",
+    )
+    guild_1st = models.ForeignKey(
+        Guild,
+        on_delete=models.CASCADE,
+        related_name="first_choice_votes",
+        help_text="First-choice guild (5 points).",
+    )
+    guild_2nd = models.ForeignKey(
+        Guild,
+        on_delete=models.CASCADE,
+        related_name="second_choice_votes",
+        help_text="Second-choice guild (3 points).",
+    )
+    guild_3rd = models.ForeignKey(
+        Guild,
+        on_delete=models.CASCADE,
+        related_name="third_choice_votes",
+        help_text="Third-choice guild (2 points).",
+    )
+    updated_at = models.DateTimeField(auto_now=True, help_text="When this vote was last changed.")
 
     class Meta:
         verbose_name = "Vote Preference"
@@ -265,11 +287,17 @@ class VotePreference(models.Model):
 class FundingSnapshot(models.Model):
     """Immutable historical record of a funding calculation at a point in time."""
 
-    cycle_label = models.CharField(max_length=100)
-    snapshot_at = models.DateTimeField(auto_now_add=True)
-    contributor_count = models.PositiveIntegerField()
-    funding_pool = models.DecimalField(max_digits=10, decimal_places=2)
-    results = models.JSONField(default=dict)
+    cycle_label = models.CharField(
+        max_length=100, help_text="Human-readable label for the funding cycle (e.g. 'March 2026')."
+    )
+    snapshot_at = models.DateTimeField(auto_now_add=True, help_text="When this snapshot was taken.")
+    contributor_count = models.PositiveIntegerField(
+        help_text="Number of paying members who contributed to the funding pool."
+    )
+    funding_pool = models.DecimalField(
+        max_digits=10, decimal_places=2, help_text="Total dollar pool (contributor_count × $10)."
+    )
+    results = models.JSONField(default=dict, help_text="Full calculation results including per-guild breakdowns.")
 
     class Meta:
         ordering = ["-snapshot_at"]

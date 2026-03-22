@@ -1,5 +1,7 @@
 """Tests for vote_calculator module."""
 
+import pytest
+
 from membership.vote_calculator import DOLLARS_PER_MEMBER, WEIGHTS, calculate_results, results_to_json
 
 
@@ -90,13 +92,10 @@ def describe_calculate_results():
         fundings = [r["funding"] for r in result["results"]]
         assert fundings == sorted(fundings, reverse=True)
 
-    def it_handles_missing_guild_keys_gracefully():
+    def it_raises_on_missing_guild_keys():
         votes = [{"guild_1st": "Ceramics"}]  # missing 2nd and 3rd
-        result = calculate_results(votes=votes)
-        assert result["votes_cast"] == 1
-        assert len(result["results"]) == 1
-        assert result["results"][0]["guild_name"] == "Ceramics"
-        assert result["results"][0]["total_points"] == 5
+        with pytest.raises(KeyError):
+            calculate_results(votes=votes)
 
     def it_handles_empty_guild_names():
         """When votes have empty guild names, no results are produced."""

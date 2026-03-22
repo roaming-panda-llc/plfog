@@ -11,7 +11,7 @@ from django.contrib.auth.models import User
 from django.test import Client
 
 from hub.forms import VotePreferenceForm
-from hub.views import _get_cycle_context
+from membership.cycle import get_cycle_context
 from membership.models import VotePreference
 from tests.membership.factories import (
     FundingSnapshotFactory,
@@ -29,9 +29,9 @@ from tests.membership.factories import (
 def describe_get_cycle_context():
     def it_returns_correct_labels_for_a_regular_month():
         fixed = dt.datetime(2026, 3, 15, 12, 0, 0, tzinfo=dt.timezone.utc)
-        with patch("hub.views.timezone") as mock_tz:
+        with patch("membership.cycle.timezone") as mock_tz:
             mock_tz.now.return_value = fixed
-            ctx = _get_cycle_context()
+            ctx = get_cycle_context()
 
         assert ctx["current_cycle_label"] == "March 2026"
         assert "March 31, 2026" in ctx["cycle_closes_on"]
@@ -39,9 +39,9 @@ def describe_get_cycle_context():
 
     def it_handles_december_rollover_to_january():
         fixed = dt.datetime(2026, 12, 10, 12, 0, 0, tzinfo=dt.timezone.utc)
-        with patch("hub.views.timezone") as mock_tz:
+        with patch("membership.cycle.timezone") as mock_tz:
             mock_tz.now.return_value = fixed
-            ctx = _get_cycle_context()
+            ctx = get_cycle_context()
 
         assert ctx["current_cycle_label"] == "December 2026"
         assert "December 31, 2026" in ctx["cycle_closes_on"]
