@@ -1,0 +1,11 @@
+{% load i18n unfold %}
+
+<div class="admin-sidebar-wrapper" :class="{ 'admin-sidebar-wrapper--closed': !sidebarDesktopOpen }">
+    <div id="nav-sidebar" class="admin-sidebar {% element_classes 'navigation' %}">
+        {% if templates.navigation %}
+            {% include templates.navigation %}
+        {% else %}
+            {% include "unfold/helpers/navigation.html" %}
+        {% endif %}
+    </div>
+</div>

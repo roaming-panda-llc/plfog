@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from django import forms
+from django.conf import settings
+from django.core.mail import send_mail
+
+if TYPE_CHECKING:
+    from django.contrib.auth.models import User
 
 from membership.models import Guild, Member
 
@@ -26,6 +33,38 @@ class EmailPreferencesForm(forms.Form):
     """Form for email notification preferences."""
 
     voting_results = forms.BooleanField(required=False, label="Voting Result Emails")
+
+
+class BetaFeedbackForm(forms.Form):
+    """Form for submitting beta feedback (bug reports, feature requests, general feedback)."""
+
+    CATEGORY_CHOICES = [
+        ("bug", "Bug Report"),
+        ("feature", "Feature Request"),
+        ("feedback", "General Feedback"),
+    ]
+
+    category = forms.ChoiceField(choices=CATEGORY_CHOICES, label="Category")
+    subject = forms.CharField(max_length=200, label="Subject")
+    message = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 6, "placeholder": "Describe your issue or idea..."}), label="Message"
+    )
+
+    def send(self, *, user: User) -> None:
+        """Send the feedback email to the configured recipients."""
+        category_label = dict(self.CATEGORY_CHOICES)[self.cleaned_data["category"]]
+        subject = f"[Beta {category_label}] {self.cleaned_data['subject']}"
+        body = (
+            f"From: {user.get_full_name() or user.email} ({user.email})\n"
+            f"Category: {category_label}\n\n"
+            f"{self.cleaned_data['message']}"
+        )
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=settings.BETA_FEEDBACK_EMAILS,
+        )
 
 
 class VotePreferenceForm(forms.Form):

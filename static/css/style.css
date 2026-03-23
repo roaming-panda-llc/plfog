@@ -197,6 +197,18 @@ p:last-child {
     color: var(--color-accent);
 }
 
+.site-beta-badge {
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.125rem 0.5rem;
+    border-radius: 10px;
+    background-color: rgba(238, 180, 75, 0.15);
+    color: var(--color-tuscan-yellow);
+    margin-left: 0.5rem;
+}
+
 .site-nav__link {
     font-size: 0.9rem;
     font-weight: 400;

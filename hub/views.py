@@ -6,10 +6,11 @@ from typing import Any
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
-from hub.forms import EmailPreferencesForm, ProfileSettingsForm, VotePreferenceForm
+from hub.forms import BetaFeedbackForm, EmailPreferencesForm, ProfileSettingsForm, VotePreferenceForm
 from membership.cycle import get_cycle_context
 from membership.models import FundingSnapshot, Guild, Member, VotePreference
 
@@ -175,3 +176,22 @@ def email_preferences(request: HttpRequest) -> HttpResponse:
         form = EmailPreferencesForm(initial={"voting_results": True})
 
     return render(request, "hub/email_preferences.html", {**ctx, "form": form})
+
+
+@login_required
+def beta_feedback(request: HttpRequest) -> HttpResponse:
+    """Beta feedback page — users can report bugs, request features, or leave general feedback."""
+    ctx = _get_hub_context(request)
+
+    user: User = request.user  # type: ignore[assignment]  # @login_required guarantees User
+
+    if request.method == "POST":
+        form = BetaFeedbackForm(request.POST)
+        if form.is_valid():
+            form.send(user=user)
+            messages.success(request, "Thanks for your feedback! We'll review it soon.")
+            return redirect("hub_beta_feedback")
+    else:
+        form = BetaFeedbackForm()
+
+    return render(request, "hub/beta_feedback.html", {**ctx, "form": form})

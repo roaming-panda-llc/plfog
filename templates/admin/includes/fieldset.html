@@ -1,0 +1,67 @@
+{% load i18n %}
+
+<div class="hub-card pl-admin-fieldset{% if fieldset.classes %} {{ fieldset.classes }}{% endif %}">
+    {% if fieldset.name %}
+    <h2 class="pl-admin-fieldset__heading">{{ fieldset.name }}</h2>
+    {% endif %}
+
+    {% if fieldset.description %}
+    <p class="hub-text-muted" style="margin-bottom: 1rem; font-size: 0.875rem;">{{ fieldset.description|safe }}</p>
+    {% endif %}
+
+    {% for line in fieldset %}
+    <div class="hub-form-group{% if line.fields|length == 1 and line.errors %} has-error{% endif %}{% if not line.has_visible_field %} hidden{% endif %}">
+        {% if line.fields|length == 1 %}
+            {% for field in line %}
+                {% if not field.field.is_hidden %}
+                    {% if field.is_checkbox %}
+                        <div class="pl-admin-checkbox-row">
+                            {{ field.field }}
+                            <label for="{{ field.field.id_for_label }}">{{ field.field.label }}</label>
+                        </div>
+                    {% else %}
+                        <label for="{{ field.field.id_for_label }}">{{ field.field.label }}{% if field.field.field.required %} <span class="pl-required">*</span>{% endif %}</label>
+                        {% if field.is_readonly %}
+                            <div class="pl-admin-readonly">{{ field.contents }}</div>
+                        {% else %}
+                            {{ field.field }}
+                        {% endif %}
+                    {% endif %}
+                    {% for error in field.errors %}
+                    <span class="hub-field-error">{{ error }}</span>
+                    {% endfor %}
+                    {% if field.field.help_text %}
+                    <span class="hub-field-hint">{{ field.field.help_text|safe }}</span>
+                    {% endif %}
+                {% else %}
+                    {{ field.field }}
+                {% endif %}
+            {% endfor %}
+        {% else %}
+            {# Multi-field line #}
+            <div class="pl-admin-multi-field">
+            {% for field in line %}
+                <div class="pl-admin-multi-field__item">
+                    {% if not field.field.is_hidden %}
+                        <label for="{{ field.field.id_for_label }}">{{ field.field.label }}{% if field.field.field.required %} <span class="pl-required">*</span>{% endif %}</label>
+                        {% if field.is_readonly %}
+                            <div class="pl-admin-readonly">{{ field.contents }}</div>
+                        {% else %}
+                            {{ field.field }}
+                        {% endif %}
+                        {% for error in field.errors %}
+                        <span class="hub-field-error">{{ error }}</span>
+                        {% endfor %}
+                        {% if field.field.help_text %}
+                        <span class="hub-field-hint">{{ field.field.help_text|safe }}</span>
+                        {% endif %}
+                    {% else %}
+                        {{ field.field }}
+                    {% endif %}
+                </div>
+            {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>

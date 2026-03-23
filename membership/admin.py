@@ -15,6 +15,7 @@ from .models import FundingSnapshot, Guild, Member, VotePreference
 
 @admin.register(Member)
 class MemberAdmin(ModelAdmin):
+    change_list_template = "admin/membership/member/change_list.html"
     list_display = [
         "display_name",
         "email",

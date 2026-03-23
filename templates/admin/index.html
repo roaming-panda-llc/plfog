@@ -3,14 +3,10 @@
 
 {% block title %}Dashboard | {{ site_title }}{% endblock %}
 
-{% block branding %}
-    {% include "unfold/helpers/site_branding.html" %}
-{% endblock %}
-
 {% block content %}
 <style>
     /* Dashboard-specific styles matching the member hub */
-    .pl-dashboard { display: flex; flex-direction: column; gap: 1.5rem; max-width: 860px; }
+    .pl-dashboard { display: flex; flex-direction: column; gap: 1.5rem; padding: 2rem 2.5rem; }
     .pl-card {
         background-color: #092E4C;
         border: 1px solid transparent;
@@ -215,9 +211,6 @@
         </form>
         <a href="{% url 'hub_snapshot_history' %}" class="pl-btn pl-btn--secondary">
             View Funding History
-        </a>
-        <a href="{% url 'hub_guild_voting' %}" class="pl-btn pl-btn--secondary">
-            View Member Hub
         </a>
     </div>
 

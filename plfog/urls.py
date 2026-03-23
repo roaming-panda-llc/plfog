@@ -1,10 +1,11 @@
 from django.contrib import admin
 from django.urls import include, path
 
-from plfog.admin_views import take_snapshot
+from plfog.admin_views import invite_member, take_snapshot
 
 # Custom admin URLs must be before admin.site.urls
 admin_custom_urls = [
+    path("admin/membership/member/invite/", invite_member, name="admin_invite_member"),
     path("admin/take-snapshot/", take_snapshot, name="admin_take_snapshot"),
 ]
 

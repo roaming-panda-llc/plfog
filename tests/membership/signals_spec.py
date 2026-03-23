@@ -8,7 +8,7 @@ import pytest
 from django.contrib.auth import get_user_model
 
 from membership.models import Member, MembershipPlan
-from tests.membership.factories import MembershipPlanFactory
+from tests.membership.factories import MemberFactory, MembershipPlanFactory
 
 User = get_user_model()
 
@@ -80,3 +80,44 @@ def describe_ensure_user_has_member():
         )
         member = Member.objects.get(user=user)
         assert member.full_legal_name == "nofullname"
+
+    def it_links_pre_created_invite_member_by_email():
+        plan = MembershipPlanFactory()
+        # Pre-create a Member placeholder (as invite flow does)
+        placeholder = MemberFactory(
+            user=None,
+            email="invited@example.com",
+            status=Member.Status.INVITED,
+            membership_plan=plan,
+        )
+        # Creating a user with matching email should link, not create new
+        user = User.objects.create_user(
+            username="invitee",
+            first_name="Jane",
+            last_name="Doe",
+            email="invited@example.com",
+            password="password",
+        )
+        placeholder.refresh_from_db()
+        assert placeholder.user == user
+        assert placeholder.status == Member.Status.ACTIVE
+        assert placeholder.full_legal_name == "Jane Doe"
+        # No duplicate Member created
+        assert Member.objects.filter(email__iexact="invited@example.com").count() == 1
+
+    def it_links_invite_member_case_insensitively():
+        plan = MembershipPlanFactory()
+        placeholder = MemberFactory(
+            user=None,
+            email="UPPER@example.com",
+            status=Member.Status.INVITED,
+            membership_plan=plan,
+        )
+        user = User.objects.create_user(
+            username="upperuser",
+            email="upper@example.com",
+            password="password",
+        )
+        placeholder.refresh_from_db()
+        assert placeholder.user == user
+        assert placeholder.status == Member.Status.ACTIVE

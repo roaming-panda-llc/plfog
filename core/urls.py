@@ -9,6 +9,8 @@ urlpatterns = [
     path("health/", views.health_check, name="health_check"),
     # Home page
     path("", views.home, name="home"),
+    # Clear pending login stage and restart
+    path("accounts/restart-login/", views.restart_login, name="restart_login"),
     # Service worker (served with Service-Worker-Allowed header)
     path("sw.js", views.service_worker, name="service_worker"),
     # WebPush endpoints
