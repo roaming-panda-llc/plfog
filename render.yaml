@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: plfog
+    runtime: python
+    buildCommand: |
+      pip install -r requirements.txt &&
+      python manage.py collectstatic --noinput &&
+      python manage.py migrate --run-syncdb
+    startCommand: gunicorn plfog.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.0"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        sync: false
+        previewValue: "False"
+      - key: DJANGO_ALLOWED_HOSTS
+        sync: false
+        previewValue: ".onrender.com"
+      - key: CSRF_TRUSTED_ORIGINS
+        sync: false
+        previewValue: "https://*.onrender.com"
+      - key: EMAIL_BACKEND
+        sync: false
+        previewValue: "django.core.mail.backends.console.EmailBackend"
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: WEBPUSH_VAPID_PUBLIC_KEY
+        sync: false
+        previewValue: "preview-placeholder"
+      - key: WEBPUSH_VAPID_PRIVATE_KEY
+        sync: false
+        previewValue: "preview-placeholder"
+      - key: WEBPUSH_VAPID_ADMIN_EMAIL
+        sync: false
+        previewValue: "preview@example.com"
+      - key: SENTRY_DSN
+        sync: false
+
+    # Preview environments for pull requests
+    previews:
+      generation: automatic

@@ -204,6 +204,33 @@ ANYMAIL = {
 
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@pastlives.space")
 
+# Logging — ensure tracebacks reach stderr (captured by Render/Gunicorn)
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "WARNING",
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO" if DEBUG else "WARNING",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
+
 # django-unfold admin theme
 UNFOLD = {
     "SITE_TITLE": "Past Lives",
