@@ -93,7 +93,7 @@ def describe_Invite():
                 mock_send.assert_called_once()
                 call_kwargs = mock_send.call_args
                 assert call_kwargs[1]["recipient_list"] == ["new@example.com"]
-                assert "new@example.com" in call_kwargs[1]["message"]
+                assert "new%40example.com" in call_kwargs[1]["message"]
                 assert "/accounts/signup/" in call_kwargs[1]["message"]
                 assert call_kwargs[1]["subject"] == "You're invited to Past Lives Makerspace"
 
@@ -104,4 +104,14 @@ def describe_Invite():
                 invite.send_invite_email()
 
                 message = mock_send.call_args[1]["message"]
-                assert "/accounts/signup/?email=test@example.com" in message
+                assert "/accounts/signup/?email=test%40example.com" in message
+
+        def it_url_encodes_plus_addressing_in_email(admin_user, settings):
+            settings.DEBUG = True
+            invite = Invite.objects.create(email="user+tag@example.com", invited_by=admin_user)
+            with patch("core.models.send_mail") as mock_send:
+                invite.send_invite_email()
+
+                message = mock_send.call_args[1]["message"]
+                assert "user%2Btag%40example.com" in message
+                assert "user+tag@example.com" not in message.split("?")[1]

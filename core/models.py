@@ -92,11 +92,14 @@ class Invite(models.Model):
 
     def send_invite_email(self) -> None:
         """Send a plaintext invite email with a signup link."""
+        from urllib.parse import urlencode
+
         from django.contrib.sites.models import Site
 
         current_site = Site.objects.get_current()
         protocol = "https" if not settings.DEBUG else "http"
-        signup_url = f"{protocol}://{current_site.domain}/accounts/signup/?email={self.email}"
+        query = urlencode({"email": self.email})
+        signup_url = f"{protocol}://{current_site.domain}/accounts/signup/?{query}"
 
         send_mail(
             subject="You're invited to Past Lives Makerspace",
