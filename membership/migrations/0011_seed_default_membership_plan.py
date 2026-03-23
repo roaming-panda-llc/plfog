@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from django.apps.registry import Apps
 from django.db import migrations
+from django.db.backends.base.schema import BaseDatabaseSchemaEditor
 
 
-def create_default_plan_and_backfill_members(apps, schema_editor):
+def create_default_plan_and_backfill_members(apps: Apps, schema_editor: BaseDatabaseSchemaEditor) -> None:
     MembershipPlan = apps.get_model("membership", "MembershipPlan")
     Member = apps.get_model("membership", "Member")
     User = apps.get_model("auth", "User")
@@ -28,7 +30,7 @@ def create_default_plan_and_backfill_members(apps, schema_editor):
         )
 
 
-def remove_default_plan_and_backfilled_members(apps, schema_editor):
+def remove_default_plan_and_backfilled_members(apps: Apps, schema_editor: BaseDatabaseSchemaEditor) -> None:
     MembershipPlan = apps.get_model("membership", "MembershipPlan")
     Member = apps.get_model("membership", "Member")
 
