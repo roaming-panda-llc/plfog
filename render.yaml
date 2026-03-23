@@ -8,24 +8,37 @@ services:
       python manage.py migrate --run-syncdb
     startCommand: gunicorn plfog.wsgi:application --bind 0.0.0.0:$PORT
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.0"
       - key: DJANGO_SECRET_KEY
         generateValue: true
       - key: DJANGO_DEBUG
-        value: "False"
+        sync: false
+        previewValue: "False"
       - key: DJANGO_ALLOWED_HOSTS
-        value: ".onrender.com"
+        sync: false
+        previewValue: ".onrender.com"
       - key: CSRF_TRUSTED_ORIGINS
-        value: "https://*.onrender.com"
-      - key: PYTHON_VERSION
-        value: "3.13.0"
+        sync: false
+        previewValue: "https://*.onrender.com"
       - key: EMAIL_BACKEND
-        value: "django.core.mail.backends.console.EmailBackend"
+        sync: false
+        previewValue: "django.core.mail.backends.console.EmailBackend"
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
       - key: WEBPUSH_VAPID_PUBLIC_KEY
-        value: "preview-placeholder"
+        sync: false
+        previewValue: "preview-placeholder"
       - key: WEBPUSH_VAPID_PRIVATE_KEY
-        value: "preview-placeholder"
+        sync: false
+        previewValue: "preview-placeholder"
       - key: WEBPUSH_VAPID_ADMIN_EMAIL
-        value: "preview@example.com"
+        sync: false
+        previewValue: "preview@example.com"
+      - key: SENTRY_DSN
+        sync: false
 
     # Preview environments for pull requests
     previews:
