@@ -23,7 +23,7 @@ def create_default_plan_and_backfill_members(apps: Apps, schema_editor: BaseData
     for user in users_without_member:
         Member.objects.create(
             user=user,
-            full_legal_name=user.get_full_name() or user.username,
+            full_legal_name=f"{user.first_name} {user.last_name}".strip() or user.username,
             email=user.email or "",
             membership_plan=plan,
             status="active",
