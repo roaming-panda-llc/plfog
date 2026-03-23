@@ -1,4 +1,4 @@
-"""BDD-style tests for plfog.adapters module — auto-admin and admin redirect."""
+"""BDD-style tests for plfog.adapters module — auto-admin, admin redirect, and signup gating."""
 
 import logging
 from unittest.mock import MagicMock, patch
@@ -7,6 +7,8 @@ import pytest
 from django.contrib.auth.models import User
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
+
+from core.models import Invite, SiteConfiguration
 
 pytestmark = pytest.mark.django_db
 
@@ -344,3 +346,173 @@ def describe_AdminRedirectAccountAdapter():
                 adapter._maybe_grant_admin(user)
 
             assert "Auto-admin granted" not in caplog.text
+
+    def describe_is_open_for_signup():
+        def it_returns_true_in_open_mode(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            config = SiteConfiguration.load()
+            config.registration_mode = SiteConfiguration.RegistrationMode.OPEN
+            config.save()
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.get("/accounts/signup/")
+            assert adapter.is_open_for_signup(request) is True
+
+        def it_returns_false_in_invite_only_with_no_invite(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            config = SiteConfiguration.load()
+            config.registration_mode = SiteConfiguration.RegistrationMode.INVITE_ONLY
+            config.save()
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.post("/accounts/signup/", data={"email": "nobody@example.com"})
+            assert adapter.is_open_for_signup(request) is False
+
+        def it_returns_true_in_invite_only_with_valid_invite(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            config = SiteConfiguration.load()
+            config.registration_mode = SiteConfiguration.RegistrationMode.INVITE_ONLY
+            config.save()
+
+            admin_user = User.objects.create_user(username="inviter", email="inviter@example.com", password="pass")
+            Invite.objects.create(email="invited@example.com", invited_by=admin_user)
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.post("/accounts/signup/", data={"email": "invited@example.com"})
+            assert adapter.is_open_for_signup(request) is True
+
+        def it_returns_false_for_accepted_invite(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            config = SiteConfiguration.load()
+            config.registration_mode = SiteConfiguration.RegistrationMode.INVITE_ONLY
+            config.save()
+
+            admin_user = User.objects.create_user(username="inviter2", email="inviter2@example.com", password="pass")
+            invite = Invite.objects.create(email="accepted@example.com", invited_by=admin_user)
+            invite.mark_accepted()
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.post("/accounts/signup/", data={"email": "accepted@example.com"})
+            assert adapter.is_open_for_signup(request) is False
+
+        def it_is_case_insensitive(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            config = SiteConfiguration.load()
+            config.registration_mode = SiteConfiguration.RegistrationMode.INVITE_ONLY
+            config.save()
+
+            admin_user = User.objects.create_user(username="inviter3", email="inviter3@example.com", password="pass")
+            Invite.objects.create(email="CasE@Example.COM", invited_by=admin_user)
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.post("/accounts/signup/", data={"email": "case@example.com"})
+            assert adapter.is_open_for_signup(request) is True
+
+        def it_returns_false_with_no_email_in_request(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            config = SiteConfiguration.load()
+            config.registration_mode = SiteConfiguration.RegistrationMode.INVITE_ONLY
+            config.save()
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.get("/accounts/signup/")
+            assert adapter.is_open_for_signup(request) is False
+
+        def it_checks_get_param_for_email(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            config = SiteConfiguration.load()
+            config.registration_mode = SiteConfiguration.RegistrationMode.INVITE_ONLY
+            config.save()
+
+            admin_user = User.objects.create_user(username="inviter4", email="inviter4@example.com", password="pass")
+            Invite.objects.create(email="getparam@example.com", invited_by=admin_user)
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.get("/accounts/signup/?email=getparam@example.com")
+            assert adapter.is_open_for_signup(request) is True
+
+    def describe_pre_login():
+        def it_marks_invite_accepted_on_signup(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            admin_user = User.objects.create_user(username="inviter5", email="inviter5@example.com", password="pass")
+            invite = Invite.objects.create(email="newuser@example.com", invited_by=admin_user)
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.get("/")
+            user = MagicMock()
+            user.email = "newuser@example.com"
+
+            with patch.object(
+                AdminRedirectAccountAdapter.__bases__[0],
+                "pre_login",
+                return_value=None,
+            ):
+                adapter.pre_login(request, user, signup=True)
+
+            invite.refresh_from_db()
+            assert invite.accepted_at is not None
+
+        def it_does_not_mark_invite_on_regular_login(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            admin_user = User.objects.create_user(username="inviter6", email="inviter6@example.com", password="pass")
+            invite = Invite.objects.create(email="existing@example.com", invited_by=admin_user)
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.get("/")
+            user = MagicMock()
+            user.email = "existing@example.com"
+
+            with patch.object(
+                AdminRedirectAccountAdapter.__bases__[0],
+                "pre_login",
+                return_value=None,
+            ):
+                adapter.pre_login(request, user, signup=False)
+
+            invite.refresh_from_db()
+            assert invite.accepted_at is None
+
+        def it_is_case_insensitive_for_invite_acceptance(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            admin_user = User.objects.create_user(username="inviter7", email="inviter7@example.com", password="pass")
+            invite = Invite.objects.create(email="MixedCase@Example.COM", invited_by=admin_user)
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.get("/")
+            user = MagicMock()
+            user.email = "mixedcase@example.com"
+
+            with patch.object(
+                AdminRedirectAccountAdapter.__bases__[0],
+                "pre_login",
+                return_value=None,
+            ):
+                adapter.pre_login(request, user, signup=True)
+
+            invite.refresh_from_db()
+            assert invite.accepted_at is not None
+
+        def it_handles_user_with_no_email_on_signup(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.get("/")
+            user = MagicMock()
+            user.email = ""
+
+            with patch.object(
+                AdminRedirectAccountAdapter.__bases__[0],
+                "pre_login",
+                return_value=None,
+            ):
+                adapter.pre_login(request, user, signup=True)  # Should not raise

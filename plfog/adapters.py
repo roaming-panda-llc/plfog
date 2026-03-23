@@ -1,11 +1,15 @@
 """Custom allauth adapter for auto-admin domain privileges and login redirect."""
 
+from __future__ import annotations
+
 import logging
+from typing import Any
 
 from allauth.account.adapter import DefaultAccountAdapter
 from django.conf import settings
 from django.http import HttpRequest
 from django.urls import reverse
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -19,12 +23,64 @@ class AdminRedirectAccountAdapter(DefaultAccountAdapter):
 
     After login, staff users are redirected to the admin panel; everyone
     else goes to the member hub.
+
+    Signup gating: when registration_mode is invite_only, only emails with
+    a pending Invite record can sign up.
     """
+
+    def is_open_for_signup(self, request: HttpRequest) -> bool:
+        """Check whether signup is allowed for the current request.
+
+        In open mode, always returns True. In invite-only mode, checks
+        whether the email from POST or GET data has a pending invite.
+        """
+        from core.models import Invite, SiteConfiguration
+
+        config = SiteConfiguration.load()
+        if config.registration_mode == SiteConfiguration.RegistrationMode.OPEN:
+            return True
+
+        email = request.POST.get("email", "") or request.GET.get("email", "")
+        if not email:
+            return False
+
+        return Invite.objects.filter(email__iexact=email, accepted_at__isnull=True).exists()
 
     def login(self, request: HttpRequest, user: object) -> None:
         """Grant admin privileges if email domain matches, then log in."""
         self._maybe_grant_admin(user)
         super().login(request, user)
+
+    def pre_login(
+        self,
+        request: HttpRequest,
+        user: object,
+        *,
+        email_verification: Any = None,
+        signal_kwargs: Any = None,
+        email: str | None = None,
+        signup: bool = False,
+        redirect_url: str | None = None,
+    ) -> Any:
+        """Mark matching invite as accepted when a new user signs up."""
+        if signup:
+            from core.models import Invite
+
+            user_email: str = getattr(user, "email", "") or ""
+            if user_email:
+                Invite.objects.filter(email__iexact=user_email, accepted_at__isnull=True).update(
+                    accepted_at=timezone.now()
+                )
+
+        return super().pre_login(
+            request,
+            user,
+            email_verification=email_verification,
+            signal_kwargs=signal_kwargs,
+            email=email,
+            signup=signup,
+            redirect_url=redirect_url,
+        )
 
     def get_login_redirect_url(self, request: HttpRequest) -> str:
         """Redirect staff to /admin/, everyone else to the member hub."""

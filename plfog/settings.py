@@ -89,6 +89,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "core.context_processors.registration_mode",
             ],
         },
     },
@@ -301,6 +302,21 @@ UNFOLD = {
                         "title": "Guilds",
                         "icon": "groups",
                         "link": reverse_lazy("admin:membership_guild_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Settings",
+                "items": [
+                    {
+                        "title": "Invites",
+                        "icon": "mail",
+                        "link": reverse_lazy("admin:core_invite_changelist"),
+                    },
+                    {
+                        "title": "Site Configuration",
+                        "icon": "settings",
+                        "link": reverse_lazy("admin:core_siteconfiguration_changelist"),
                     },
                 ],
             },
