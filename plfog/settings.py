@@ -260,39 +260,42 @@ UNFOLD = {
     "BORDER_RADIUS": "6px",
     "COLORS": {
         "base": {
-            # Deep navy scale derived from brand #092e4c
-            "50": "oklch(95% 0.01 240)",
-            "100": "oklch(90% 0.02 240)",
-            "200": "oklch(80% 0.03 240)",
-            "300": "oklch(65% 0.04 240)",
-            "400": "oklch(50% 0.05 240)",
-            "500": "oklch(40% 0.05 240)",
-            "600": "oklch(33% 0.05 240)",
-            "700": "oklch(28% 0.05 238)",
-            "800": "oklch(23% 0.044 240)",
-            "900": "oklch(19% 0.04 240)",
-            "950": "oklch(14% 0.03 240)",
+            # Matched to hub hex colors:
+            #   950 = #12121f (main bg)
+            #   900 = #1a1a2e (topbar/panels)
+            #   700 = #092E4C (sidebar/cards)
+            "50": "oklch(95% 0.01 250)",
+            "100": "oklch(90% 0.02 250)",
+            "200": "oklch(80% 0.03 250)",
+            "300": "oklch(65% 0.04 245)",
+            "400": "oklch(50% 0.05 245)",
+            "500": "oklch(40% 0.05 245)",
+            "600": "oklch(33% 0.05 242)",
+            "700": "oklch(25.5% 0.055 240)",
+            "800": "oklch(20% 0.035 265)",
+            "900": "oklch(17% 0.025 265)",
+            "950": "oklch(13.5% 0.025 265)",
         },
         "primary": {
-            # Amber/golden accent scale derived from brand #eeb44b
-            "50": "oklch(97% 0.03 75)",
-            "100": "oklch(94% 0.06 75)",
-            "200": "oklch(90% 0.10 75)",
-            "300": "oklch(85% 0.13 75)",
-            "400": "oklch(80% 0.15 75)",
-            "500": "oklch(75% 0.15 75)",
-            "600": "oklch(65% 0.14 75)",
-            "700": "oklch(55% 0.13 75)",
-            "800": "oklch(45% 0.10 75)",
-            "900": "oklch(38% 0.08 75)",
-            "950": "oklch(28% 0.05 75)",
+            # Tuscan Yellow #EEB44B
+            "50": "oklch(97% 0.03 80)",
+            "100": "oklch(94% 0.06 80)",
+            "200": "oklch(90% 0.10 80)",
+            "300": "oklch(85% 0.13 78)",
+            "400": "oklch(82% 0.145 77)",
+            "500": "oklch(80% 0.145 76)",
+            "600": "oklch(72% 0.13 76)",
+            "700": "oklch(60% 0.12 76)",
+            "800": "oklch(48% 0.10 76)",
+            "900": "oklch(38% 0.08 76)",
+            "950": "oklch(28% 0.05 76)",
         },
         "font": {
-            # Warm cream text for dark theme
-            "subtle-light": "oklch(72% 0.03 230)",
-            "subtle-dark": "oklch(72% 0.03 230)",
-            "default-light": "oklch(85% 0.02 95)",
-            "default-dark": "oklch(85% 0.02 95)",
+            # Cream #F4EFDD / Muted #96ACBB
+            "subtle-light": "oklch(72% 0.025 225)",
+            "subtle-dark": "oklch(72% 0.025 225)",
+            "default-light": "oklch(92% 0.015 95)",
+            "default-dark": "oklch(92% 0.015 95)",
             "important-light": "oklch(95% 0.02 95)",
             "important-dark": "oklch(95% 0.02 95)",
         },
@@ -310,11 +313,6 @@ UNFOLD = {
             {
                 "items": [
                     {
-                        "title": "Member Hub",
-                        "icon": "home",
-                        "link": reverse_lazy("hub_guild_voting"),
-                    },
-                    {
                         "title": "Voting Dashboard",
                         "icon": "how_to_vote",
                         "link": reverse_lazy("admin:index"),
@@ -330,12 +328,7 @@ UNFOLD = {
                         "link": reverse_lazy("admin:membership_guild_changelist"),
                     },
                     {
-                        "title": "Invites",
-                        "icon": "mail",
-                        "link": reverse_lazy("admin:core_invite_changelist"),
-                    },
-                    {
-                        "title": "Site Configuration",
+                        "title": "Site Settings",
                         "icon": "settings",
                         "link": reverse_lazy("admin:core_siteconfiguration_changelist"),
                     },

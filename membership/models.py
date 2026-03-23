@@ -82,6 +82,7 @@ class Member(models.Model):
     total_monthly_rent: Decimal
 
     class Status(models.TextChoices):
+        INVITED = "invited", "Invited"
         ACTIVE = "active", "Active"
         FORMER = "former", "Former"
         SUSPENDED = "suspended", "Suspended"

@@ -17,7 +17,7 @@ User = get_user_model()
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def ensure_user_has_member(sender: type, instance: Any, **kwargs: Any) -> None:
-    """Auto-create a Member record for any user who doesn't have one."""
+    """Auto-create or link a Member record for any user who doesn't have one."""
     from .models import Member, MembershipPlan
 
     try:
@@ -26,6 +26,21 @@ def ensure_user_has_member(sender: type, instance: Any, **kwargs: Any) -> None:
     except Member.DoesNotExist:
         pass
 
+    # Check for a pre-created Member from an invite (matched by email)
+    email = getattr(instance, "email", "") or ""
+    if email:
+        try:
+            member = Member.objects.get(email__iexact=email, user__isnull=True)
+            member.user = instance
+            member.full_legal_name = instance.get_full_name() or instance.username
+            member.status = Member.Status.ACTIVE
+            member.save(update_fields=["user", "full_legal_name", "status"])
+            logger.info("Linked existing Member (invite) to user %s.", instance.username)
+            return
+        except Member.DoesNotExist:
+            pass
+
+    # No pre-existing member found; create one
     try:
         plan = MembershipPlan.objects.order_by("pk").earliest("pk")
     except MembershipPlan.DoesNotExist:

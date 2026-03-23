@@ -5,36 +5,48 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#092E4C">
-    <title>{% block title %}Member Hub{% endblock %} - Past Lives</title>
+    <title>{% block title %}Member View{% endblock %} - Past Lives</title>
     <link rel="icon" type="image/png" href="{% static 'img/favicon.png' %}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/hub.css' %}">
     <script>
         (function() {
-            var theme = localStorage.getItem('theme');
-            if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+            var t = localStorage.getItem('theme');
+            var h = document.documentElement;
+            if (t === 'light') {
+                h.setAttribute('data-theme', 'light');
+                h.classList.remove('dark');
+            } else {
+                h.removeAttribute('data-theme');
+                h.classList.add('dark');
+            }
+            window.__plSetTheme = function(isLight) {
+                if (isLight) {
+                    h.setAttribute('data-theme', 'light');
+                    h.classList.remove('dark');
+                    localStorage.setItem('theme', 'light');
+                    localStorage.setItem('_x_adminTheme', '"light"');
+                } else {
+                    h.removeAttribute('data-theme');
+                    h.classList.add('dark');
+                    localStorage.removeItem('theme');
+                    localStorage.setItem('_x_adminTheme', '"dark"');
+                }
+            };
         })();
     </script>
 </head>
-<body hx-boost="true">
-    <aside class="hub-sidebar">
-        <a href="{% url 'hub_guild_voting' %}" class="hub-sidebar__brand">
-            <img src="{% static 'img/favicon.png' %}" alt="Past Lives" class="hub-sidebar__brand-icon" width="24" height="24">
-            <span class="hub-sidebar__brand-text">Past Lives <span class="hub-sidebar__brand-label">Member</span></span>
+<body hx-boost="true" x-data="{ sidebarOpen: (localStorage.getItem('hubSidebarOpen') !== null) ? (localStorage.getItem('hubSidebarOpen') === '1') : true }" x-init="$watch('sidebarOpen', v => localStorage.setItem('hubSidebarOpen', v ? '1' : '0'))">
+    <aside class="hub-sidebar" :class="{ 'hub-sidebar--closed': !sidebarOpen }">
+        <a href="{% url 'hub_guild_voting' %}" class="pl-brand">
+            <img src="{% static 'img/favicon.png' %}" alt="Past Lives" class="pl-brand__icon" width="24" height="24">
+            <span class="pl-brand__info">
+                <span class="pl-brand__text">Past Lives</span>
+                <span class="pl-brand__label">Member</span>
+            </span>
         </a>
 
         <nav class="hub-sidebar__nav" aria-label="Hub navigation">
-            {% if user.is_staff %}
-            <a href="{% url 'admin:index' %}" class="hub-sidebar__link" hx-boost="false">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 15v2"/>
-                    <path d="M12 3a6 6 0 0 0-6 6v4l-2 2h16l-2-2V9a6 6 0 0 0-6-6z"/>
-                    <rect x="4" y="19" width="16" height="2" rx="1"/>
-                </svg>
-                Admin Panel
-            </a>
-            {% endif %}
-
             <a href="{% url 'hub_guild_voting' %}" class="hub-sidebar__link {% active_nav 'hub_guild_voting' %}">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M9 11l3 3L22 4"/>
@@ -75,39 +87,51 @@
                 </div>
             </div>
 
-            <a href="{% url 'hub_beta_feedback' %}" class="hub-sidebar__link {% active_nav 'hub_beta_feedback' %}">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                </svg>
-                Send Feedback
-            </a>
         </nav>
     </aside>
 
-    <div class="hub-main-wrapper">
-        <header class="hub-topbar">
-            <span class="hub-beta-badge">BETA</span>
-            <div class="hub-topbar__spacer"></div>
-            <div class="hub-topbar__profile" x-data="{ open: false }">
-                <button class="hub-topbar__avatar" @click="open = !open" :aria-expanded="open" @keydown.escape.window="if (open) { open = false; $el.focus() }" aria-label="User menu">
+    <div class="hub-main-wrapper" :class="{ 'hub-main-wrapper--expanded': !sidebarOpen }">
+        <header class="pl-topbar">
+            <button class="pl-topbar__toggle" @click="sidebarOpen = !sidebarOpen" aria-label="Toggle sidebar">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <path d="M9 3v18"/>
+                </svg>
+            </button>
+            <span class="pl-topbar__divider"></span>
+            <span class="pl-badge--beta">BETA</span>
+            {% if user.is_staff %}
+            <span class="pl-topbar__divider"></span>
+            <a href="{% url 'admin:index' %}" class="pl-view-switcher" hx-boost="false" title="Switch to Admin View">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                Admin View
+            </a>
+            {% endif %}
+            <div class="pl-topbar__spacer"></div>
+            <button class="pl-topbar__theme-toggle"
+                    x-data="{ light: localStorage.getItem('theme') === 'light' }"
+                    @click="light = !light; window.__plSetTheme(light)"
+                    aria-label="Toggle theme">
+                <svg x-show="!light" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="5"/><path d="M12 1v2"/><path d="M12 21v2"/><path d="M4.22 4.22l1.42 1.42"/><path d="M18.36 18.36l1.42 1.42"/><path d="M1 12h2"/><path d="M21 12h2"/><path d="M4.22 19.78l1.42-1.42"/><path d="M18.36 5.64l1.42-1.42"/>
+                </svg>
+                <svg x-show="light" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+            </button>
+            <div class="pl-profile" x-data="{ open: false }">
+                <button class="pl-profile__avatar" @click="open = !open" :aria-expanded="open" @keydown.escape.window="if (open) { open = false; $el.focus() }" aria-label="User menu">
                     {{ user_initials }}
                 </button>
-                <div class="hub-topbar__dropdown" :class="{ 'open': open }" @click.away="open = false" role="menu">
-                    <div class="hub-topbar__dropdown-header">
-                        <div class="hub-topbar__dropdown-name">{{ user.get_full_name|default:user.email }}</div>
-                        <div class="hub-topbar__dropdown-email">{{ user.email }}</div>
+                <div class="pl-profile__dropdown" x-show="open" x-transition @click.away="open = false" role="menu">
+                    <div class="pl-profile__dropdown-header">
+                        <div class="pl-profile__dropdown-name">{{ user.get_full_name|default:user.email }}</div>
+                        <div class="pl-profile__dropdown-email">{{ user.email }}</div>
                     </div>
-                    <a href="{% url 'hub_profile_settings' %}" class="hub-topbar__dropdown-item" role="menuitem">Profile</a>
-                    <a href="{% url 'hub_email_preferences' %}" class="hub-topbar__dropdown-item" role="menuitem">Email Preferences</a>
-                    <button class="hub-topbar__dropdown-item" role="menuitem"
-                            x-data="{ light: localStorage.getItem('theme') === 'light' }"
-                            @click="light = !light;
-                                    if (light) { document.documentElement.setAttribute('data-theme', 'light'); localStorage.setItem('theme', 'light'); }
-                                    else { document.documentElement.removeAttribute('data-theme'); localStorage.removeItem('theme'); }">
-                        <span x-text="light ? 'Dark Mode' : 'Light Mode'">Light Mode</span>
-                    </button>
-                    <div class="hub-topbar__dropdown-divider"></div>
-                    <a href="{% url 'account_logout' %}" class="hub-topbar__dropdown-item hub-topbar__dropdown-item--danger" role="menuitem" hx-boost="false">Log Out</a>
+                    <a href="{% url 'hub_profile_settings' %}" class="pl-profile__dropdown-item" role="menuitem">Profile</a>
+                    <a href="{% url 'hub_email_preferences' %}" class="pl-profile__dropdown-item" role="menuitem">Email Preferences</a>
+                    <div class="pl-profile__dropdown-divider"></div>
+                    <a href="{% url 'account_logout' %}" class="pl-profile__dropdown-item pl-profile__dropdown-item--danger" role="menuitem" hx-boost="false">Log Out</a>
                 </div>
             </div>
         </header>
@@ -139,5 +163,12 @@
         });
     </script>
     {% block extra_js %}{% endblock %}
+
+    <a href="{% url 'hub_beta_feedback' %}" class="pl-feedback-btn" hx-boost="false" title="Send Feedback">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        Feedback
+    </a>
 </body>
 </html>

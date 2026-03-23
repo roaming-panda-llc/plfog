@@ -7,6 +7,8 @@ from django.contrib.auth.models import User
 from django.db import IntegrityError
 
 from core.models import Invite, SiteConfiguration
+from membership.models import Member
+from tests.membership.factories import MembershipPlanFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -38,7 +40,7 @@ def describe_SiteConfiguration():
 
     def it_has_str_representation():
         config = SiteConfiguration.load()
-        assert str(config) == "Site Configuration"
+        assert str(config) == "Site Settings"
 
 
 def describe_Invite():
@@ -115,3 +117,45 @@ def describe_Invite():
                 message = mock_send.call_args[1]["message"]
                 assert "user%2Btag%40example.com" in message
                 assert "user+tag@example.com" not in message.split("?")[1]
+
+    def describe_create_and_send():
+        def it_creates_invite_and_member_placeholder(admin_user):
+            MembershipPlanFactory()
+            with patch("core.models.send_mail"):
+                invite = Invite.create_and_send(email="fresh@example.com", invited_by=admin_user)
+
+            assert invite.email == "fresh@example.com"
+            assert invite.invited_by == admin_user
+            assert invite.member is not None
+            assert invite.member.status == Member.Status.INVITED
+            assert invite.member.email == "fresh@example.com"
+
+        def it_sends_invite_email(admin_user):
+            MembershipPlanFactory()
+            with patch("core.models.send_mail") as mock_send:
+                Invite.create_and_send(email="send@example.com", invited_by=admin_user)
+
+            mock_send.assert_called_once()
+
+        def it_raises_when_active_member_exists(admin_user):
+            from tests.membership.factories import MemberFactory
+
+            MemberFactory(email="exists@example.com", status=Member.Status.ACTIVE)
+            with pytest.raises(ValueError, match="already exists"):
+                Invite.create_and_send(email="exists@example.com", invited_by=admin_user)
+
+        def it_raises_when_pending_invite_exists(admin_user):
+            MembershipPlanFactory()
+            with patch("core.models.send_mail"):
+                Invite.create_and_send(email="dup@example.com", invited_by=admin_user)
+
+            with pytest.raises(ValueError, match="pending invite"):
+                Invite.create_and_send(email="dup@example.com", invited_by=admin_user)
+
+        def it_raises_when_no_membership_plan(admin_user):
+            from membership.models import Member, MembershipPlan
+
+            Member.objects.all().delete()
+            MembershipPlan.objects.all().delete()
+            with pytest.raises(ValueError, match="no membership plan"):
+                Invite.create_and_send(email="noplan@example.com", invited_by=admin_user)

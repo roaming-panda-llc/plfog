@@ -1,0 +1,19 @@
+{% load i18n unfold %}
+
+{% if sidebar_navigation %}
+    <nav class="hub-sidebar__nav" aria-label="Admin navigation">
+        {% for group in sidebar_navigation %}
+            {% for item in group.items %}
+                {% if item.has_permission %}
+                    <a href="{% if item.link_callback %}{{ item.link_callback }}{% else %}{{ item.link }}{% endif %}"
+                       class="hub-sidebar__link {% if item.active %}active{% endif %}">
+                        {% if item.icon %}
+                            <span class="material-symbols-outlined" style="font-size:18px;width:18px;height:18px;line-height:1;">{{ item.icon }}</span>
+                        {% endif %}
+                        {{ item.title|safe }}
+                    </a>
+                {% endif %}
+            {% endfor %}
+        {% endfor %}
+    </nav>
+{% endif %}

@@ -1,8 +1,9 @@
 /* Past Lives Makerspace - Unfold admin custom styles
  *
- * Aligned with the member hub aesthetic:
+ * Matched exactly to the member hub:
  *   Fonts: Lato (headings), Inter (body)
- *   Colors: Navy #092E4C, Tuscan Yellow #EEB44B, Cream #F4EFDD
+ *   Navy: #092E4C  |  Dark BG: #12121f  |  Topbar: #1a1a2e
+ *   Tuscan Yellow: #EEB44B  |  Cream: #F4EFDD  |  Muted: #96ACBB
  */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&family=Lato:wght@400;700;900&display=swap');
 
@@ -28,59 +29,86 @@ button,
    Sidebar — match hub sidebar exactly
    ======================================== */
 
-/* Width — match hub's 220px */
-#nav-sidebar {
-    width: 220px !important;
+/* Sidebar wrapper — controls the space in the flex layout */
+.admin-sidebar-wrapper {
+    width: 220px;
+    min-width: 220px;
+    transition: width 0.2s ease, min-width 0.2s ease;
+    position: relative;
+    z-index: 60;
 }
 
+.admin-sidebar-wrapper--closed {
+    width: 0;
+    min-width: 0;
+}
+
+/* Sidebar panel — fixed, slides with transform */
+.admin-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 220px;
+    overflow-y: auto;
+    transition: transform 0.2s ease;
+    z-index: 60;
+}
+
+.admin-sidebar-wrapper--closed .admin-sidebar {
+    transform: translateX(-100%);
+}
+
+/* Main content area — smooth transition when sidebar toggles */
+#main {
+    transition: flex 0.2s ease;
+}
+
+/* Width overrides for any Unfold remnants */
 .w-\[288px\] {
     width: 220px !important;
 }
 
-
-aside[class*="lg:w-"] {
+/* Sidebar background — #092E4C everywhere */
+.admin-sidebar-wrapper,
+.admin-sidebar,
+#nav-sidebar,
+#nav-sidebar > nav,
+#nav-sidebar nav > div {
     background-color: #092E4C !important;
 }
 
-#nav-sidebar {
-    background-color: #092E4C !important;
-}
-
-/* Sidebar brand area — match hub brand */
-#nav-sidebar .border-b {
-    border-bottom-color: rgba(255, 255, 255, 0.08) !important;
-    height: auto !important;
-    padding: 0 !important;
-    margin-bottom: 0 !important;
-}
-
-.admin-brand {
+/* Shared brand block — same .pl-brand classes as hub.css, hardcoded for admin */
+.pl-brand {
     display: flex;
     align-items: center;
     gap: 0.625rem;
     padding: 1.25rem 1rem;
-    color: #F4EFDD !important;
-    text-decoration: none !important;
+    color: #F4EFDD;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    text-decoration: none;
 }
 
-.admin-brand:hover {
-    color: #F4EFDD !important;
+.pl-brand:hover { color: #F4EFDD; }
+
+.pl-brand__icon { width: 24px; height: 24px; }
+
+.pl-brand__info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
 }
 
-.admin-brand__icon {
-    width: 24px;
-    height: 24px;
+.pl-brand__text {
+    font-family: 'Lato', system-ui, -apple-system, sans-serif;
+    font-size: 1.125rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    color: #F4EFDD;
 }
 
-.admin-brand__text {
-    font-family: 'Lato', system-ui, -apple-system, sans-serif !important;
-    font-size: 1.125rem !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.02em !important;
-    color: #F4EFDD !important;
-}
-
-.admin-brand__label {
+.pl-brand__label {
     font-size: 0.625rem;
     font-weight: 700;
     letter-spacing: 0.1em;
@@ -89,56 +117,43 @@ aside[class*="lg:w-"] {
     border-radius: 10px;
     background-color: rgba(238, 180, 75, 0.15);
     color: #EEB44B;
-    vertical-align: middle;
-    margin-left: 0.25rem;
+    width: fit-content;
 }
 
-/* Sidebar nav — match hub sidebar__nav */
-#nav-sidebar-apps {
-    padding: 0.75rem 0.5rem !important;
+/* Sidebar nav — uses hub's .hub-sidebar__nav and .hub-sidebar__link classes directly */
+.hub-sidebar__nav {
+    padding: 0.75rem 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 }
 
-#nav-sidebar-apps ol {
-    padding: 0 !important;
-    gap: 2px !important;
+.hub-sidebar__link {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.5rem 0.75rem;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 0.875rem;
+    font-weight: 400;
+    color: rgba(244, 239, 221, 0.7);
+    border-radius: 6px;
+    transition: background-color 0.15s ease, color 0.15s ease;
+    text-decoration: none;
 }
 
-/* Nav links — match hub sidebar__link */
-#nav-sidebar-apps a {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
-    font-size: 0.875rem !important;
-    font-weight: 400 !important;
-    color: rgba(244, 239, 221, 0.7) !important;
-    border-radius: 6px !important;
-    padding: 0.5rem 0.75rem !important;
-    height: auto !important;
-    transition: background-color 0.15s ease, color 0.15s ease !important;
+.hub-sidebar__link:hover {
+    color: #F4EFDD;
+    background-color: rgba(255, 255, 255, 0.06);
 }
 
-#nav-sidebar-apps a:hover {
-    color: #F4EFDD !important;
-    background-color: rgba(255, 255, 255, 0.06) !important;
+.hub-sidebar__link.active {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #F4EFDD;
 }
 
-#nav-sidebar-apps a.active {
-    background-color: rgba(255, 255, 255, 0.08) !important;
-    color: #F4EFDD !important;
-    font-weight: 400 !important;
-}
-
-#nav-sidebar-apps a.active .material-symbols-outlined {
-    color: #EEB44B !important;
-}
-
-/* Nav icons — match hub icon sizing */
-#nav-sidebar-apps .material-symbols-outlined {
-    font-size: 18px !important;
-    margin-right: 0.625rem !important;
-}
-
-/* Hide section group titles (no categories) */
-#nav-sidebar-apps h2 {
-    display: none !important;
+.hub-sidebar__link.active .material-symbols-outlined {
+    color: #EEB44B;
 }
 
 /* Hide user profile from sidebar bottom */
@@ -147,32 +162,132 @@ aside[class*="lg:w-"] {
 }
 
 /* ========================================
-   Main content area — dark background
+   Main content area — #12121f (hub --hub-bg)
    ======================================== */
-.dark main[class*="min-h-screen"],
-main[class*="min-h-screen"] {
+body {
     background-color: #12121f !important;
 }
 
 /* ========================================
-   Top bar — dark, subtle border
+   Shared Top Bar (.pl-topbar) — same classes as hub.css
    ======================================== */
 
-header[class*="sticky"],
-div[class*="border-b"][class*="z-40"] {
-    background-color: #1a1a2e !important;
-    border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+/* Hide "Site administration" text if it leaks through */
+#site-name {
+    display: none !important;
+}
+
+/* Ensure Unfold's #main doesn't clip our dropdown */
+#main {
     overflow: visible !important;
-    position: relative !important;
-    z-index: 50 !important;
 }
 
-/* Admin profile avatar + dropdown (top-right, matches hub) */
-.admin-profile {
+.pl-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    height: 56px;
+    background-color: #1a1a2e;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    align-items: center;
+    padding: 0 1.5rem;
+    gap: 0.75rem;
+    overflow: visible;
+}
+
+.pl-topbar__toggle {
+    background: none;
+    border: none;
+    color: #96ACBB;
+    cursor: pointer;
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.pl-topbar__toggle:hover {
+    color: #F4EFDD;
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+.pl-topbar__divider {
+    width: 1px;
+    height: 20px;
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+.pl-badge--beta {
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.125rem 0.5rem;
+    border-radius: 10px;
+    background-color: rgba(238, 180, 75, 0.15);
+    color: #EEB44B;
+}
+
+/* View switcher — distinct button to switch between admin/hub */
+.pl-view-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.75rem;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #EEB44B;
+    background-color: rgba(238, 180, 75, 0.1);
+    border: 1px solid rgba(238, 180, 75, 0.25);
+    border-radius: 6px;
+    text-decoration: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+    white-space: nowrap;
+}
+
+.pl-view-switcher:hover {
+    background-color: rgba(238, 180, 75, 0.18);
+    border-color: rgba(238, 180, 75, 0.4);
+    color: #EEB44B;
+}
+
+.pl-view-switcher svg {
+    flex-shrink: 0;
+}
+
+.pl-topbar__spacer { flex: 1; }
+
+.pl-topbar__theme-toggle {
+    background: none;
+    border: none;
+    color: #96ACBB;
+    cursor: pointer;
+    padding: 0.375rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.pl-topbar__theme-toggle:hover {
+    color: #F4EFDD;
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* ========================================
+   Shared Profile Dropdown (.pl-profile) — same classes as hub.css
+   ======================================== */
+.pl-profile {
     position: relative;
+    z-index: 100;
 }
 
-.admin-profile__avatar {
+.pl-profile__avatar {
     width: 36px;
     height: 36px;
     border-radius: 50%;
@@ -189,12 +304,11 @@ div[class*="border-b"][class*="z-40"] {
     transition: box-shadow 0.15s ease;
 }
 
-.admin-profile__avatar:hover {
+.pl-profile__avatar:hover {
     box-shadow: 0 0 0 2px #1a1a2e, 0 0 0 4px #EEB44B;
 }
 
-.admin-profile__dropdown {
-    display: none;
+.pl-profile__dropdown {
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
@@ -207,28 +321,24 @@ div[class*="border-b"][class*="z-40"] {
     z-index: 100;
 }
 
-.admin-profile__dropdown.open {
-    display: block;
-}
-
-.admin-profile__dropdown-header {
+.pl-profile__dropdown-header {
     padding: 0.875rem 1rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.admin-profile__dropdown-name {
+.pl-profile__dropdown-name {
     font-size: 0.875rem;
     font-weight: 700;
     color: #F4EFDD;
 }
 
-.admin-profile__dropdown-email {
+.pl-profile__dropdown-email {
     font-size: 0.75rem;
     color: #96ACBB;
     margin-top: 2px;
 }
 
-.admin-profile__dropdown-item {
+.pl-profile__dropdown-item {
     display: block;
     width: 100%;
     padding: 0.625rem 1rem;
@@ -243,37 +353,31 @@ div[class*="border-b"][class*="z-40"] {
     text-decoration: none;
 }
 
-.admin-profile__dropdown-item:hover {
+.pl-profile__dropdown-item:hover {
     background-color: rgba(255, 255, 255, 0.05);
     color: #F4EFDD;
 }
 
-.admin-profile__dropdown-item--danger {
-    color: #e05555 !important;
-}
+.pl-profile__dropdown-item--danger { color: #e05555; }
+.pl-profile__dropdown-item--danger:hover { color: #e05555; }
 
-.admin-profile__dropdown-item--danger:hover {
-    color: #e05555 !important;
-}
-
-.admin-profile__dropdown-divider {
+.pl-profile__dropdown-divider {
     height: 1px;
     background-color: rgba(255, 255, 255, 0.1);
     margin: 0.25rem 0;
 }
 
 /* ========================================
-   Cards & panels — navy cards on dark bg
+   Cards & panels — targeted, not wildcard
    ======================================== */
-.dark [class*="bg-white"],
-[class*="dark:bg-base-900"] {
-    background-color: #092E4C !important;
-    border-color: transparent !important;
-    border-radius: 10px;
+
+/* Main content wrapper — dark background */
+#main {
+    background-color: #12121f !important;
 }
 
-/* Table containers and content panels */
-#changelist .results,
+/* Dashboard custom cards */
+.pl-card,
 .module {
     background-color: #092E4C;
     border-radius: 10px;
@@ -281,93 +385,302 @@ div[class*="border-b"][class*="z-40"] {
 }
 
 /* ========================================
-   Text colors — warm cream tones
+   Admin list pages — clean, matches hub
+   ======================================== */
+.pl-admin-list {
+    padding: 2rem 2.5rem;
+}
+
+.pl-admin-list__title {
+    font-family: 'Lato', system-ui, sans-serif;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #F4EFDD;
+    margin-bottom: 1.5rem;
+}
+
+.pl-admin-list__toolbar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.pl-admin-list__search {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: #0a1929;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    padding: 0 0.75rem;
+    flex: 1;
+    max-width: 400px;
+}
+
+.pl-admin-list__search input,
+.pl-admin-list__search input[type="text"] {
+    background: transparent !important;
+    border: none !important;
+    color: #F4EFDD !important;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 0.875rem;
+    padding: 0.5rem 0 !important;
+    width: 100%;
+    outline: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+}
+
+.pl-admin-list__search:focus-within {
+    border-color: #EEB44B;
+    box-shadow: 0 0 0 3px rgba(238, 180, 75, 0.15);
+}
+
+.pl-admin-list__add-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 0.875rem;
+    font-weight: 700;
+    background-color: #EEB44B;
+    color: #092E4C;
+    border-radius: 6px;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.15s ease;
+    margin-left: auto;
+}
+
+.pl-admin-list__add-btn:hover {
+    background-color: #d4a043;
+    color: #092E4C;
+}
+
+.pl-admin-list__invite-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 0.875rem;
+    font-weight: 600;
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #F4EFDD;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    text-decoration: none;
+    white-space: nowrap;
+    margin-left: auto;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.pl-admin-list__invite-btn:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #F4EFDD;
+}
+
+[data-theme="light"] .pl-admin-list__invite-btn {
+    background-color: rgba(0, 0, 0, 0.04);
+    color: #1D1E1E;
+    border-color: #d0cdc5;
+}
+
+[data-theme="light"] .pl-admin-list__invite-btn:hover {
+    background-color: rgba(0, 0, 0, 0.08);
+    color: #1D1E1E;
+}
+
+/* Table — same as hub tables */
+.pl-admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9375rem;
+}
+
+.pl-admin-table thead th {
+    text-align: left;
+    padding: 0.75rem;
+    font-weight: 500;
+    color: #96ACBB;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.875rem;
+    white-space: nowrap;
+}
+
+.pl-admin-table thead th a {
+    color: #96ACBB;
+    text-decoration: none;
+}
+
+.pl-admin-table thead th a:hover {
+    color: #F4EFDD;
+}
+
+.pl-admin-table tbody td,
+.pl-admin-table tbody th {
+    padding: 0.75rem;
+    color: #F4EFDD;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    font-weight: 400;
+}
+
+.pl-admin-table tbody tr:hover td,
+.pl-admin-table tbody tr:hover th {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.pl-admin-table a {
+    color: #EEB44B;
+    text-decoration: none;
+}
+
+.pl-admin-table a:hover {
+    color: #d4a043;
+}
+
+.pl-admin-list__pagination {
+    margin-top: 1rem;
+    font-size: 0.8125rem;
+    color: #96ACBB;
+}
+
+/* Checkboxes — simple style */
+.pl-admin-table input[type="checkbox"] {
+    appearance: auto !important;
+    width: auto !important;
+    height: auto !important;
+    min-width: auto !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: none !important;
+}
+
+.pl-admin-table input[type="checkbox"]::after {
+    display: none !important;
+    content: none !important;
+}
+
+/* Dashboard .module panels */
+.module {
+    background-color: #092E4C;
+    border-radius: 10px;
+    border: none;
+}
+
+/* Hub card used in admin context */
+.hub-card {
+    background-color: #092E4C;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 2rem;
+}
+
+/* ========================================
+   Text & selection
    ======================================== */
 ::selection {
     background-color: rgba(238, 180, 75, 0.3);
 }
 
 /* ========================================
-   Buttons — tuscan yellow primary
+   Fixed Feedback Button — bottom left
    ======================================== */
-button[class*="bg-primary"],
-a[class*="bg-primary"],
-.submit-row button[type="submit"] {
-    background-color: #EEB44B !important;
-    color: #092E4C !important;
+.pl-feedback-btn {
+    position: fixed;
+    bottom: 1.25rem;
+    left: 1.25rem;
+    z-index: 200;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #96ACBB;
+    background-color: #092E4C;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    text-decoration: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pl-feedback-btn:hover {
+    color: #EEB44B;
+    border-color: #EEB44B;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.pl-feedback-btn svg {
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.pl-feedback-btn:hover svg {
+    opacity: 1;
+}
+
+[data-theme="light"] .pl-feedback-btn {
+    background-color: #ffffff;
+    border-color: #d0cdc5;
+    color: #666;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .pl-feedback-btn:hover {
+    color: #EEB44B;
+    border-color: #EEB44B;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+/* ========================================
+   Buttons — hub-style for admin
+   ======================================== */
+.hub-btn {
+    display: inline-block;
+    padding: 0.625rem 1.5rem;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 0.9375rem;
     font-weight: 700;
     letter-spacing: 0.02em;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
     transition: background-color 0.15s ease, transform 0.1s ease;
+    text-decoration: none;
 }
 
-button[class*="bg-primary"]:hover,
-a[class*="bg-primary"]:hover,
-.submit-row button[type="submit"]:hover {
-    background-color: #d4a043 !important;
+.hub-btn:active { transform: translateY(1px); }
+
+.hub-btn--primary {
+    background-color: #EEB44B;
+    color: #092E4C;
 }
 
-button[class*="bg-primary"]:active,
-a[class*="bg-primary"]:active {
-    transform: translateY(1px);
+.hub-btn--primary:hover {
+    background-color: #d4a043;
+    color: #092E4C;
 }
 
-/* Secondary / outline buttons */
-a[class*="border"][class*="rounded"] {
-    border-color: rgba(255, 255, 255, 0.12);
-    transition: background-color 0.15s ease;
+.hub-btn--secondary {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #F4EFDD;
 }
 
-a[class*="border"][class*="rounded"]:hover {
-    background-color: rgba(255, 255, 255, 0.06);
+.hub-btn--secondary:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+    color: #F4EFDD;
 }
 
-/* ========================================
-   Links — tuscan yellow accent
-   ======================================== */
-a[class*="text-primary"] {
-    color: #EEB44B !important;
-}
-
-a[class*="text-primary"]:hover {
-    color: #d4a043 !important;
-}
-
-/* ========================================
-   Tables — clean lines, navy bg
-   ======================================== */
-#result_list table,
-table[class*="w-full"] {
-    border-collapse: collapse;
-}
-
-#result_list th,
-#result_list td {
-    border-bottom-color: rgba(255, 255, 255, 0.06) !important;
-}
-
-#result_list tr:hover td {
-    background-color: rgba(255, 255, 255, 0.03);
-}
-
-/* Admin index: model name links fill their table cell */
-.module table th[scope="row"] a {
-    display: block;
-    margin: -0.75rem;
-    padding: 0.75rem;
-}
-
-/* Change list: primary column link fills its cell */
-#result_list th > a:only-child {
-    display: block;
-    margin: -0.5rem -0.75rem;
-    padding: 0.5rem 0.75rem;
-}
-
-@media (min-width: 1024px) {
-    #result_list th > a:only-child {
-        margin: -0.75rem;
-        padding: 0.75rem;
-    }
+/* Legacy Unfold button overrides */
+button[class*="bg-primary"],
+a[class*="bg-primary"] {
+    background-color: #EEB44B !important;
+    color: #092E4C !important;
 }
 
 /* ========================================
@@ -378,12 +691,18 @@ input[type="email"],
 input[type="password"],
 input[type="number"],
 input[type="url"],
+input[type="date"],
+input[type="datetime-local"],
 select,
 textarea {
     background-color: #0a1929 !important;
-    border-color: rgba(255, 255, 255, 0.15) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
     color: #F4EFDD !important;
     border-radius: 6px !important;
+    padding: 0.625rem 0.875rem;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 0.9375rem;
+    width: 100%;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -393,6 +712,378 @@ textarea:focus {
     border-color: #EEB44B !important;
     box-shadow: 0 0 0 3px rgba(238, 180, 75, 0.15) !important;
     outline: none !important;
+}
+
+/* ========================================
+   Admin change form pages — clean hub style
+   ======================================== */
+.pl-admin-form {
+    padding: 2rem 2.5rem;
+}
+
+.pl-admin-form__back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8125rem;
+    color: #96ACBB;
+    text-decoration: none;
+    margin-bottom: 1.25rem;
+    transition: color 0.15s ease;
+}
+
+.pl-admin-form__back:hover {
+    color: #F4EFDD;
+}
+
+.pl-admin-form__title {
+    font-family: 'Lato', system-ui, sans-serif;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #F4EFDD;
+    margin-bottom: 1.5rem;
+}
+
+.pl-admin-form__errors {
+    margin-bottom: 1.5rem;
+}
+
+/* Fieldset card — hub-card with form styling */
+.pl-admin-fieldset {
+    margin-bottom: 1.5rem;
+}
+
+.pl-admin-fieldset__heading {
+    font-family: 'Lato', system-ui, sans-serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #F4EFDD;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Form groups inside admin — match hub exactly */
+.pl-admin-fieldset .hub-form-group {
+    margin-bottom: 1.25rem;
+}
+
+.pl-admin-fieldset .hub-form-group:last-child {
+    margin-bottom: 0;
+}
+
+.pl-admin-fieldset .hub-form-group label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    color: #96ACBB;
+    margin-bottom: 0.375rem;
+    letter-spacing: 0.02em;
+}
+
+.pl-admin-fieldset .hub-form-group.hidden {
+    display: none;
+}
+
+.pl-required {
+    color: #EEB44B;
+}
+
+.pl-admin-readonly {
+    font-size: 0.9375rem;
+    color: #F4EFDD;
+    padding: 0.625rem 0;
+}
+
+.pl-admin-checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.pl-admin-checkbox-row input[type="checkbox"] {
+    flex-shrink: 0 !important;
+    width: 2rem !important;
+    min-width: 2rem !important;
+    height: 1.25rem !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    background-color: #4a4a5a !important;
+    border-radius: 9999px !important;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.pl-admin-checkbox-row input[type="checkbox"]:checked {
+    background-color: #22c55e !important;
+}
+
+[data-theme="light"] .pl-admin-checkbox-row input[type="checkbox"] {
+    background-color: #d0cdc5 !important;
+}
+
+[data-theme="light"] .pl-admin-checkbox-row input[type="checkbox"]:checked {
+    background-color: #22c55e !important;
+}
+
+.pl-admin-checkbox-row label {
+    margin-bottom: 0 !important;
+    font-size: 0.9375rem !important;
+    color: #F4EFDD !important;
+}
+
+/* Multi-field rows (side by side) */
+.pl-admin-multi-field {
+    display: flex;
+    gap: 1rem;
+}
+
+.pl-admin-multi-field__item {
+    flex: 1;
+}
+
+/* Help text & errors — same as hub */
+.pl-admin-fieldset .hub-field-hint {
+    display: block;
+    font-size: 0.75rem;
+    color: #96ACBB;
+    margin-top: 0.25rem;
+}
+
+.pl-admin-fieldset .hub-field-error {
+    display: block;
+    font-size: 0.8125rem;
+    color: #f0a0a0;
+    margin-top: 0.25rem;
+}
+
+.hub-form-error {
+    padding: 0.75rem 1rem;
+    background-color: rgba(240, 160, 160, 0.12);
+    border-left: 3px solid #f0a0a0;
+    border-radius: 6px;
+    color: #f0a0a0;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+}
+
+/* Submit row — clean buttons bar */
+.pl-admin-submit {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.pl-admin-submit__actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.pl-admin-submit__secondary {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+}
+
+.pl-admin-submit__cancel {
+    font-size: 0.875rem;
+    color: #96ACBB;
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+
+.pl-admin-submit__cancel:hover {
+    color: #F4EFDD;
+}
+
+.pl-admin-submit__delete {
+    font-size: 0.875rem;
+    color: #e05555;
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+
+.pl-admin-submit__delete:hover {
+    color: #ff6b6b;
+}
+
+/* Delete confirmation page */
+.pl-admin-delete-list {
+    list-style: disc;
+    padding-left: 1.5rem;
+    margin-top: 0.75rem;
+    color: #96ACBB;
+    font-size: 0.875rem;
+}
+
+.pl-admin-delete-list li {
+    padding: 0.25rem 0;
+}
+
+/* Override Unfold's submit-row that might leak through */
+#submit-row,
+.submit-row {
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+    position: static !important;
+}
+
+/* Neutralize Unfold's widget wrapper Tailwind classes inside our form */
+.pl-admin-fieldset .max-w-2xl { max-width: none !important; }
+.pl-admin-fieldset .relative { position: relative; }
+.pl-admin-fieldset .w-full { width: 100%; }
+.pl-admin-fieldset .grow { flex-grow: 1; }
+.pl-admin-fieldset .flex-col { display: block !important; }
+.pl-admin-fieldset .items-center { align-items: stretch !important; }
+.pl-admin-fieldset .flex.flex-row { display: flex; flex-direction: row; }
+
+/* Unfold's select arrow icon — hide it, we use native appearance */
+.pl-admin-fieldset .grow > .material-symbols-outlined {
+    display: none !important;
+}
+
+/* Related widget wrapper — the edit/add/view/delete buttons next to FK dropdowns */
+.pl-admin-fieldset .related-widget-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.pl-admin-fieldset .related-widget-wrapper-link {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 34px !important;
+    height: 34px !important;
+    margin-left: 0 !important;
+    border-radius: 6px;
+    background-color: rgba(255, 255, 255, 0.06) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    color: #96ACBB !important;
+    transition: color 0.15s ease, background-color 0.15s ease;
+    box-shadow: none !important;
+}
+
+.pl-admin-fieldset .related-widget-wrapper-link:hover {
+    color: #F4EFDD !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.pl-admin-fieldset .related-widget-wrapper-link.delete-related {
+    color: #e05555 !important;
+}
+
+.pl-admin-fieldset .related-widget-wrapper-link.delete-related:hover {
+    color: #ff6b6b !important;
+}
+
+.pl-admin-fieldset .related-widget-wrapper-link .material-symbols-outlined {
+    display: inline !important;
+    font-size: 18px;
+    line-height: 2;
+    vertical-align: middle;
+}
+
+[data-theme="light"] .pl-admin-fieldset .related-widget-wrapper-link {
+    background-color: rgba(0, 0, 0, 0.03) !important;
+    border-color: #d0cdc5 !important;
+    color: #666 !important;
+}
+
+[data-theme="light"] .pl-admin-fieldset .related-widget-wrapper-link:hover {
+    color: #1D1E1E !important;
+    background-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+.pl-admin-fieldset .related-widget-wrapper a:hover {
+    color: #EEB44B;
+}
+
+/* Force all form inputs/selects inside our fieldset to fill width */
+.pl-admin-fieldset select,
+.pl-admin-fieldset input[type="text"],
+.pl-admin-fieldset input[type="email"],
+.pl-admin-fieldset input[type="number"],
+.pl-admin-fieldset input[type="url"],
+.pl-admin-fieldset input[type="password"],
+.pl-admin-fieldset input[type="date"],
+.pl-admin-fieldset input[type="datetime-local"],
+.pl-admin-fieldset textarea {
+    width: 100% !important;
+    max-width: 100% !important;
+    appearance: auto !important;
+    -webkit-appearance: auto !important;
+    padding: 0.625rem 0.875rem !important;
+    font-size: 0.9375rem !important;
+    font-weight: 300 !important;
+    background-color: #0a1929 !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    color: #F4EFDD !important;
+    border-radius: 6px !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+.pl-admin-fieldset select:focus,
+.pl-admin-fieldset input:focus,
+.pl-admin-fieldset textarea:focus {
+    border-color: #EEB44B !important;
+    box-shadow: 0 0 0 3px rgba(238, 180, 75, 0.15) !important;
+}
+
+/* Unfold checkbox/toggle — let Unfold's toggle render, just reset our overrides */
+.pl-admin-fieldset input[type="checkbox"] {
+    width: auto !important;
+    max-width: none !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+/* Django admin widgets — date/time split, related lookups, etc. */
+.related-widget-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.related-widget-wrapper select {
+    flex: 1;
+}
+
+/* Django admin date/time widgets */
+.datetime input,
+.datetimeshortcuts {
+    display: inline-block;
+}
+
+.datetimeshortcuts a {
+    color: #EEB44B;
+    font-size: 0.8125rem;
+}
+
+/* Django admin help text that comes as .help class */
+.help {
+    font-size: 0.75rem;
+    color: #96ACBB;
+    margin-top: 0.25rem;
+}
+
+/* Hide Unfold's sticky submit bar if it leaks */
+.lg\\:sticky.lg\\:bottom-0 {
+    position: static !important;
+    background: none !important;
 }
 
 /* ========================================
@@ -449,4 +1140,295 @@ textarea:focus {
 
 ::-webkit-scrollbar-thumb:hover {
     background-color: rgba(244, 239, 221, 0.25);
+}
+
+/* ========================================
+   Light theme — admin panel
+   Mirrors hub.css [data-theme="light"] vars
+   ======================================== */
+[data-theme="light"] body {
+    background-color: #f8f6f0 !important;
+}
+
+[data-theme="light"] #main {
+    background-color: #f8f6f0 !important;
+}
+
+/* Topbar */
+[data-theme="light"] .pl-topbar {
+    background-color: #ffffff;
+    border-bottom-color: #e0ddd5;
+}
+
+[data-theme="light"] .pl-topbar__toggle {
+    color: #666;
+}
+
+[data-theme="light"] .pl-topbar__toggle:hover {
+    color: #1D1E1E;
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .pl-topbar__divider {
+    background-color: #e0ddd5;
+}
+
+[data-theme="light"] .pl-topbar__theme-toggle {
+    color: #666;
+}
+
+[data-theme="light"] .pl-topbar__theme-toggle:hover {
+    color: #1D1E1E;
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Profile dropdown */
+[data-theme="light"] .pl-profile__avatar {
+    background-color: #EEB44B;
+    color: #092E4C;
+}
+
+[data-theme="light"] .pl-profile__avatar:hover {
+    box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #EEB44B;
+}
+
+[data-theme="light"] .pl-profile__dropdown {
+    background-color: #ffffff;
+    border-color: #e0ddd5;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="light"] .pl-profile__dropdown-header {
+    border-bottom-color: #e0ddd5;
+}
+
+[data-theme="light"] .pl-profile__dropdown-name {
+    color: #1D1E1E;
+}
+
+[data-theme="light"] .pl-profile__dropdown-email {
+    color: #666;
+}
+
+[data-theme="light"] .pl-profile__dropdown-item {
+    color: #1D1E1E;
+}
+
+[data-theme="light"] .pl-profile__dropdown-item:hover {
+    background-color: rgba(0, 0, 0, 0.04);
+    color: #1D1E1E;
+}
+
+[data-theme="light"] .pl-profile__dropdown-divider {
+    background-color: #e0ddd5;
+}
+
+/* Cards & panels */
+[data-theme="light"] .pl-card,
+[data-theme="light"] .module,
+[data-theme="light"] .hub-card {
+    background-color: #ffffff !important;
+    border-color: #e0ddd5 !important;
+}
+
+/* List pages */
+[data-theme="light"] .pl-admin-list__title {
+    color: #1D1E1E;
+}
+
+[data-theme="light"] .pl-admin-list__search {
+    background-color: #f8f6f0;
+    border-color: #d0cdc5;
+}
+
+[data-theme="light"] .pl-admin-list__search input,
+[data-theme="light"] .pl-admin-list__search input[type="text"] {
+    color: #1D1E1E !important;
+}
+
+[data-theme="light"] .pl-admin-list__search:focus-within {
+    border-color: #EEB44B;
+}
+
+/* Tables */
+[data-theme="light"] .pl-admin-table thead th {
+    color: #666;
+    border-bottom-color: #e0ddd5;
+}
+
+[data-theme="light"] .pl-admin-table thead th a {
+    color: #666;
+}
+
+[data-theme="light"] .pl-admin-table thead th a:hover {
+    color: #1D1E1E;
+}
+
+[data-theme="light"] .pl-admin-table tbody td,
+[data-theme="light"] .pl-admin-table tbody th {
+    color: #1D1E1E;
+    border-bottom-color: #e0ddd5;
+}
+
+[data-theme="light"] .pl-admin-table tbody tr:hover td,
+[data-theme="light"] .pl-admin-table tbody tr:hover th {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="light"] .pl-admin-list__pagination {
+    color: #666;
+}
+
+/* Form pages */
+[data-theme="light"] .pl-admin-form__back {
+    color: #666;
+}
+
+[data-theme="light"] .pl-admin-form__back:hover {
+    color: #1D1E1E;
+}
+
+[data-theme="light"] .pl-admin-form__title {
+    color: #1D1E1E;
+}
+
+[data-theme="light"] .pl-admin-fieldset__heading {
+    color: #1D1E1E;
+    border-bottom-color: #e0ddd5;
+}
+
+[data-theme="light"] .pl-admin-fieldset .hub-form-group label {
+    color: #666;
+}
+
+[data-theme="light"] .pl-admin-readonly {
+    color: #1D1E1E;
+}
+
+[data-theme="light"] .pl-admin-checkbox-row label {
+    color: #1D1E1E !important;
+}
+
+[data-theme="light"] .pl-admin-fieldset .hub-field-hint,
+[data-theme="light"] .help {
+    color: #666;
+}
+
+[data-theme="light"] .pl-admin-submit {
+    border-top-color: #e0ddd5;
+}
+
+[data-theme="light"] .pl-admin-submit__cancel {
+    color: #666;
+}
+
+[data-theme="light"] .pl-admin-submit__cancel:hover {
+    color: #1D1E1E;
+}
+
+/* Form inputs */
+[data-theme="light"] input[type="text"],
+[data-theme="light"] input[type="email"],
+[data-theme="light"] input[type="password"],
+[data-theme="light"] input[type="number"],
+[data-theme="light"] input[type="url"],
+[data-theme="light"] input[type="date"],
+[data-theme="light"] input[type="datetime-local"],
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+    background-color: #f8f6f0 !important;
+    border-color: #d0cdc5 !important;
+    color: #1D1E1E !important;
+}
+
+[data-theme="light"] .pl-admin-fieldset select,
+[data-theme="light"] .pl-admin-fieldset input[type="text"],
+[data-theme="light"] .pl-admin-fieldset input[type="email"],
+[data-theme="light"] .pl-admin-fieldset input[type="number"],
+[data-theme="light"] .pl-admin-fieldset input[type="url"],
+[data-theme="light"] .pl-admin-fieldset input[type="password"],
+[data-theme="light"] .pl-admin-fieldset input[type="date"],
+[data-theme="light"] .pl-admin-fieldset input[type="datetime-local"],
+[data-theme="light"] .pl-admin-fieldset textarea {
+    background-color: #f8f6f0 !important;
+    border-color: #d0cdc5 !important;
+    color: #1D1E1E !important;
+}
+
+[data-theme="light"] .pl-admin-fieldset .related-widget-wrapper a {
+    color: #666;
+}
+
+[data-theme="light"] .pl-admin-fieldset .related-widget-wrapper a:hover {
+    color: #EEB44B;
+}
+
+/* View switcher — slightly adjust for light bg */
+[data-theme="light"] .pl-view-switcher {
+    background-color: rgba(238, 180, 75, 0.08);
+    border-color: rgba(238, 180, 75, 0.3);
+}
+
+[data-theme="light"] .pl-view-switcher:hover {
+    background-color: rgba(238, 180, 75, 0.15);
+    border-color: rgba(238, 180, 75, 0.5);
+}
+
+/* Dashboard-specific text */
+[data-theme="light"] .pl-text-muted {
+    color: #666;
+}
+
+[data-theme="light"] .pl-stat {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="light"] .pl-stat__label {
+    color: #666;
+}
+
+[data-theme="light"] .pl-section-label {
+    color: #666;
+}
+
+[data-theme="light"] .pl-table thead th {
+    color: #666;
+    border-bottom-color: #e0ddd5;
+}
+
+[data-theme="light"] .pl-table tbody td {
+    color: #1D1E1E;
+    border-bottom-color: #e0ddd5;
+}
+
+[data-theme="light"] .pl-meta {
+    color: #666;
+}
+
+/* Headings */
+[data-theme="light"] h1, [data-theme="light"] h2,
+[data-theme="light"] h3, [data-theme="light"] h4 {
+    color: #1D1E1E;
+}
+
+[data-theme="light"] .pl-card__title {
+    color: #1D1E1E;
+}
+
+[data-theme="light"] .pl-card__subtitle {
+    color: #1D1E1E;
+}
+
+/* Selection */
+[data-theme="light"] ::selection {
+    background-color: rgba(238, 180, 75, 0.25);
+}
+
+/* Scrollbar */
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.25);
 }

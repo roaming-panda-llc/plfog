@@ -1,14 +1,16 @@
-"""Tests for admin dashboard callback and snapshot view."""
+"""Tests for admin dashboard callback, snapshot view, and invite view."""
 
 from __future__ import annotations
 
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client
 
-from membership.models import FundingSnapshot
+from core.models import Invite
+from membership.models import FundingSnapshot, Member
 from tests.membership.factories import (
     GuildFactory,
     MemberFactory,
@@ -96,3 +98,48 @@ def describe_take_snapshot_admin():
     def it_rejects_get(admin_client):
         resp = admin_client.get("/admin/take-snapshot/")
         assert resp.status_code == 405
+
+
+@pytest.mark.django_db
+def describe_invite_member_view():
+    def it_requires_staff(client):
+        resp = client.get("/admin/membership/member/invite/")
+        assert resp.status_code == 302
+        assert "/login" in resp.url or "/accounts/" in resp.url
+
+    def it_renders_form_on_get(admin_client):
+        resp = admin_client.get("/admin/membership/member/invite/")
+        assert resp.status_code == 200
+        assert "form" in resp.context
+
+    def it_creates_invite_on_valid_post(admin_client):
+        MembershipPlanFactory()
+        with patch("core.models.send_mail"):
+            resp = admin_client.post(
+                "/admin/membership/member/invite/",
+                data={"email": "new@example.com"},
+            )
+        assert resp.status_code == 302
+        assert Invite.objects.filter(email="new@example.com").exists()
+        member = Member.objects.get(email="new@example.com")
+        assert member.status == Member.Status.INVITED
+
+    def it_shows_error_for_existing_member(admin_client):
+        MembershipPlanFactory()
+        MemberFactory(email="exists@example.com", status=Member.Status.ACTIVE)
+        resp = admin_client.post(
+            "/admin/membership/member/invite/",
+            data={"email": "exists@example.com"},
+        )
+        assert resp.status_code == 200  # re-renders form with errors
+
+    def it_shows_error_when_no_plan_exists(admin_client):
+        from membership.models import Member, MembershipPlan
+
+        Member.objects.all().delete()
+        MembershipPlan.objects.all().delete()
+        resp = admin_client.post(
+            "/admin/membership/member/invite/",
+            data={"email": "noplan@example.com"},
+        )
+        assert resp.status_code == 200  # re-renders form with error message

@@ -1,0 +1,62 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls admin_list %}
+
+{% block content %}
+<div class="pl-admin-list">
+    <h1 class="pl-admin-list__title">{{ cl.opts.verbose_name_plural|capfirst }}</h1>
+
+    <div class="pl-admin-list__toolbar">
+        {% if cl.search_fields %}
+        <form method="get" class="pl-admin-list__search">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;flex-shrink:0;">
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+            </svg>
+            <input type="text" name="q" value="{{ cl.query }}" placeholder="Search {{ cl.opts.verbose_name_plural }}...">
+            {% for key, value in cl.params.items %}
+                {% if key != 'q' %}
+                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                {% endif %}
+            {% endfor %}
+        </form>
+        {% endif %}
+
+        <a href="{% url 'admin_invite_member' %}" class="pl-admin-list__invite-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+            </svg>
+            Invite Member
+        </a>
+
+        {% if has_add_permission %}
+        <a href="{% url cl.opts|admin_urlname:'add' %}" class="pl-admin-list__add-btn">
+            + Add {{ cl.opts.verbose_name }}
+        </a>
+        {% endif %}
+    </div>
+
+    <form id="changelist-form" method="post">
+        {% csrf_token %}
+
+        {% if cl.formset %}
+            {{ cl.formset.management_form }}
+        {% endif %}
+
+        {% if cl.result_list %}
+        <div class="hub-card" style="padding: 0; overflow: hidden;">
+            {% result_list cl %}
+        </div>
+        {% else %}
+        <div class="hub-card">
+            <p style="color: #96ACBB;">No {{ cl.opts.verbose_name_plural }} found.</p>
+        </div>
+        {% endif %}
+    </form>
+
+    {% if cl.paginator.num_pages > 1 %}
+    <div class="pl-admin-list__pagination">
+        {{ cl.result_count }} total &middot; Page {{ cl.page_num|add:"1" }} of {{ cl.paginator.num_pages }}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

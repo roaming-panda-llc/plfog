@@ -34,18 +34,19 @@ class SiteConfiguration(models.Model):
         INVITE_ONLY = "invite_only", "Invite Only"
 
     registration_mode = models.CharField(
+        "New User Registration Mode",
         max_length=20,
         choices=RegistrationMode.choices,
         default=RegistrationMode.INVITE_ONLY,
-        help_text="Whether new users can register freely or only via invite.",
+        help_text="Open — anyone can sign up. Invite Only — only people with an invite can register.",
     )
 
     class Meta:
-        verbose_name = "Site Configuration"
-        verbose_name_plural = "Site Configuration"
+        verbose_name = "Site Settings"
+        verbose_name_plural = "Site Settings"
 
     def __str__(self) -> str:
-        return "Site Configuration"
+        return "Site Settings"
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         """Force singleton by always using pk=1."""
@@ -70,6 +71,14 @@ class Invite(models.Model):
         blank=True,
         help_text="The admin user who sent this invite.",
     )
+    member = models.OneToOneField(
+        "membership.Member",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="invite",
+        help_text="The pre-created Member record for this invite.",
+    )
     created_at = models.DateTimeField(auto_now_add=True, help_text="When the invite was created.")
     accepted_at = models.DateTimeField(null=True, blank=True, help_text="When the invite was accepted by signing up.")
 
@@ -89,6 +98,43 @@ class Invite(models.Model):
         """Mark this invite as accepted with the current timestamp."""
         self.accepted_at = timezone.now()
         self.save(update_fields=["accepted_at"])
+
+    @classmethod
+    def create_and_send(cls, email: str, invited_by: Any) -> Invite:
+        """Create an invite with a pre-created Member placeholder and send the email.
+
+        Args:
+            email: The email address to invite.
+            invited_by: The admin User sending the invite.
+
+        Returns:
+            The created Invite instance.
+
+        Raises:
+            ValueError: If email already has an active member or pending invite, or no MembershipPlan exists.
+        """
+        from membership.models import Member, MembershipPlan
+
+        if Member.objects.filter(email__iexact=email).exclude(status=Member.Status.INVITED).exists():
+            raise ValueError(f"A member with email {email} already exists.")
+
+        if cls.objects.filter(email__iexact=email, accepted_at__isnull=True).exists():
+            raise ValueError(f"A pending invite for {email} already exists.")
+
+        plan = MembershipPlan.objects.order_by("pk").first()
+        if plan is None:
+            raise ValueError("Cannot invite: no membership plan exists yet.")
+
+        member = Member.objects.create(
+            email=email,
+            full_legal_name=email,
+            membership_plan=plan,
+            status=Member.Status.INVITED,
+        )
+
+        invite = cls.objects.create(email=email, invited_by=invited_by, member=member)
+        invite.send_invite_email()
+        return invite
 
     def send_invite_email(self) -> None:
         """Send a plaintext invite email with a signup link."""

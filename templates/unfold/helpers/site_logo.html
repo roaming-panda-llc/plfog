@@ -1,11 +1,1 @@
-{% load i18n %}
-
-<a href="{% url "admin:index" %}" class="admin-brand">
-    {% if site_logo.light and site_logo.dark %}
-        <img src="{{ site_logo.dark }}" alt="{% trans 'Home' %}" class="admin-brand__icon hidden dark:block" width="24" height="24"/>
-        <img src="{{ site_logo.light }}" alt="{% trans 'Home' %}" class="admin-brand__icon block dark:hidden" width="24" height="24"/>
-    {% else %}
-        <img src="{{ site_logo }}" class="admin-brand__icon" alt="{% trans 'Home' %}" width="24" height="24"/>
-    {% endif %}
-    <span class="admin-brand__text">Past Lives <span class="admin-brand__label">Admin</span></span>
-</a>
+{# Unused — brand is rendered directly in navigation_header.html using shared .pl-brand classes #}

@@ -1,0 +1,37 @@
+{% load i18n admin_urls %}
+
+<div class="pl-admin-submit">
+    {% block submit-row %}
+    <div class="pl-admin-submit__actions">
+        {% if show_save %}
+        <button type="submit" name="_save" class="hub-btn hub-btn--primary">Save</button>
+        {% endif %}
+
+        {% if show_save_and_continue %}
+        <button type="submit" name="_continue" class="hub-btn hub-btn--secondary">
+            {% if can_change %}Save and continue editing{% else %}Save and view{% endif %}
+        </button>
+        {% endif %}
+
+        {% if show_save_and_add_another %}
+        <button type="submit" name="_addanother" class="hub-btn hub-btn--secondary">Save and add another</button>
+        {% endif %}
+
+        {% if show_save_as_new %}
+        <button type="submit" name="_saveasnew" class="hub-btn hub-btn--secondary">Save as new</button>
+        {% endif %}
+    </div>
+
+    <div class="pl-admin-submit__secondary">
+        {% if show_close %}
+            {% url opts|admin_urlname:'changelist' as changelist_url %}
+            <a href="{% add_preserved_filters changelist_url %}" class="pl-admin-submit__cancel">Cancel</a>
+        {% endif %}
+
+        {% if show_delete_link and original %}
+            {% url opts|admin_urlname:'delete' original.pk|admin_urlquote as delete_url %}
+            <a href="{% add_preserved_filters delete_url %}" class="pl-admin-submit__delete">Delete {{ opts.verbose_name }}</a>
+        {% endif %}
+    </div>
+    {% endblock %}
+</div>
