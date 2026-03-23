@@ -7,7 +7,7 @@ import logging
 import pytest
 from django.contrib.auth import get_user_model
 
-from membership.models import Member
+from membership.models import Member, MembershipPlan
 from tests.membership.factories import MembershipPlanFactory
 
 User = get_user_model()
@@ -46,6 +46,7 @@ def describe_ensure_user_has_member():
         assert Member.objects.filter(user=user).count() == 1
 
     def it_logs_warning_and_skips_when_no_membership_plan_exists(caplog):
+        MembershipPlan.objects.all().delete()
         with caplog.at_level(logging.WARNING, logger="membership.signals"):
             user = User.objects.create_user(
                 username="noplan",
