@@ -136,6 +136,17 @@ a:hover { color: var(--color-yellow-hover); }
     letter-spacing: 0.02em;
 }
 
+.hub-sidebar__brand-label {
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.125rem 0.375rem;
+    border-radius: 10px;
+    background-color: rgba(238, 180, 75, 0.15);
+    color: var(--color-tuscan-yellow);
+}
+
 .hub-sidebar__nav {
     padding: 0.75rem 0.5rem;
     display: flex;
