@@ -6,7 +6,6 @@ Import and call register_all_models() in your admin.py or AppConfig.ready():
     register_all_models()
 """
 
-from allauth.socialaccount.models import SocialAccount, SocialApp, SocialToken
 from django.apps import apps
 from django.contrib import admin
 from django.contrib.sites.models import Site
@@ -25,15 +24,11 @@ EXCLUDED_APPS = {
     "unfold.contrib.forms",
     "allauth",
     "allauth.account",
-    "allauth.socialaccount",
-    "allauth.socialaccount.providers.google",
-    "allauth.socialaccount.providers.github",
-    "allauth.socialaccount.providers.discord",
     "django_extensions",
 }
 
 
-HIDDEN_MODELS = {Site, SocialApp, SocialToken, SocialAccount}
+HIDDEN_MODELS = {Site}
 
 
 def unregister_hidden_models():

@@ -1,4 +1,4 @@
-"""BDD-style tests for plfog.adapters module — auto-admin and admin redirect."""
+"""BDD-style tests for plfog.adapters module — auto-admin, admin redirect, and signup gating."""
 
 import logging
 from unittest.mock import MagicMock, patch
@@ -8,483 +8,14 @@ from django.contrib.auth.models import User
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
 
+from core.models import Invite, SiteConfiguration
+
 pytestmark = pytest.mark.django_db
-
-
-def _make_social_login(email: str) -> MagicMock:
-    """Create a mock sociallogin object with the given email."""
-    mock_sociallogin = MagicMock()
-    mock_sociallogin.user = User(email=email, username=email.split("@")[0])
-    mock_sociallogin.account = MagicMock()
-    mock_sociallogin.email_addresses = []
-    mock_sociallogin.token = MagicMock()
-    return mock_sociallogin
-
-
-def _make_existing_social_login(user: User) -> MagicMock:
-    """Create a mock sociallogin object for an existing (saved) user."""
-    mock_sociallogin = MagicMock()
-    mock_sociallogin.user = user
-    mock_sociallogin.account = MagicMock()
-    mock_sociallogin.email_addresses = []
-    mock_sociallogin.token = MagicMock()
-    return mock_sociallogin
-
-
-def _patch_super_save_user(email: str, username: str):
-    """Return a context manager that patches DefaultSocialAccountAdapter.save_user."""
-    from plfog.adapters import AutoAdminSocialAccountAdapter
-
-    mock_user = User(email=email, username=username)
-    mock_user.pk = 1
-    object.__setattr__(mock_user, "save", MagicMock())
-    return patch.object(
-        AutoAdminSocialAccountAdapter.__bases__[0],
-        "save_user",
-        return_value=mock_user,
-    )
-
-
-def describe_save_user_with_empty_admin_domains():
-    def it_does_not_grant_admin(rf, settings):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = []
-        adapter = AutoAdminSocialAccountAdapter()
-        request = rf.get("/")
-
-        with _patch_super_save_user("user@example.com", "user"):
-            user = adapter.save_user(request, _make_social_login("user@example.com"))
-
-        assert user.is_staff is False
-        assert user.is_superuser is False
-
-
-def describe_save_user_with_matching_domain():
-    def it_grants_admin_privileges(rf, settings):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["example.com"]
-        adapter = AutoAdminSocialAccountAdapter()
-        request = rf.get("/")
-
-        with _patch_super_save_user("user@example.com", "user"):
-            user = adapter.save_user(request, _make_social_login("user@example.com"))
-
-        assert user.is_staff is True
-        assert user.is_superuser is True
-        user.save.assert_called_once_with(update_fields=["is_staff", "is_superuser"])
-
-    def it_does_not_grant_admin_when_domain_does_not_match(rf, settings):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["example.com"]
-        adapter = AutoAdminSocialAccountAdapter()
-        request = rf.get("/")
-
-        with _patch_super_save_user("user@other.com", "user"):
-            user = adapter.save_user(request, _make_social_login("user@other.com"))
-
-        assert user.is_staff is False
-        assert user.is_superuser is False
-
-
-def describe_save_user_with_multiple_domains():
-    def it_grants_admin_for_any_matching_domain(rf, settings):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["pastlives.space", "roaming-panda.com"]
-        adapter = AutoAdminSocialAccountAdapter()
-        request = rf.get("/")
-
-        with _patch_super_save_user("mark@roaming-panda.com", "mark"):
-            user = adapter.save_user(request, _make_social_login("mark@roaming-panda.com"))
-
-        assert user.is_staff is True
-        assert user.is_superuser is True
-
-
-def describe_save_user_case_insensitivity():
-    def it_matches_uppercase_email_domain(rf, settings):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["pastlives.space"]
-        adapter = AutoAdminSocialAccountAdapter()
-        request = rf.get("/")
-
-        with _patch_super_save_user("User@PASTLIVES.SPACE", "User"):
-            user = adapter.save_user(request, _make_social_login("User@PASTLIVES.SPACE"))
-
-        assert user.is_staff is True
-        assert user.is_superuser is True
-
-
-def describe_maybe_grant_admin_edge_cases():
-    def it_skips_user_with_empty_email(settings):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["example.com"]
-        adapter = AutoAdminSocialAccountAdapter()
-
-        user = MagicMock()
-        user.email = ""
-        user.is_staff = False
-        user.is_superuser = False
-        adapter._maybe_grant_admin(user)
-
-        user.save.assert_not_called()
-
-    def it_skips_user_with_email_without_at_sign(settings):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["example.com"]
-        adapter = AutoAdminSocialAccountAdapter()
-
-        user = MagicMock()
-        user.email = "noemail"
-        user.is_staff = False
-        user.is_superuser = False
-        adapter._maybe_grant_admin(user)
-
-        user.save.assert_not_called()
-
-    def it_skips_user_with_none_email(settings):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["example.com"]
-        adapter = AutoAdminSocialAccountAdapter()
-
-        user = MagicMock()
-        user.email = None
-        user.is_staff = False
-        user.is_superuser = False
-        adapter._maybe_grant_admin(user)
-
-        user.save.assert_not_called()
-
-    def it_skips_when_admin_domains_not_configured(settings):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        if hasattr(settings, "ADMIN_DOMAINS"):
-            delattr(settings, "ADMIN_DOMAINS")
-        adapter = AutoAdminSocialAccountAdapter()
-
-        user = MagicMock()
-        user.email = "user@example.com"
-        user.is_staff = False
-        user.is_superuser = False
-        adapter._maybe_grant_admin(user)
-
-        user.save.assert_not_called()
-
-
-def describe_maybe_grant_admin_matching():
-    def it_sets_is_staff_and_is_superuser(settings):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["example.com"]
-        adapter = AutoAdminSocialAccountAdapter()
-
-        user = MagicMock()
-        user.email = "admin@example.com"
-        user.is_staff = False
-        user.is_superuser = False
-        adapter._maybe_grant_admin(user)
-
-        assert user.is_staff is True
-        assert user.is_superuser is True
-        user.save.assert_called_once_with(update_fields=["is_staff", "is_superuser"])
-
-    def it_does_not_match_subdomains(settings):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["example.com"]
-        adapter = AutoAdminSocialAccountAdapter()
-
-        user = MagicMock()
-        user.email = "user@sub.example.com"
-        user.is_staff = False
-        user.is_superuser = False
-        adapter._maybe_grant_admin(user)
-
-        user.save.assert_not_called()
-
-    def it_skips_save_when_user_already_has_admin_privileges(settings):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["example.com"]
-        adapter = AutoAdminSocialAccountAdapter()
-
-        user = MagicMock()
-        user.email = "admin@example.com"
-        user.is_staff = True
-        user.is_superuser = True
-        adapter._maybe_grant_admin(user)
-
-        user.save.assert_not_called()
-
-    def it_upgrades_when_only_is_staff_is_true(settings):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["example.com"]
-        adapter = AutoAdminSocialAccountAdapter()
-
-        user = MagicMock()
-        user.email = "admin@example.com"
-        user.is_staff = True
-        user.is_superuser = False
-        adapter._maybe_grant_admin(user)
-
-        assert user.is_staff is True
-        assert user.is_superuser is True
-        user.save.assert_called_once_with(update_fields=["is_staff", "is_superuser"])
-
-    def it_upgrades_when_only_is_superuser_is_true(settings):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["example.com"]
-        adapter = AutoAdminSocialAccountAdapter()
-
-        user = MagicMock()
-        user.email = "admin@example.com"
-        user.is_staff = False
-        user.is_superuser = True
-        adapter._maybe_grant_admin(user)
-
-        assert user.is_staff is True
-        assert user.is_superuser is True
-        user.save.assert_called_once_with(update_fields=["is_staff", "is_superuser"])
-
-
-def describe_maybe_grant_admin_logging():
-    def it_logs_when_admin_is_granted(settings, caplog):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["example.com"]
-        adapter = AutoAdminSocialAccountAdapter()
-
-        user = MagicMock()
-        user.email = "admin@example.com"
-        user.is_staff = False
-        user.is_superuser = False
-
-        with caplog.at_level(logging.INFO, logger="plfog.adapters"):
-            adapter._maybe_grant_admin(user)
-
-        assert "Auto-admin granted to admin@example.com" in caplog.text
-        assert "domain: example.com" in caplog.text
-
-    def it_does_not_log_when_already_admin(settings, caplog):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["example.com"]
-        adapter = AutoAdminSocialAccountAdapter()
-
-        user = MagicMock()
-        user.email = "admin@example.com"
-        user.is_staff = True
-        user.is_superuser = True
-
-        with caplog.at_level(logging.INFO, logger="plfog.adapters"):
-            adapter._maybe_grant_admin(user)
-
-        assert "Auto-admin granted" not in caplog.text
-
-
-def describe_pre_social_login():
-    """Tests for the pre_social_login hook — promotes existing users on every login."""
-
-    def it_upgrades_existing_user_with_matching_domain(rf, settings):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["roaming-panda.com"]
-        adapter = AutoAdminSocialAccountAdapter()
-        request = rf.get("/")
-
-        user = User.objects.create_user(
-            username="mark",
-            email="mark@roaming-panda.com",
-            password="testpass",
-        )
-        assert user.is_staff is False
-        assert user.is_superuser is False
-
-        sociallogin = _make_existing_social_login(user)
-        adapter.pre_social_login(request, sociallogin)
-
-        user.refresh_from_db()
-        assert user.is_staff is True
-        assert user.is_superuser is True
-
-    def it_does_not_upgrade_existing_user_with_non_matching_domain(rf, settings):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["roaming-panda.com"]
-        adapter = AutoAdminSocialAccountAdapter()
-        request = rf.get("/")
-
-        user = User.objects.create_user(
-            username="outsider",
-            email="outsider@gmail.com",
-            password="testpass",
-        )
-
-        sociallogin = _make_existing_social_login(user)
-        adapter.pre_social_login(request, sociallogin)
-
-        user.refresh_from_db()
-        assert user.is_staff is False
-        assert user.is_superuser is False
-
-    def it_skips_save_when_existing_user_already_has_admin(rf, settings):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["roaming-panda.com"]
-        adapter = AutoAdminSocialAccountAdapter()
-        request = rf.get("/")
-
-        user = User.objects.create_user(
-            username="mark",
-            email="mark@roaming-panda.com",
-            password="testpass",
-            is_staff=True,
-            is_superuser=True,
-        )
-
-        # Spy on save to verify it is NOT called
-        with patch.object(User, "save", wraps=user.save) as mock_save:
-            sociallogin = _make_existing_social_login(user)
-            adapter.pre_social_login(request, sociallogin)
-
-            mock_save.assert_not_called()
-
-    def it_does_not_promote_new_unsaved_users(rf, settings):
-        """pre_social_login should skip users without a pk (new users).
-
-        New users are handled by save_user() instead.
-        """
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["example.com"]
-        adapter = AutoAdminSocialAccountAdapter()
-        request = rf.get("/")
-
-        sociallogin = _make_social_login("newuser@example.com")
-        # sociallogin.user has no pk (unsaved User instance)
-        assert sociallogin.user.pk is None
-
-        adapter.pre_social_login(request, sociallogin)
-
-        # User should NOT have been promoted (no pk = new user, save_user handles it)
-        assert sociallogin.user.is_staff is False
-        assert sociallogin.user.is_superuser is False
-
-    def it_upgrades_with_multiple_admin_domains(rf, settings):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["pastlives.space", "roaming-panda.com"]
-        adapter = AutoAdminSocialAccountAdapter()
-        request = rf.get("/")
-
-        user = User.objects.create_user(
-            username="mark",
-            email="mark@roaming-panda.com",
-            password="testpass",
-        )
-
-        sociallogin = _make_existing_social_login(user)
-        adapter.pre_social_login(request, sociallogin)
-
-        user.refresh_from_db()
-        assert user.is_staff is True
-        assert user.is_superuser is True
-
-    def it_handles_case_insensitive_email_domain(rf, settings):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["roaming-panda.com"]
-        adapter = AutoAdminSocialAccountAdapter()
-        request = rf.get("/")
-
-        user = User.objects.create_user(
-            username="mark",
-            email="Mark@ROAMING-PANDA.COM",
-            password="testpass",
-        )
-
-        sociallogin = _make_existing_social_login(user)
-        adapter.pre_social_login(request, sociallogin)
-
-        user.refresh_from_db()
-        assert user.is_staff is True
-        assert user.is_superuser is True
-
-    def it_skips_when_admin_domains_is_empty(rf, settings):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = []
-        adapter = AutoAdminSocialAccountAdapter()
-        request = rf.get("/")
-
-        user = User.objects.create_user(
-            username="mark",
-            email="mark@roaming-panda.com",
-            password="testpass",
-        )
-
-        sociallogin = _make_existing_social_login(user)
-        adapter.pre_social_login(request, sociallogin)
-
-        user.refresh_from_db()
-        assert user.is_staff is False
-        assert user.is_superuser is False
-
-    def it_logs_promotion_for_existing_user(rf, settings, caplog):
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["roaming-panda.com"]
-        adapter = AutoAdminSocialAccountAdapter()
-        request = rf.get("/")
-
-        user = User.objects.create_user(
-            username="mark",
-            email="mark@roaming-panda.com",
-            password="testpass",
-        )
-
-        sociallogin = _make_existing_social_login(user)
-        with caplog.at_level(logging.INFO, logger="plfog.adapters"):
-            adapter.pre_social_login(request, sociallogin)
-
-        assert "Auto-admin granted to mark@roaming-panda.com" in caplog.text
-
-    def it_upgrades_user_with_only_is_staff(rf, settings):
-        """User with is_staff=True but is_superuser=False should be upgraded."""
-        from plfog.adapters import AutoAdminSocialAccountAdapter
-
-        settings.ADMIN_DOMAINS = ["roaming-panda.com"]
-        adapter = AutoAdminSocialAccountAdapter()
-        request = rf.get("/")
-
-        user = User.objects.create_user(
-            username="mark",
-            email="mark@roaming-panda.com",
-            password="testpass",
-            is_staff=True,
-            is_superuser=False,
-        )
-
-        sociallogin = _make_existing_social_login(user)
-        adapter.pre_social_login(request, sociallogin)
-
-        user.refresh_from_db()
-        assert user.is_staff is True
-        assert user.is_superuser is True
 
 
 def _make_request_with_user(rf: RequestFactory, *, is_staff: bool, is_superuser: bool) -> object:
     """Create a GET request with an attached user having the given flags."""
-    request = rf.get("/accounts/google/login/callback/")
+    request = rf.get("/accounts/login/")
     user = MagicMock()
     user.is_staff = is_staff
     user.is_superuser = is_superuser
@@ -493,6 +24,51 @@ def _make_request_with_user(rf: RequestFactory, *, is_staff: bool, is_superuser:
 
 
 def describe_AdminRedirectAccountAdapter():
+    def describe_login():
+        def it_calls_maybe_grant_admin_then_super_login(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.get("/")
+            user = MagicMock()
+            user.email = "admin@example.com"
+            user.is_staff = False
+            user.is_superuser = False
+
+            with patch.object(
+                AdminRedirectAccountAdapter.__bases__[0],
+                "login",
+            ) as mock_super_login:
+                adapter._maybe_grant_admin = MagicMock()  # type: ignore[method-assign]
+                adapter.login(request, user)
+
+                adapter._maybe_grant_admin.assert_called_once_with(user)
+                mock_super_login.assert_called_once_with(request, user)
+
+        def it_grants_admin_before_login_for_matching_domain(rf, settings):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            settings.ADMIN_DOMAINS = ["example.com"]
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.get("/")
+
+            user = User.objects.create_user(
+                username="admin",
+                email="admin@example.com",
+                password="testpass",
+            )
+            assert user.is_staff is False
+
+            with patch.object(
+                AdminRedirectAccountAdapter.__bases__[0],
+                "login",
+            ):
+                adapter.login(request, user)
+
+            user.refresh_from_db()
+            assert user.is_staff is True
+            assert user.is_superuser is True
+
     def describe_get_login_redirect_url():
         def it_redirects_staff_to_admin(rf):
             from plfog.adapters import AdminRedirectAccountAdapter
@@ -544,3 +120,399 @@ def describe_AdminRedirectAccountAdapter():
             url = adapter.get_login_redirect_url(request)
 
             assert url == reverse("admin:index")
+
+    def describe_maybe_grant_admin():
+        def it_sets_is_staff_and_is_superuser(settings):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            settings.ADMIN_DOMAINS = ["example.com"]
+            adapter = AdminRedirectAccountAdapter()
+
+            user = MagicMock()
+            user.email = "admin@example.com"
+            user.is_staff = False
+            user.is_superuser = False
+            adapter._maybe_grant_admin(user)
+
+            assert user.is_staff is True
+            assert user.is_superuser is True
+            user.save.assert_called_once_with(update_fields=["is_staff", "is_superuser"])
+
+        def it_does_not_grant_admin_with_empty_admin_domains(settings):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            settings.ADMIN_DOMAINS = []
+            adapter = AdminRedirectAccountAdapter()
+
+            user = MagicMock()
+            user.email = "user@example.com"
+            user.is_staff = False
+            user.is_superuser = False
+            adapter._maybe_grant_admin(user)
+
+            user.save.assert_not_called()
+
+        def it_does_not_grant_admin_when_domain_does_not_match(settings):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            settings.ADMIN_DOMAINS = ["example.com"]
+            adapter = AdminRedirectAccountAdapter()
+
+            user = MagicMock()
+            user.email = "user@other.com"
+            user.is_staff = False
+            user.is_superuser = False
+            adapter._maybe_grant_admin(user)
+
+            user.save.assert_not_called()
+
+        def it_grants_admin_for_any_matching_domain(settings):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            settings.ADMIN_DOMAINS = ["pastlives.space", "roaming-panda.com"]
+            adapter = AdminRedirectAccountAdapter()
+
+            user = MagicMock()
+            user.email = "mark@roaming-panda.com"
+            user.is_staff = False
+            user.is_superuser = False
+            adapter._maybe_grant_admin(user)
+
+            assert user.is_staff is True
+            assert user.is_superuser is True
+
+        def it_matches_uppercase_email_domain(settings):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            settings.ADMIN_DOMAINS = ["pastlives.space"]
+            adapter = AdminRedirectAccountAdapter()
+
+            user = MagicMock()
+            user.email = "User@PASTLIVES.SPACE"
+            user.is_staff = False
+            user.is_superuser = False
+            adapter._maybe_grant_admin(user)
+
+            assert user.is_staff is True
+            assert user.is_superuser is True
+
+        def it_does_not_match_subdomains(settings):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            settings.ADMIN_DOMAINS = ["example.com"]
+            adapter = AdminRedirectAccountAdapter()
+
+            user = MagicMock()
+            user.email = "user@sub.example.com"
+            user.is_staff = False
+            user.is_superuser = False
+            adapter._maybe_grant_admin(user)
+
+            user.save.assert_not_called()
+
+        def it_skips_save_when_user_already_has_admin_privileges(settings):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            settings.ADMIN_DOMAINS = ["example.com"]
+            adapter = AdminRedirectAccountAdapter()
+
+            user = MagicMock()
+            user.email = "admin@example.com"
+            user.is_staff = True
+            user.is_superuser = True
+            adapter._maybe_grant_admin(user)
+
+            user.save.assert_not_called()
+
+        def it_upgrades_when_only_is_staff_is_true(settings):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            settings.ADMIN_DOMAINS = ["example.com"]
+            adapter = AdminRedirectAccountAdapter()
+
+            user = MagicMock()
+            user.email = "admin@example.com"
+            user.is_staff = True
+            user.is_superuser = False
+            adapter._maybe_grant_admin(user)
+
+            assert user.is_staff is True
+            assert user.is_superuser is True
+            user.save.assert_called_once_with(update_fields=["is_staff", "is_superuser"])
+
+        def it_upgrades_when_only_is_superuser_is_true(settings):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            settings.ADMIN_DOMAINS = ["example.com"]
+            adapter = AdminRedirectAccountAdapter()
+
+            user = MagicMock()
+            user.email = "admin@example.com"
+            user.is_staff = False
+            user.is_superuser = True
+            adapter._maybe_grant_admin(user)
+
+            assert user.is_staff is True
+            assert user.is_superuser is True
+            user.save.assert_called_once_with(update_fields=["is_staff", "is_superuser"])
+
+        def it_skips_user_with_empty_email(settings):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            settings.ADMIN_DOMAINS = ["example.com"]
+            adapter = AdminRedirectAccountAdapter()
+
+            user = MagicMock()
+            user.email = ""
+            user.is_staff = False
+            user.is_superuser = False
+            adapter._maybe_grant_admin(user)
+
+            user.save.assert_not_called()
+
+        def it_skips_user_with_email_without_at_sign(settings):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            settings.ADMIN_DOMAINS = ["example.com"]
+            adapter = AdminRedirectAccountAdapter()
+
+            user = MagicMock()
+            user.email = "noemail"
+            user.is_staff = False
+            user.is_superuser = False
+            adapter._maybe_grant_admin(user)
+
+            user.save.assert_not_called()
+
+        def it_skips_user_with_none_email(settings):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            settings.ADMIN_DOMAINS = ["example.com"]
+            adapter = AdminRedirectAccountAdapter()
+
+            user = MagicMock()
+            user.email = None
+            user.is_staff = False
+            user.is_superuser = False
+            adapter._maybe_grant_admin(user)
+
+            user.save.assert_not_called()
+
+        def it_skips_when_admin_domains_not_configured(settings):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            if hasattr(settings, "ADMIN_DOMAINS"):
+                delattr(settings, "ADMIN_DOMAINS")
+            adapter = AdminRedirectAccountAdapter()
+
+            user = MagicMock()
+            user.email = "user@example.com"
+            user.is_staff = False
+            user.is_superuser = False
+            adapter._maybe_grant_admin(user)
+
+            user.save.assert_not_called()
+
+    def describe_maybe_grant_admin_logging():
+        def it_logs_when_admin_is_granted(settings, caplog):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            settings.ADMIN_DOMAINS = ["example.com"]
+            adapter = AdminRedirectAccountAdapter()
+
+            user = MagicMock()
+            user.email = "admin@example.com"
+            user.is_staff = False
+            user.is_superuser = False
+
+            with caplog.at_level(logging.INFO, logger="plfog.adapters"):
+                adapter._maybe_grant_admin(user)
+
+            assert "Auto-admin granted to admin@example.com" in caplog.text
+            assert "domain: example.com" in caplog.text
+
+        def it_does_not_log_when_already_admin(settings, caplog):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            settings.ADMIN_DOMAINS = ["example.com"]
+            adapter = AdminRedirectAccountAdapter()
+
+            user = MagicMock()
+            user.email = "admin@example.com"
+            user.is_staff = True
+            user.is_superuser = True
+
+            with caplog.at_level(logging.INFO, logger="plfog.adapters"):
+                adapter._maybe_grant_admin(user)
+
+            assert "Auto-admin granted" not in caplog.text
+
+    def describe_is_open_for_signup():
+        def it_returns_true_in_open_mode(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            config = SiteConfiguration.load()
+            config.registration_mode = SiteConfiguration.RegistrationMode.OPEN
+            config.save()
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.get("/accounts/signup/")
+            assert adapter.is_open_for_signup(request) is True
+
+        def it_returns_false_in_invite_only_with_no_invite(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            config = SiteConfiguration.load()
+            config.registration_mode = SiteConfiguration.RegistrationMode.INVITE_ONLY
+            config.save()
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.post("/accounts/signup/", data={"email": "nobody@example.com"})
+            assert adapter.is_open_for_signup(request) is False
+
+        def it_returns_true_in_invite_only_with_valid_invite(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            config = SiteConfiguration.load()
+            config.registration_mode = SiteConfiguration.RegistrationMode.INVITE_ONLY
+            config.save()
+
+            admin_user = User.objects.create_user(username="inviter", email="inviter@example.com", password="pass")
+            Invite.objects.create(email="invited@example.com", invited_by=admin_user)
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.post("/accounts/signup/", data={"email": "invited@example.com"})
+            assert adapter.is_open_for_signup(request) is True
+
+        def it_returns_false_for_accepted_invite(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            config = SiteConfiguration.load()
+            config.registration_mode = SiteConfiguration.RegistrationMode.INVITE_ONLY
+            config.save()
+
+            admin_user = User.objects.create_user(username="inviter2", email="inviter2@example.com", password="pass")
+            invite = Invite.objects.create(email="accepted@example.com", invited_by=admin_user)
+            invite.mark_accepted()
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.post("/accounts/signup/", data={"email": "accepted@example.com"})
+            assert adapter.is_open_for_signup(request) is False
+
+        def it_is_case_insensitive(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            config = SiteConfiguration.load()
+            config.registration_mode = SiteConfiguration.RegistrationMode.INVITE_ONLY
+            config.save()
+
+            admin_user = User.objects.create_user(username="inviter3", email="inviter3@example.com", password="pass")
+            Invite.objects.create(email="CasE@Example.COM", invited_by=admin_user)
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.post("/accounts/signup/", data={"email": "case@example.com"})
+            assert adapter.is_open_for_signup(request) is True
+
+        def it_returns_false_with_no_email_in_request(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            config = SiteConfiguration.load()
+            config.registration_mode = SiteConfiguration.RegistrationMode.INVITE_ONLY
+            config.save()
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.get("/accounts/signup/")
+            assert adapter.is_open_for_signup(request) is False
+
+        def it_checks_get_param_for_email(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            config = SiteConfiguration.load()
+            config.registration_mode = SiteConfiguration.RegistrationMode.INVITE_ONLY
+            config.save()
+
+            admin_user = User.objects.create_user(username="inviter4", email="inviter4@example.com", password="pass")
+            Invite.objects.create(email="getparam@example.com", invited_by=admin_user)
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.get("/accounts/signup/?email=getparam@example.com")
+            assert adapter.is_open_for_signup(request) is True
+
+    def describe_pre_login():
+        def it_marks_invite_accepted_on_signup(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            admin_user = User.objects.create_user(username="inviter5", email="inviter5@example.com", password="pass")
+            invite = Invite.objects.create(email="newuser@example.com", invited_by=admin_user)
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.get("/")
+            user = MagicMock()
+            user.email = "newuser@example.com"
+
+            with patch.object(
+                AdminRedirectAccountAdapter.__bases__[0],
+                "pre_login",
+                return_value=None,
+            ):
+                adapter.pre_login(request, user, signup=True)
+
+            invite.refresh_from_db()
+            assert invite.accepted_at is not None
+
+        def it_does_not_mark_invite_on_regular_login(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            admin_user = User.objects.create_user(username="inviter6", email="inviter6@example.com", password="pass")
+            invite = Invite.objects.create(email="existing@example.com", invited_by=admin_user)
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.get("/")
+            user = MagicMock()
+            user.email = "existing@example.com"
+
+            with patch.object(
+                AdminRedirectAccountAdapter.__bases__[0],
+                "pre_login",
+                return_value=None,
+            ):
+                adapter.pre_login(request, user, signup=False)
+
+            invite.refresh_from_db()
+            assert invite.accepted_at is None
+
+        def it_is_case_insensitive_for_invite_acceptance(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            admin_user = User.objects.create_user(username="inviter7", email="inviter7@example.com", password="pass")
+            invite = Invite.objects.create(email="MixedCase@Example.COM", invited_by=admin_user)
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.get("/")
+            user = MagicMock()
+            user.email = "mixedcase@example.com"
+
+            with patch.object(
+                AdminRedirectAccountAdapter.__bases__[0],
+                "pre_login",
+                return_value=None,
+            ):
+                adapter.pre_login(request, user, signup=True)
+
+            invite.refresh_from_db()
+            assert invite.accepted_at is not None
+
+        def it_handles_user_with_no_email_on_signup(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            adapter = AdminRedirectAccountAdapter()
+            request = rf.get("/")
+            user = MagicMock()
+            user.email = ""
+
+            with patch.object(
+                AdminRedirectAccountAdapter.__bases__[0],
+                "pre_login",
+                return_value=None,
+            ):
+                adapter.pre_login(request, user, signup=True)  # Should not raise

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Registration Closed - Past Lives{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <h1 class="auth-page__title">Registration Closed</h1>
+    <p class="auth-page__subtitle">Registration is currently by invitation only.</p>
+    <div class="auth-card">
+        <p>If you've received an invite, please use the link in your invite email to sign up.</p>
+        <div class="auth-links">
+            <p>Already have an account? <a href="{% url 'account_login' %}">Log in</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

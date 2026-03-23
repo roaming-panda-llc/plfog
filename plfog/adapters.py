@@ -1,48 +1,92 @@
-"""Custom allauth adapters for auto-admin domain privileges."""
+"""Custom allauth adapter for auto-admin domain privileges and login redirect."""
+
+from __future__ import annotations
 
 import logging
+from typing import Any
 
 from allauth.account.adapter import DefaultAccountAdapter
-from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from django.conf import settings
 from django.http import HttpRequest
 from django.urls import reverse
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
 
-class AutoAdminSocialAccountAdapter(DefaultSocialAccountAdapter):
-    """Grant admin privileges to users whose email domain is in ADMIN_DOMAINS.
+class AdminRedirectAccountAdapter(DefaultAccountAdapter):
+    """Grant admin privileges on login and redirect staff users to /admin/.
 
-    On social login, if the user's email domain matches any domain in the
+    On every login, if the user's email domain matches any domain in the
     ADMIN_DOMAINS setting (case-insensitive), the user gets is_staff=True
     and is_superuser=True.
 
-    This works via two hooks:
-    - ``save_user()``: fires on NEW user creation (first social login).
-    - ``pre_social_login()``: fires on EVERY social login, catching
-      existing users whose accounts predate the ADMIN_DOMAINS feature.
+    After login, staff users are redirected to the admin panel; everyone
+    else goes to the member hub.
 
-    Users with non-matching domains are not modified — existing admin users
-    who log in from a non-listed domain keep whatever privileges they had.
+    Signup gating: when registration_mode is invite_only, only emails with
+    a pending Invite record can sign up.
     """
 
-    def save_user(self, request: HttpRequest, sociallogin: object, form: object = None) -> object:
-        """Save user and grant admin privileges if email domain matches."""
-        user = super().save_user(request, sociallogin, form=form)
-        self._maybe_grant_admin(user)
-        return user
+    def is_open_for_signup(self, request: HttpRequest) -> bool:
+        """Check whether signup is allowed for the current request.
 
-    def pre_social_login(self, request: HttpRequest, sociallogin: object) -> None:
-        """Promote existing users to admin if their email domain matches.
-
-        This hook fires on every social login (before ``save_user``).
-        For existing users whose accounts predate the ADMIN_DOMAINS feature,
-        this is the only chance to upgrade their privileges.
+        In open mode, always returns True. In invite-only mode, checks
+        whether the email from POST or GET data has a pending invite.
         """
-        user = sociallogin.user  # type: ignore[attr-defined]
-        if user.pk is not None:
-            self._maybe_grant_admin(user)
+        from core.models import Invite, SiteConfiguration
+
+        config = SiteConfiguration.load()
+        if config.registration_mode == SiteConfiguration.RegistrationMode.OPEN:
+            return True
+
+        email = request.POST.get("email", "") or request.GET.get("email", "")
+        if not email:
+            return False
+
+        return Invite.objects.filter(email__iexact=email, accepted_at__isnull=True).exists()
+
+    def login(self, request: HttpRequest, user: object) -> None:
+        """Grant admin privileges if email domain matches, then log in."""
+        self._maybe_grant_admin(user)
+        super().login(request, user)
+
+    def pre_login(
+        self,
+        request: HttpRequest,
+        user: object,
+        *,
+        email_verification: Any = None,
+        signal_kwargs: Any = None,
+        email: str | None = None,
+        signup: bool = False,
+        redirect_url: str | None = None,
+    ) -> Any:
+        """Mark matching invite as accepted when a new user signs up."""
+        if signup:
+            from core.models import Invite
+
+            user_email: str = getattr(user, "email", "") or ""
+            if user_email:
+                Invite.objects.filter(email__iexact=user_email, accepted_at__isnull=True).update(
+                    accepted_at=timezone.now()
+                )
+
+        return super().pre_login(
+            request,
+            user,
+            email_verification=email_verification,
+            signal_kwargs=signal_kwargs,
+            email=email,
+            signup=signup,
+            redirect_url=redirect_url,
+        )
+
+    def get_login_redirect_url(self, request: HttpRequest) -> str:
+        """Redirect staff to /admin/, everyone else to the member hub."""
+        if request.user.is_staff:
+            return reverse("admin:index")
+        return reverse("hub_guild_voting")
 
     def _maybe_grant_admin(self, user: object) -> None:
         """Check user's email domain and grant admin if it matches ADMIN_DOMAINS.
@@ -66,12 +110,3 @@ class AutoAdminSocialAccountAdapter(DefaultSocialAccountAdapter):
             user.is_superuser = True  # type: ignore[attr-defined]
             user.save(update_fields=["is_staff", "is_superuser"])  # type: ignore[attr-defined]
             logger.info("Auto-admin granted to %s (domain: %s)", email, domain)
-
-
-class AdminRedirectAccountAdapter(DefaultAccountAdapter):
-    """Redirect staff users to /admin/ after login when no explicit next URL is set."""
-
-    def get_login_redirect_url(self, request: HttpRequest) -> str:
-        if request.user.is_staff:
-            return reverse("admin:index")
-        return reverse("hub_guild_voting")
