@@ -4,11 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.core.mail import send_mail
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -190,19 +188,7 @@ def beta_feedback(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = BetaFeedbackForm(request.POST)
         if form.is_valid():
-            category_label = dict(BetaFeedbackForm.CATEGORY_CHOICES)[form.cleaned_data["category"]]
-            subject = f"[Beta {category_label}] {form.cleaned_data['subject']}"
-            body = (
-                f"From: {user.get_full_name() or user.email} ({user.email})\n"
-                f"Category: {category_label}\n\n"
-                f"{form.cleaned_data['message']}"
-            )
-            send_mail(
-                subject=subject,
-                message=body,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=settings.BETA_FEEDBACK_EMAILS,
-            )
+            form.send(user=user)
             messages.success(request, "Thanks for your feedback! We'll review it soon.")
             return redirect("hub_beta_feedback")
     else:

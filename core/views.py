@@ -6,7 +6,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET, require_POST
 
@@ -22,7 +22,7 @@ def health_check(request):
     return JsonResponse({"status": "ok"})
 
 
-def restart_login(request):
+def restart_login(request: HttpRequest) -> HttpResponse:
     """Clear any pending login stage and redirect to the login page."""
     clear_login(request)
     return redirect("account_login")
