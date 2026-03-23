@@ -590,16 +590,6 @@ def describe_admin_domains_validation():
                 )
 
 
-def describe_socialaccount_adapter_setting():
-    def it_points_to_auto_admin_adapter(monkeypatch):
-        with patch("sentry_sdk.init"):
-            settings_module = _reload_settings(
-                monkeypatch,
-                {"DJANGO_DEBUG": "True", "SENTRY_DSN": None},
-            )
-            assert settings_module.SOCIALACCOUNT_ADAPTER == "plfog.adapters.AutoAdminSocialAccountAdapter"
-
-
 def describe_account_adapter_setting():
     def it_points_to_admin_redirect_adapter(monkeypatch):
         with patch("sentry_sdk.init"):
@@ -610,14 +600,30 @@ def describe_account_adapter_setting():
             assert settings_module.ACCOUNT_ADAPTER == "plfog.adapters.AdminRedirectAccountAdapter"
 
 
-def describe_socialaccount_login_on_get():
-    def it_is_enabled(monkeypatch):
+def describe_login_by_code_settings():
+    def it_enables_login_by_code(monkeypatch):
         with patch("sentry_sdk.init"):
             settings_module = _reload_settings(
                 monkeypatch,
                 {"DJANGO_DEBUG": "True", "SENTRY_DSN": None},
             )
-            assert settings_module.SOCIALACCOUNT_LOGIN_ON_GET is True
+            assert settings_module.ACCOUNT_LOGIN_BY_CODE_ENABLED is True
+
+    def it_sets_login_by_code_timeout_to_300(monkeypatch):
+        with patch("sentry_sdk.init"):
+            settings_module = _reload_settings(
+                monkeypatch,
+                {"DJANGO_DEBUG": "True", "SENTRY_DSN": None},
+            )
+            assert settings_module.ACCOUNT_LOGIN_BY_CODE_TIMEOUT == 300
+
+    def it_sets_login_by_code_max_attempts_to_3(monkeypatch):
+        with patch("sentry_sdk.init"):
+            settings_module = _reload_settings(
+                monkeypatch,
+                {"DJANGO_DEBUG": "True", "SENTRY_DSN": None},
+            )
+            assert settings_module.ACCOUNT_LOGIN_BY_CODE_MAX_ATTEMPTS == 3
 
 
 def describe_anymail():

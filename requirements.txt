@@ -1,5 +1,5 @@
 Django>=5.1,<6.1
-django-allauth[socialaccount]>=65.0
+django-allauth>=65.0
 django-unfold>=0.80
 gunicorn>=23.0
 whitenoise>=6.8

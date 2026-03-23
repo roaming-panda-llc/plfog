@@ -55,10 +55,6 @@ INSTALLED_APPS = [
     # Third-party
     "allauth",
     "allauth.account",
-    "allauth.socialaccount",
-    "allauth.socialaccount.providers.google",
-    "allauth.socialaccount.providers.github",
-    "allauth.socialaccount.providers.discord",
     "django_extensions",
     "anymail",
     # Project apps
@@ -164,7 +160,7 @@ AUTHENTICATION_BACKENDS = [
 
 # Allauth (v65+ format)
 ACCOUNT_LOGIN_METHODS = {"email"}
-ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
+ACCOUNT_SIGNUP_FIELDS = ["email*"]
 ACCOUNT_EMAIL_VERIFICATION = "optional"
 ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_SESSION_REMEMBER = True
@@ -172,11 +168,14 @@ ACCOUNT_SESSION_REMEMBER = True
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
 
-SOCIALACCOUNT_ADAPTER = "plfog.adapters.AutoAdminSocialAccountAdapter"
 ACCOUNT_ADAPTER = "plfog.adapters.AdminRedirectAccountAdapter"
-SOCIALACCOUNT_LOGIN_ON_GET = True
 
-# Auto-admin: comma-separated list of email domains that get admin privileges on social login.
+# Login-by-code (passwordless email login)
+ACCOUNT_LOGIN_BY_CODE_ENABLED = True
+ACCOUNT_LOGIN_BY_CODE_TIMEOUT = 300  # 5 minutes
+ACCOUNT_LOGIN_BY_CODE_MAX_ATTEMPTS = 3
+
+# Auto-admin: comma-separated list of email domains that get admin privileges on login.
 # Empty/unset means no auto-admin. Malformed values raise ValueError at startup.
 _admin_domains_raw = os.environ.get("ADMIN_DOMAINS", "")
 if _admin_domains_raw.strip():
@@ -203,35 +202,6 @@ ANYMAIL = {
 }
 
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@pastlives.space")
-
-# OAuth providers (APP config pattern - no Django admin SocialApp needed)
-SOCIALACCOUNT_PROVIDERS = {
-    "google": {
-        "SCOPE": ["profile", "email"],
-        "AUTH_PARAMS": {"access_type": "online"},
-        "APP": {
-            "client_id": os.environ.get("GOOGLE_CLIENT_ID", ""),
-            "secret": os.environ.get("GOOGLE_CLIENT_SECRET", ""),
-            "key": "",
-        },
-    },
-    "github": {
-        "SCOPE": ["user:email"],
-        "APP": {
-            "client_id": os.environ.get("GITHUB_CLIENT_ID", ""),
-            "secret": os.environ.get("GITHUB_CLIENT_SECRET", ""),
-            "key": "",
-        },
-    },
-    "discord": {
-        "SCOPE": ["identify", "email"],
-        "APP": {
-            "client_id": os.environ.get("DISCORD_CLIENT_ID", ""),
-            "secret": os.environ.get("DISCORD_CLIENT_SECRET", ""),
-            "key": "",
-        },
-    },
-}
 
 # django-unfold admin theme
 UNFOLD = {
