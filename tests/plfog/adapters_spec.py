@@ -4,6 +4,7 @@ import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
+from anymail.exceptions import AnymailRequestsAPIError
 from django.contrib.auth.models import User
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
@@ -516,3 +517,36 @@ def describe_AdminRedirectAccountAdapter():
                 return_value=None,
             ):
                 adapter.pre_login(request, user, signup=True)  # Should not raise
+
+    def describe_send_mail():
+        def it_delegates_to_super_on_success(rf):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            adapter = AdminRedirectAccountAdapter()
+
+            with patch.object(
+                AdminRedirectAccountAdapter.__bases__[0],
+                "send_mail",
+            ) as mock_super:
+                adapter.send_mail("account/email/login_code", "user@example.com", {"code": "123456"})
+
+                mock_super.assert_called_once_with("account/email/login_code", "user@example.com", {"code": "123456"})
+
+        def it_catches_anymail_error_and_logs(rf, caplog):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            adapter = AdminRedirectAccountAdapter()
+
+            with (
+                patch.object(
+                    AdminRedirectAccountAdapter.__bases__[0],
+                    "send_mail",
+                    side_effect=AnymailRequestsAPIError("Resend API response 403"),
+                ),
+                caplog.at_level(logging.ERROR, logger="plfog.adapters"),
+            ):
+                adapter.send_mail("account/email/login_code", "user@example.com", {})
+
+            assert "Failed to send email" in caplog.text
+            assert "account/email/login_code" in caplog.text
+            assert "user@example.com" in caplog.text

@@ -653,10 +653,10 @@ def describe_default_from_email():
             )
             assert settings_module.DEFAULT_FROM_EMAIL == "hello@example.com"
 
-    def it_defaults_to_noreply_pastlives(monkeypatch):
+    def it_defaults_to_resend_onboarding(monkeypatch):
         with patch("sentry_sdk.init"):
             settings_module = _reload_settings(
                 monkeypatch,
                 {"DJANGO_DEBUG": "True", "SENTRY_DSN": None, "DEFAULT_FROM_EMAIL": None},
             )
-            assert settings_module.DEFAULT_FROM_EMAIL == "noreply@pastlives.space"
+            assert settings_module.DEFAULT_FROM_EMAIL == "onboarding@resend.dev"
