@@ -97,13 +97,11 @@ def describe_calculate_results():
         with pytest.raises(KeyError):
             calculate_results(votes=votes)
 
-    def it_handles_empty_guild_names():
-        """When votes have empty guild names, no results are produced."""
-        votes = [{"guild_1st": "", "guild_2nd": "", "guild_3rd": ""}]
-        result = calculate_results(votes=votes)
-        assert result["total_points"] == 0
-        assert result["total_pool"] == 10  # 1 voter × $10
-        assert result["results"] == []
+    def it_raises_on_empty_guild_names():
+        """Empty guild names indicate a bug upstream — fail loudly."""
+        votes = [{"guild_1st": "", "guild_2nd": "Glass", "guild_3rd": "Wood"}]
+        with pytest.raises(ValueError, match="Empty guild name"):
+            calculate_results(votes=votes)
 
     def it_uses_paying_voter_count_for_pool():
         """Pool = paying_voter_count × $10, not total voters."""

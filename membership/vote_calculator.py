@@ -44,10 +44,11 @@ def calculate_results(
             ("guild_3rd", WEIGHTS["3rd"]),
         ]:
             guild_name = vote[rank_key]
-            if guild_name:
-                guild_scores[guild_name]["total_points"] += weight
-                vote_count_key = rank_key.replace("guild_", "votes_")
-                guild_scores[guild_name][vote_count_key] += 1
+            if not guild_name:
+                raise ValueError(f"Empty guild name in vote for rank '{rank_key}'")
+            guild_scores[guild_name]["total_points"] += weight
+            vote_count_key = rank_key.replace("guild_", "votes_")
+            guild_scores[guild_name][vote_count_key] += 1
 
     votes_cast = len(votes)
     pool_contributors = paying_voter_count if paying_voter_count is not None else votes_cast

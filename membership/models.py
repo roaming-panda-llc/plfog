@@ -203,7 +203,7 @@ class Guild(models.Model):
     sublet_count: int
 
     name = models.CharField(max_length=255, unique=True)
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True, help_text="Whether this guild is eligible for voting and display.")
     guild_lead = models.ForeignKey(
         Member,
         null=True,
@@ -306,6 +306,45 @@ class FundingSnapshot(models.Model):
 
     def __str__(self) -> str:
         return f"{self.cycle_label} — ${self.funding_pool}"
+
+    @classmethod
+    def take(cls) -> FundingSnapshot | None:
+        """Create a snapshot from current vote preferences.
+
+        Returns:
+            The created FundingSnapshot, or None if no votes exist.
+        """
+        from membership.vote_calculator import calculate_results
+
+        preferences = VotePreference.objects.select_related(
+            "member__membership_plan",
+            "guild_1st",
+            "guild_2nd",
+            "guild_3rd",
+        ).all()
+
+        if not preferences.exists():
+            return None
+
+        paying_count = preferences.filter(member__membership_plan__monthly_price__gt=0).count()
+
+        votes = [
+            {
+                "guild_1st": pref.guild_1st.name,
+                "guild_2nd": pref.guild_2nd.name,
+                "guild_3rd": pref.guild_3rd.name,
+            }
+            for pref in preferences
+        ]
+
+        calc = calculate_results(votes, paying_voter_count=paying_count)
+
+        return cls.objects.create(
+            cycle_label=timezone.now().strftime("%B %Y"),
+            contributor_count=paying_count,
+            funding_pool=calc["total_pool"],
+            results=calc,
+        )
 
 
 # ---------------------------------------------------------------------------
