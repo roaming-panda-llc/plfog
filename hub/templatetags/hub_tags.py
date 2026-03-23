@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from django import template
-from django.db.models import QuerySet
 
 if TYPE_CHECKING:
+    from django.db.models import QuerySet
+
     from membership.models import Guild
 
 register = template.Library()
