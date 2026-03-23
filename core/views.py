@@ -10,6 +10,8 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_GET, require_POST
 
+from allauth.account.internal.stagekit import clear_login
+
 from .models import PushSubscription
 
 logger = logging.getLogger(__name__)
@@ -18,6 +20,12 @@ logger = logging.getLogger(__name__)
 def health_check(request):
     """Health check endpoint."""
     return JsonResponse({"status": "ok"})
+
+
+def restart_login(request):
+    """Clear any pending login stage and redirect to the login page."""
+    clear_login(request)
+    return redirect("account_login")
 
 
 def home(request):

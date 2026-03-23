@@ -18,7 +18,7 @@
                 :aria-expanded="open"
                 @keydown.escape.window="if (open) { open = false; $el.focus() }"
                 aria-label="User menu">
-            {{ user.get_full_name.0|default:user.get_username.0|upper }}
+            {{ user.get_full_name.0|default:user.email.0|upper }}
         </button>
         <div class="admin-profile__dropdown"
              :class="{ 'open': open }"

@@ -37,6 +37,7 @@ button,
     width: 220px !important;
 }
 
+
 aside[class*="lg:w-"] {
     background-color: #092E4C !important;
 }
@@ -77,6 +78,19 @@ aside[class*="lg:w-"] {
     font-weight: 700 !important;
     letter-spacing: 0.02em !important;
     color: #F4EFDD !important;
+}
+
+.admin-brand__label {
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.125rem 0.375rem;
+    border-radius: 10px;
+    background-color: rgba(238, 180, 75, 0.15);
+    color: #EEB44B;
+    vertical-align: middle;
+    margin-left: 0.25rem;
 }
 
 /* Sidebar nav — match hub sidebar__nav */
@@ -143,6 +157,15 @@ main[class*="min-h-screen"] {
 /* ========================================
    Top bar — dark, subtle border
    ======================================== */
+
+header[class*="sticky"],
+div[class*="border-b"][class*="z-40"] {
+    background-color: #1a1a2e !important;
+    border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+    overflow: visible !important;
+    position: relative !important;
+    z-index: 50 !important;
+}
 
 /* Admin profile avatar + dropdown (top-right, matches hub) */
 .admin-profile {
@@ -237,10 +260,6 @@ main[class*="min-h-screen"] {
     height: 1px;
     background-color: rgba(255, 255, 255, 0.1);
     margin: 0.25rem 0;
-}
-header[class*="sticky"] {
-    background-color: #1a1a2e !important;
-    border-bottom-color: rgba(255, 255, 255, 0.06) !important;
 }
 
 /* ========================================
