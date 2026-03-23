@@ -132,6 +132,13 @@
         });
     </script>
     <script defer src="{% static 'js/alpine.min.js' %}"></script>
+    <script>
+        document.addEventListener('htmx:afterSwap', function(event) {
+            if (window.Alpine) {
+                Alpine.initTree(event.detail.target);
+            }
+        });
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>
