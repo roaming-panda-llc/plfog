@@ -6,7 +6,6 @@ import logging
 from typing import Any
 
 from allauth.account.adapter import DefaultAccountAdapter
-from anymail.exceptions import AnymailError
 from django.conf import settings
 from django.http import HttpRequest
 from django.urls import reverse
@@ -87,7 +86,7 @@ class AdminRedirectAccountAdapter(DefaultAccountAdapter):
         """Send mail, catching delivery errors so they don't 500 the request."""
         try:
             super().send_mail(template_prefix, email, context)
-        except AnymailError:
+        except Exception:
             logger.exception("Failed to send email (template=%s, to=%s)", template_prefix, email)
 
     def get_login_redirect_url(self, request: HttpRequest) -> str:

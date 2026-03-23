@@ -207,7 +207,7 @@ def describe_debug_false():
             )
             assert settings_module.SESSION_COOKIE_SECURE is True
 
-    def it_uses_resend_email_backend(monkeypatch):
+    def it_uses_smtp_email_backend_by_default(monkeypatch):
         with patch("sentry_sdk.init"):
             settings_module = _reload_settings(
                 monkeypatch,
@@ -216,6 +216,21 @@ def describe_debug_false():
                     "DJANGO_SECRET_KEY": "test-secret-key-for-production",
                     "DJANGO_ALLOWED_HOSTS": "example.com",
                     "SENTRY_DSN": None,
+                    "EMAIL_BACKEND": None,
+                },
+            )
+            assert settings_module.EMAIL_BACKEND == "django.core.mail.backends.smtp.EmailBackend"
+
+    def it_uses_custom_email_backend_from_env(monkeypatch):
+        with patch("sentry_sdk.init"):
+            settings_module = _reload_settings(
+                monkeypatch,
+                {
+                    "DJANGO_DEBUG": "False",
+                    "DJANGO_SECRET_KEY": "test-secret-key-for-production",
+                    "DJANGO_ALLOWED_HOSTS": "example.com",
+                    "SENTRY_DSN": None,
+                    "EMAIL_BACKEND": "anymail.backends.resend.EmailBackend",
                 },
             )
             assert settings_module.EMAIL_BACKEND == "anymail.backends.resend.EmailBackend"
@@ -626,6 +641,48 @@ def describe_login_by_code_settings():
             assert settings_module.ACCOUNT_LOGIN_BY_CODE_MAX_ATTEMPTS == 3
 
 
+def describe_smtp_settings():
+    def it_defaults_email_host_to_smtp2go(monkeypatch):
+        with patch("sentry_sdk.init"):
+            settings_module = _reload_settings(
+                monkeypatch,
+                {"DJANGO_DEBUG": "True", "SENTRY_DSN": None, "EMAIL_HOST": None},
+            )
+            assert settings_module.EMAIL_HOST == "mail.smtp2go.com"
+
+    def it_reads_email_host_from_env(monkeypatch):
+        with patch("sentry_sdk.init"):
+            settings_module = _reload_settings(
+                monkeypatch,
+                {"DJANGO_DEBUG": "True", "SENTRY_DSN": None, "EMAIL_HOST": "smtp.example.com"},
+            )
+            assert settings_module.EMAIL_HOST == "smtp.example.com"
+
+    def it_defaults_email_port_to_2525(monkeypatch):
+        with patch("sentry_sdk.init"):
+            settings_module = _reload_settings(
+                monkeypatch,
+                {"DJANGO_DEBUG": "True", "SENTRY_DSN": None, "EMAIL_PORT": None},
+            )
+            assert settings_module.EMAIL_PORT == 2525
+
+    def it_reads_email_port_from_env(monkeypatch):
+        with patch("sentry_sdk.init"):
+            settings_module = _reload_settings(
+                monkeypatch,
+                {"DJANGO_DEBUG": "True", "SENTRY_DSN": None, "EMAIL_PORT": "587"},
+            )
+            assert settings_module.EMAIL_PORT == 587
+
+    def it_defaults_email_use_tls_to_true(monkeypatch):
+        with patch("sentry_sdk.init"):
+            settings_module = _reload_settings(
+                monkeypatch,
+                {"DJANGO_DEBUG": "True", "SENTRY_DSN": None, "EMAIL_USE_TLS": None},
+            )
+            assert settings_module.EMAIL_USE_TLS is True
+
+
 def describe_anymail():
     def it_reads_resend_api_key_from_env(monkeypatch):
         with patch("sentry_sdk.init"):
@@ -653,10 +710,10 @@ def describe_default_from_email():
             )
             assert settings_module.DEFAULT_FROM_EMAIL == "hello@example.com"
 
-    def it_defaults_to_resend_onboarding(monkeypatch):
+    def it_defaults_to_noreply_pastlives(monkeypatch):
         with patch("sentry_sdk.init"):
             settings_module = _reload_settings(
                 monkeypatch,
                 {"DJANGO_DEBUG": "True", "SENTRY_DSN": None, "DEFAULT_FROM_EMAIL": None},
             )
-            assert settings_module.DEFAULT_FROM_EMAIL == "onboarding@resend.dev"
+            assert settings_module.DEFAULT_FROM_EMAIL == "noreply@pastlives.space"

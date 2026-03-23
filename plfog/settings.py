@@ -196,13 +196,27 @@ if _admin_domains_raw.strip():
 else:
     ADMIN_DOMAINS = []
 
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend" if DEBUG else "anymail.backends.resend.EmailBackend"
+# Email — use SMTP2GO in production until pastlives.space is verified in Resend,
+# then switch back to anymail.backends.resend.EmailBackend.
+_email_backend_env = os.environ.get("EMAIL_BACKEND", "")
+if DEBUG:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+elif _email_backend_env:
+    EMAIL_BACKEND = _email_backend_env
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "mail.smtp2go.com")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "2525"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True").lower() == "true"
 
 ANYMAIL = {
     "RESEND_API_KEY": os.environ.get("RESEND_API_KEY"),
 }
 
-DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "onboarding@resend.dev")
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@pastlives.space")
 
 # Logging — ensure tracebacks reach stderr (captured by Render/Gunicorn)
 LOGGING = {

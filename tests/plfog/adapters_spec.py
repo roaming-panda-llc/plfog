@@ -3,8 +3,9 @@
 import logging
 from unittest.mock import MagicMock, patch
 
+import smtplib
+
 import pytest
-from anymail.exceptions import AnymailRequestsAPIError
 from django.contrib.auth.models import User
 from django.test import RequestFactory, override_settings
 from django.urls import reverse
@@ -532,7 +533,7 @@ def describe_AdminRedirectAccountAdapter():
 
                 mock_super.assert_called_once_with("account/email/login_code", "user@example.com", {"code": "123456"})
 
-        def it_catches_anymail_error_and_logs(rf, caplog):
+        def it_catches_smtp_error_and_logs(rf, caplog):
             from plfog.adapters import AdminRedirectAccountAdapter
 
             adapter = AdminRedirectAccountAdapter()
@@ -541,7 +542,7 @@ def describe_AdminRedirectAccountAdapter():
                 patch.object(
                     AdminRedirectAccountAdapter.__bases__[0],
                     "send_mail",
-                    side_effect=AnymailRequestsAPIError("Resend API response 403"),
+                    side_effect=smtplib.SMTPAuthenticationError(535, b"Authentication failed"),
                 ),
                 caplog.at_level(logging.ERROR, logger="plfog.adapters"),
             ):
