@@ -10,4 +10,5 @@ urlpatterns = [
     path("guilds/<int:pk>/", views.guild_detail, name="hub_guild_detail"),
     path("settings/profile/", views.profile_settings, name="hub_profile_settings"),
     path("settings/emails/", views.email_preferences, name="hub_email_preferences"),
+    path("feedback/", views.beta_feedback, name="hub_beta_feedback"),
 ]

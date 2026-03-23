@@ -20,6 +20,7 @@
     <header class="site-header">
         <nav class="site-nav" aria-label="Main navigation">
             <a href="{% url 'home' %}" class="site-nav__brand">Past Lives</a>
+            <span class="site-beta-badge">BETA</span>
             {% if user.is_authenticated %}
                 <span class="site-nav__user">{{ user.email }}</span>
                 <a href="{% url 'account_logout' %}" class="site-nav__link">Log out</a>

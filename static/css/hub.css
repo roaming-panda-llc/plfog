@@ -248,6 +248,17 @@ a:hover { color: var(--color-yellow-hover); }
     padding: 0 1.5rem;
 }
 
+.hub-beta-badge {
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.125rem 0.5rem;
+    border-radius: 10px;
+    background-color: rgba(238, 180, 75, 0.15);
+    color: var(--color-tuscan-yellow);
+}
+
 .hub-topbar__spacer { flex: 1; }
 
 .hub-topbar__profile { position: relative; }
@@ -444,7 +455,8 @@ a:hover { color: var(--color-yellow-hover); }
 .hub-form-group input[type="text"],
 .hub-form-group input[type="email"],
 .hub-form-group input[type="tel"],
-.hub-form-group select {
+.hub-form-group select,
+.hub-form-group textarea {
     width: 100%;
     padding: 0.625rem 0.875rem;
     font-family: var(--font-body);
@@ -457,8 +469,14 @@ a:hover { color: var(--color-yellow-hover); }
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+.hub-form-group textarea {
+    resize: vertical;
+    min-height: 120px;
+}
+
 .hub-form-group input:focus,
-.hub-form-group select:focus {
+.hub-form-group select:focus,
+.hub-form-group textarea:focus {
     outline: none;
     border-color: var(--color-tuscan-yellow);
     box-shadow: 0 0 0 3px rgba(238, 180, 75, 0.15);

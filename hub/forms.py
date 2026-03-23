@@ -28,6 +28,22 @@ class EmailPreferencesForm(forms.Form):
     voting_results = forms.BooleanField(required=False, label="Voting Result Emails")
 
 
+class BetaFeedbackForm(forms.Form):
+    """Form for submitting beta feedback (bug reports, feature requests, general feedback)."""
+
+    CATEGORY_CHOICES = [
+        ("bug", "Bug Report"),
+        ("feature", "Feature Request"),
+        ("feedback", "General Feedback"),
+    ]
+
+    category = forms.ChoiceField(choices=CATEGORY_CHOICES, label="Category")
+    subject = forms.CharField(max_length=200, label="Subject")
+    message = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 6, "placeholder": "Describe your issue or idea..."}), label="Message"
+    )
+
+
 class VotePreferenceForm(forms.Form):
     """Form for submitting or updating a member's persistent guild vote preferences."""
 

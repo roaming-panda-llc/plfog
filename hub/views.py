@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.mail import send_mail
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
-from hub.forms import EmailPreferencesForm, ProfileSettingsForm, VotePreferenceForm
+from hub.forms import BetaFeedbackForm, EmailPreferencesForm, ProfileSettingsForm, VotePreferenceForm
 from membership.cycle import get_cycle_context
 from membership.models import FundingSnapshot, Guild, Member, VotePreference
 
@@ -175,3 +177,32 @@ def email_preferences(request: HttpRequest) -> HttpResponse:
         form = EmailPreferencesForm(initial={"voting_results": True})
 
     return render(request, "hub/email_preferences.html", {**ctx, "form": form})
+
+
+@login_required
+def beta_feedback(request: HttpRequest) -> HttpResponse:
+    """Beta feedback page — users can report bugs, request features, or leave general feedback."""
+    ctx = _get_hub_context(request)
+
+    if request.method == "POST":
+        form = BetaFeedbackForm(request.POST)
+        if form.is_valid():
+            category_label = dict(BetaFeedbackForm.CATEGORY_CHOICES)[form.cleaned_data["category"]]
+            subject = f"[Beta {category_label}] {form.cleaned_data['subject']}"
+            body = (
+                f"From: {request.user.get_full_name() or request.user.email} ({request.user.email})\n"
+                f"Category: {category_label}\n\n"
+                f"{form.cleaned_data['message']}"
+            )
+            send_mail(
+                subject=subject,
+                message=body,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=settings.BETA_FEEDBACK_EMAILS,
+            )
+            messages.success(request, "Thanks for your feedback! We'll review it soon.")
+            return redirect("hub_beta_feedback")
+    else:
+        form = BetaFeedbackForm()
+
+    return render(request, "hub/beta_feedback.html", {**ctx, "form": form})
