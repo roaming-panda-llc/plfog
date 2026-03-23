@@ -12,7 +12,7 @@ from django.test import Client
 
 from hub.forms import VotePreferenceForm
 from membership.cycle import get_cycle_context
-from membership.models import VotePreference
+from membership.models import Member, VotePreference
 from tests.membership.factories import (
     FundingSnapshotFactory,
     GuildFactory,
@@ -61,8 +61,7 @@ def describe_guild_voting_view():
         assert "/accounts/login/" in response.url
 
     def it_shows_form_for_active_member(client: Client):
-        user = User.objects.create_user(username="voter", password="pass")
-        MemberFactory(user=user)
+        User.objects.create_user(username="voter", password="pass")
         GuildFactory(name="Alpha")
         client.login(username="voter", password="pass")
 
@@ -73,8 +72,9 @@ def describe_guild_voting_view():
         assert response.context["member"] is not None
 
     def it_shows_message_when_no_member(client: Client):
-        User.objects.create_user(username="nomember", password="pass")
+        user = User.objects.create_user(username="nomember", password="pass")
         client.login(username="nomember", password="pass")
+        Member.objects.filter(user=user).delete()
 
         response = client.get("/guilds/voting/")
 
@@ -86,7 +86,7 @@ def describe_guild_voting_view():
 
     def it_submits_new_vote(client: Client):
         user = User.objects.create_user(username="newvoter", password="pass")
-        member = MemberFactory(user=user)
+        member = user.member
         g1 = GuildFactory(name="Wood")
         g2 = GuildFactory(name="Metal")
         g3 = GuildFactory(name="Clay")
@@ -109,7 +109,7 @@ def describe_guild_voting_view():
 
     def it_updates_existing_vote(client: Client):
         user = User.objects.create_user(username="updater", password="pass")
-        member = MemberFactory(user=user)
+        member = user.member
         g1 = GuildFactory(name="Fiber")
         g2 = GuildFactory(name="Print")
         g3 = GuildFactory(name="Laser")
@@ -129,7 +129,7 @@ def describe_guild_voting_view():
 
     def it_shows_updated_message_when_preference_exists(client: Client):
         user = User.objects.create_user(username="updatemsg", password="pass")
-        member = MemberFactory(user=user)
+        member = user.member
         g1 = GuildFactory(name="AA")
         g2 = GuildFactory(name="BB")
         g3 = GuildFactory(name="CC")
@@ -147,8 +147,7 @@ def describe_guild_voting_view():
         assert any("updated" in str(m) for m in msgs)
 
     def it_rejects_duplicate_guilds(client: Client):
-        user = User.objects.create_user(username="dupeuser", password="pass")
-        MemberFactory(user=user)
+        User.objects.create_user(username="dupeuser", password="pass")
         g1 = GuildFactory(name="Same")
         g2 = GuildFactory(name="Other")
         client.login(username="dupeuser", password="pass")
@@ -164,7 +163,7 @@ def describe_guild_voting_view():
 
     def it_shows_current_preferences(client: Client):
         user = User.objects.create_user(username="showpref", password="pass")
-        member = MemberFactory(user=user)
+        member = user.member
         g1 = GuildFactory(name="Guild A")
         g2 = GuildFactory(name="Guild B")
         g3 = GuildFactory(name="Guild C")
@@ -178,8 +177,7 @@ def describe_guild_voting_view():
         assert response.context["preference"].guild_1st == g1
 
     def it_shows_latest_results(client: Client):
-        user = User.objects.create_user(username="results_viewer", password="pass")
-        MemberFactory(user=user)
+        User.objects.create_user(username="results_viewer", password="pass")
         snap = FundingSnapshotFactory(
             cycle_label="March 2026",
             funding_pool=Decimal("100.00"),
@@ -193,8 +191,7 @@ def describe_guild_voting_view():
         assert response.context["latest_snapshot"] == snap
 
     def it_includes_cycle_info_in_context(client: Client):
-        user = User.objects.create_user(username="cycleuser", password="pass")
-        MemberFactory(user=user)
+        User.objects.create_user(username="cycleuser", password="pass")
         client.login(username="cycleuser", password="pass")
 
         response = client.get("/guilds/voting/")
@@ -221,8 +218,7 @@ def describe_snapshot_history_view():
         assert "/accounts/login/" in response.url
 
     def it_shows_list_of_snapshots(client: Client):
-        user = User.objects.create_user(username="histuser", password="pass")
-        MemberFactory(user=user)
+        User.objects.create_user(username="histuser", password="pass")
         snap1 = FundingSnapshotFactory(cycle_label="January 2026", funding_pool=Decimal("100.00"))
         snap2 = FundingSnapshotFactory(cycle_label="February 2026", funding_pool=Decimal("120.00"))
         client.login(username="histuser", password="pass")
@@ -235,8 +231,7 @@ def describe_snapshot_history_view():
         assert snap2 in snapshots
 
     def it_shows_empty_state_when_no_snapshots(client: Client):
-        user = User.objects.create_user(username="emptyuser", password="pass")
-        MemberFactory(user=user)
+        User.objects.create_user(username="emptyuser", password="pass")
         client.login(username="emptyuser", password="pass")
 
         response = client.get("/guilds/voting/history/")
@@ -245,8 +240,7 @@ def describe_snapshot_history_view():
         assert list(response.context["snapshots"]) == []
 
     def it_is_accessible_to_non_staff_members(client: Client):
-        user = User.objects.create_user(username="plainmember", password="pass", is_staff=False)
-        MemberFactory(user=user)
+        User.objects.create_user(username="plainmember", password="pass", is_staff=False)
         client.login(username="plainmember", password="pass")
 
         response = client.get("/guilds/voting/history/")
@@ -268,8 +262,7 @@ def describe_snapshot_detail_view():
         assert "/accounts/login/" in response.url
 
     def it_shows_snapshot_data(client: Client):
-        user = User.objects.create_user(username="detailuser", password="pass")
-        MemberFactory(user=user)
+        User.objects.create_user(username="detailuser", password="pass")
         snap = FundingSnapshotFactory(
             cycle_label="March 2026",
             funding_pool=Decimal("200.00"),
@@ -284,8 +277,7 @@ def describe_snapshot_detail_view():
         assert response.context["snapshot"] == snap
 
     def it_returns_404_for_invalid_pk(client: Client):
-        user = User.objects.create_user(username="notfounduser", password="pass")
-        MemberFactory(user=user)
+        User.objects.create_user(username="notfounduser", password="pass")
         client.login(username="notfounduser", password="pass")
 
         response = client.get("/guilds/voting/history/99999/")
@@ -293,8 +285,7 @@ def describe_snapshot_detail_view():
         assert response.status_code == 404
 
     def it_is_accessible_to_non_staff_members(client: Client):
-        user = User.objects.create_user(username="regularuser", password="pass", is_staff=False)
-        MemberFactory(user=user)
+        User.objects.create_user(username="regularuser", password="pass", is_staff=False)
         snap = FundingSnapshotFactory(cycle_label="April 2026")
         client.login(username="regularuser", password="pass")
 

@@ -7,6 +7,7 @@ from django.contrib.auth.models import AnonymousUser, User
 from django.test import Client, RequestFactory
 
 from hub.views import _get_hub_context, _get_member
+from membership.models import Member
 from tests.membership.factories import GuildFactory, MemberFactory
 
 
@@ -25,8 +26,7 @@ def describe_get_hub_context():
         assert list(response.context["guilds"]) == [g1, g2]
 
     def it_returns_initials_from_member(client: Client):
-        user = User.objects.create_user(username="u2", password="pass", first_name="Jane", last_name="Doe")
-        MemberFactory(user=user, full_legal_name="Jane Doe")
+        User.objects.create_user(username="u2", password="pass", first_name="Jane", last_name="Doe")
         client.login(username="u2", password="pass")
 
         response = client.get("/guilds/voting/")
@@ -34,8 +34,9 @@ def describe_get_hub_context():
         assert response.context["user_initials"] == "JD"
 
     def it_returns_empty_initials_when_no_member_linked(client: Client):
-        User.objects.create_user(username="u3", password="pass", first_name="Jane")
+        user = User.objects.create_user(username="u3", password="pass", first_name="Jane")
         client.login(username="u3", password="pass")
+        Member.objects.filter(user=user).delete()
 
         response = client.get("/guilds/voting/")
 
@@ -58,17 +59,18 @@ def describe_get_member():
     @pytest.mark.django_db
     def it_returns_member_when_linked(rf: RequestFactory):
         user = User.objects.create_user(username="has_member", password="pass")
-        member = MemberFactory(user=user, full_legal_name="Has Member")
         request = rf.get("/settings/profile/")
         request.user = user
 
         result = _get_member(request)
 
-        assert result == member
+        assert result == user.member
 
     @pytest.mark.django_db
     def it_returns_none_when_no_member_linked(rf: RequestFactory):
         user = User.objects.create_user(username="no_member", password="pass")
+        Member.objects.filter(user=user).delete()
+        user = User.objects.get(pk=user.pk)  # Refresh to clear cached .member
         request = rf.get("/settings/profile/")
         request.user = user
 
@@ -149,8 +151,9 @@ def describe_profile_settings():
         assert response.status_code == 302
 
     def it_renders_with_no_member_linked(client: Client):
-        User.objects.create_user(username="nomember", password="pass")
+        user = User.objects.create_user(username="nomember", password="pass")
         client.login(username="nomember", password="pass")
+        Member.objects.filter(user=user).delete()
 
         response = client.get("/settings/profile/")
 
@@ -160,18 +163,17 @@ def describe_profile_settings():
 
     def it_renders_with_member_linked(client: Client):
         user = User.objects.create_user(username="withmember", password="pass")
-        member = MemberFactory(user=user, full_legal_name="Test User")
         client.login(username="withmember", password="pass")
 
         response = client.get("/settings/profile/")
 
         assert response.status_code == 200
-        assert response.context["member"] == member
+        assert response.context["member"] == user.member
         assert response.context["form"] is not None
 
     def it_updates_member_profile_on_post(client: Client):
         user = User.objects.create_user(username="editor", password="pass")
-        member = MemberFactory(user=user, full_legal_name="Editor")
+        member = user.member
         client.login(username="editor", password="pass")
 
         response = client.post(
@@ -190,7 +192,7 @@ def describe_profile_settings():
 
     def it_strips_whitespace_from_post_data(client: Client):
         user = User.objects.create_user(username="stripper", password="pass")
-        member = MemberFactory(user=user, full_legal_name="Whitespace")
+        member = user.member
         client.login(username="stripper", password="pass")
 
         client.post(
@@ -203,8 +205,9 @@ def describe_profile_settings():
         assert member.phone == "555-0000"
 
     def it_shows_info_message_when_no_member(client: Client):
-        User.objects.create_user(username="nolink", password="pass")
+        user = User.objects.create_user(username="nolink", password="pass")
         client.login(username="nolink", password="pass")
+        Member.objects.filter(user=user).delete()
 
         response = client.get("/settings/profile/")
 
@@ -213,8 +216,7 @@ def describe_profile_settings():
         assert "not linked" in str(messages_list[0])
 
     def it_rejects_phone_exceeding_max_length(client: Client):
-        user = User.objects.create_user(username="longphone", password="pass")
-        MemberFactory(user=user, full_legal_name="Long Phone")
+        User.objects.create_user(username="longphone", password="pass")
         client.login(username="longphone", password="pass")
 
         response = client.post(
