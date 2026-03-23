@@ -4,19 +4,23 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('core', '0003_create_default_siteconfiguration'),
+        ("core", "0003_create_default_siteconfiguration"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='siteconfiguration',
-            options={'verbose_name': 'Site Settings', 'verbose_name_plural': 'Site Settings'},
+            name="siteconfiguration",
+            options={"verbose_name": "Site Settings", "verbose_name_plural": "Site Settings"},
         ),
         migrations.AlterField(
-            model_name='siteconfiguration',
-            name='registration_mode',
-            field=models.CharField(choices=[('open', 'Open'), ('invite_only', 'Invite Only')], default='invite_only', help_text='Open — anyone can sign up. Invite Only — only people with an invite can register.', max_length=20),
+            model_name="siteconfiguration",
+            name="registration_mode",
+            field=models.CharField(
+                choices=[("open", "Open"), ("invite_only", "Invite Only")],
+                default="invite_only",
+                help_text="Open — anyone can sign up. Invite Only — only people with an invite can register.",
+                max_length=20,
+            ),
         ),
     ]

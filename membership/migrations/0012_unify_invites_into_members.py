@@ -4,15 +4,23 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('membership', '0011_seed_default_membership_plan'),
+        ("membership", "0011_seed_default_membership_plan"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='member',
-            name='status',
-            field=models.CharField(choices=[('invited', 'Invited'), ('active', 'Active'), ('former', 'Former'), ('suspended', 'Suspended')], default='active', max_length=20),
+            model_name="member",
+            name="status",
+            field=models.CharField(
+                choices=[
+                    ("invited", "Invited"),
+                    ("active", "Active"),
+                    ("former", "Former"),
+                    ("suspended", "Suspended"),
+                ],
+                default="active",
+                max_length=20,
+            ),
         ),
     ]
