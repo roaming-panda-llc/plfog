@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from django.contrib import admin
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse
 from unfold.admin import ModelAdmin
 
 from .models import SiteConfiguration
@@ -32,7 +32,7 @@ class SiteConfigurationAdmin(ModelAdmin):
         """Never allow deleting the singleton."""
         return False
 
-    def changelist_view(self, request: HttpRequest, extra_context: dict | None = None) -> HttpRequest:
+    def changelist_view(self, request: HttpRequest, extra_context: dict | None = None) -> HttpResponse:
         """Redirect the changelist straight to the singleton edit form."""
         from django.shortcuts import redirect
 
