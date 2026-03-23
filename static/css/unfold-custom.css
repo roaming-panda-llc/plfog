@@ -1,54 +1,165 @@
 /* Past Lives Makerspace - Unfold admin custom styles
  *
- * Brand fonts: Kazimir (Bold) / Supria Sans (Light)
- * Web substitutes: Playfair Display / Lato (via Google Fonts)
- *
- * Color Palette:
- *   Primary:   Matte Navy #092E4C, Soft Blue #96ACBB
- *   Secondary: Tuscan Yellow #EEB44B, PL Black #1D1E1E, PL Cream #F4EFDD
- *
- * Note: Google Fonts loaded via Unfold STYLES config; no @import needed here
- * since Unfold includes its own font loading mechanism. We apply families directly.
+ * Aligned with the member hub aesthetic:
+ *   Fonts: Lato (headings), Inter (body)
+ *   Colors: Navy #092E4C, Tuscan Yellow #EEB44B, Cream #F4EFDD
  */
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Lato:wght@300;400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&family=Lato:wght@400;700;900&display=swap');
 
-/* Heading font: Playfair Display (substitute for Kazimir Bold) */
+/* ========================================
+   Font overrides — match member hub
+   ======================================== */
 h1, h2, h3, h4, h5, h6,
 .font-semibold {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Lato', system-ui, -apple-system, sans-serif;
 }
 
-/* Body font: Lato (substitute for Supria Sans Light) */
 body,
 input,
 select,
 textarea,
 button,
 .font-normal {
-    font-family: 'Lato', sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
 }
 
-/* Google sign-in button on admin login */
-.google-signin-btn {
-    background-color: #EEB44B;
-    color: #092E4C;
-    font-weight: 600;
-    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+/* ========================================
+   Sidebar — deeper navy, match hub sidebar
+   ======================================== */
+aside[class*="lg:w-"] {
+    background-color: #092E4C !important;
 }
 
-.google-signin-btn:hover {
-    background-color: #d4a043;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+/* Sidebar brand area */
+aside a[class*="flex"][class*="items-center"][class*="gap-"] {
+    color: #F4EFDD;
 }
 
-.google-signin-btn:focus-visible {
-    outline: 2px solid #EEB44B;
-    outline-offset: 2px;
+/* Sidebar nav links — cream text, yellow active */
+aside nav a {
+    color: rgba(244, 239, 221, 0.7) !important;
+    transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-/* Ensure proper text selection styling in admin */
+aside nav a:hover {
+    color: #F4EFDD !important;
+    background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+aside nav a[class*="bg-primary"],
+aside nav a[aria-current="page"] {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    color: #F4EFDD !important;
+}
+
+/* Sidebar section titles */
+aside nav span[class*="uppercase"] {
+    color: rgba(244, 239, 221, 0.35) !important;
+    letter-spacing: 0.1em;
+}
+
+/* ========================================
+   Main content area — dark background
+   ======================================== */
+.dark main[class*="min-h-screen"],
+main[class*="min-h-screen"] {
+    background-color: #12121f !important;
+}
+
+/* ========================================
+   Top bar — dark, subtle border
+   ======================================== */
+header[class*="sticky"] {
+    background-color: #1a1a2e !important;
+    border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ========================================
+   Cards & panels — navy cards on dark bg
+   ======================================== */
+.dark [class*="bg-white"],
+[class*="dark:bg-base-900"] {
+    background-color: #092E4C !important;
+    border-color: transparent !important;
+    border-radius: 10px;
+}
+
+/* Table containers and content panels */
+#changelist .results,
+.module {
+    background-color: #092E4C;
+    border-radius: 10px;
+    border: none;
+}
+
+/* ========================================
+   Text colors — warm cream tones
+   ======================================== */
 ::selection {
     background-color: rgba(238, 180, 75, 0.3);
+}
+
+/* ========================================
+   Buttons — tuscan yellow primary
+   ======================================== */
+button[class*="bg-primary"],
+a[class*="bg-primary"],
+.submit-row button[type="submit"] {
+    background-color: #EEB44B !important;
+    color: #092E4C !important;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+button[class*="bg-primary"]:hover,
+a[class*="bg-primary"]:hover,
+.submit-row button[type="submit"]:hover {
+    background-color: #d4a043 !important;
+}
+
+button[class*="bg-primary"]:active,
+a[class*="bg-primary"]:active {
+    transform: translateY(1px);
+}
+
+/* Secondary / outline buttons */
+a[class*="border"][class*="rounded"] {
+    border-color: rgba(255, 255, 255, 0.12);
+    transition: background-color 0.15s ease;
+}
+
+a[class*="border"][class*="rounded"]:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* ========================================
+   Links — tuscan yellow accent
+   ======================================== */
+a[class*="text-primary"] {
+    color: #EEB44B !important;
+}
+
+a[class*="text-primary"]:hover {
+    color: #d4a043 !important;
+}
+
+/* ========================================
+   Tables — clean lines, navy bg
+   ======================================== */
+#result_list table,
+table[class*="w-full"] {
+    border-collapse: collapse;
+}
+
+#result_list th,
+#result_list td {
+    border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+#result_list tr:hover td {
+    background-color: rgba(255, 255, 255, 0.03);
 }
 
 /* Admin index: model name links fill their table cell */
@@ -70,4 +181,85 @@ button,
         margin: -0.75rem;
         padding: 0.75rem;
     }
+}
+
+/* ========================================
+   Form fields — match hub input styling
+   ======================================== */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="url"],
+select,
+textarea {
+    background-color: #0a1929 !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+    color: #F4EFDD !important;
+    border-radius: 6px !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    border-color: #EEB44B !important;
+    box-shadow: 0 0 0 3px rgba(238, 180, 75, 0.15) !important;
+    outline: none !important;
+}
+
+/* ========================================
+   Messages — match hub alerts
+   ======================================== */
+.messagelist .success,
+[class*="bg-green"] {
+    background-color: rgba(123, 200, 143, 0.12) !important;
+    color: #7bc88f !important;
+    border-left: 3px solid #7bc88f;
+}
+
+.messagelist .error,
+[class*="bg-red"] {
+    background-color: rgba(240, 160, 160, 0.12) !important;
+    color: #f0a0a0 !important;
+    border-left: 3px solid #f0a0a0;
+}
+
+/* ========================================
+   Login page — align with hub aesthetic
+   ======================================== */
+.login-page,
+[class*="unauthenticated"] {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Email code login link */
+.mt-6.text-center a {
+    color: #EEB44B;
+    transition: color 0.15s ease;
+}
+
+.mt-6.text-center a:hover {
+    color: #d4a043;
+}
+
+/* ========================================
+   Scrollbar — subtle, matches dark theme
+   ======================================== */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: rgba(244, 239, 221, 0.15);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(244, 239, 221, 0.25);
 }

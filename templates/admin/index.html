@@ -8,92 +8,226 @@
 {% endblock %}
 
 {% block content %}
-<div class="flex flex-col gap-8 max-w-4xl">
+<style>
+    /* Dashboard-specific styles matching the member hub */
+    .pl-dashboard { display: flex; flex-direction: column; gap: 1.5rem; max-width: 860px; }
+    .pl-card {
+        background-color: #092E4C;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        padding: 2rem;
+    }
+    .pl-card__title {
+        font-family: 'Lato', system-ui, sans-serif;
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #F4EFDD;
+        margin-bottom: 0.5rem;
+    }
+    .pl-card__subtitle {
+        font-family: 'Lato', system-ui, sans-serif;
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #F4EFDD;
+        margin-bottom: 1rem;
+    }
+    .pl-text-muted {
+        color: #96ACBB;
+        font-size: 0.9375rem;
+    }
+    .pl-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    .pl-stat {
+        background-color: rgba(255, 255, 255, 0.04);
+        border-radius: 8px;
+        padding: 1.25rem;
+        text-align: center;
+    }
+    .pl-stat__value {
+        font-family: 'Lato', system-ui, sans-serif;
+        font-size: 2rem;
+        font-weight: 900;
+        color: #EEB44B;
+        line-height: 1.2;
+    }
+    .pl-stat__label {
+        font-size: 0.8125rem;
+        color: #96ACBB;
+        margin-top: 0.25rem;
+        letter-spacing: 0.02em;
+    }
+    .pl-section-label {
+        font-size: 0.6875rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: #96ACBB;
+        margin-bottom: 0.75rem;
+    }
+    .pl-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9375rem;
+    }
+    .pl-table thead th {
+        text-align: left;
+        padding: 0.5rem 0.75rem;
+        font-weight: 500;
+        color: #96ACBB;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        font-size: 0.875rem;
+    }
+    .pl-table thead th.text-right { text-align: right; }
+    .pl-table tbody td {
+        padding: 0.5rem 0.75rem;
+        color: #F4EFDD;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    .pl-table tbody td.text-right { text-align: right; }
+    .pl-table tbody td.font-semibold { font-weight: 700; }
+    .pl-actions {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+    .pl-btn {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.625rem 1.5rem;
+        font-family: 'Inter', system-ui, sans-serif;
+        font-size: 0.9375rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background-color 0.15s ease, transform 0.1s ease;
+    }
+    .pl-btn:active { transform: translateY(1px); }
+    .pl-btn--primary {
+        background-color: #EEB44B;
+        color: #092E4C;
+    }
+    .pl-btn--primary:hover {
+        background-color: #d4a043;
+        color: #092E4C;
+    }
+    .pl-btn--secondary {
+        background-color: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #F4EFDD;
+    }
+    .pl-btn--secondary:hover {
+        background-color: rgba(255, 255, 255, 0.06);
+        color: #F4EFDD;
+    }
+    .pl-meta {
+        font-size: 0.8125rem;
+        color: #96ACBB;
+        margin-top: 1rem;
+    }
+    @media (max-width: 768px) {
+        .pl-stats { grid-template-columns: 1fr; }
+        .pl-card { padding: 1.25rem; }
+    }
+</style>
 
-    {# --- Voting Dashboard --- #}
-    <div class="border border-base-200 dark:border-base-700 rounded-md bg-white dark:bg-base-900 p-6">
-        <h2 class="text-lg font-semibold mb-4">Voting Dashboard</h2>
+<div class="pl-dashboard">
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div class="border border-base-200 dark:border-base-700 rounded-md p-4 text-center">
-                <div class="text-3xl font-bold text-primary-500">{{ stats.total_voters }}</div>
-                <div class="text-sm text-font-subtle-light dark:text-font-subtle-dark mt-1">Members with votes</div>
-            </div>
-            <div class="border border-base-200 dark:border-base-700 rounded-md p-4 text-center">
-                <div class="text-3xl font-bold text-primary-500">{{ stats.active_members }}</div>
-                <div class="text-sm text-font-subtle-light dark:text-font-subtle-dark mt-1">Active members</div>
-            </div>
-            <div class="border border-base-200 dark:border-base-700 rounded-md p-4 text-center">
-                <div class="text-3xl font-bold text-primary-500">{{ stats.participation_pct }}%</div>
-                <div class="text-sm text-font-subtle-light dark:text-font-subtle-dark mt-1">Participation rate</div>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div class="border border-base-200 dark:border-base-700 rounded-md p-4 text-center">
-                <div class="text-3xl font-bold text-primary-500">{{ stats.paying_voters }}</div>
-                <div class="text-sm text-font-subtle-light dark:text-font-subtle-dark mt-1">Paying voters</div>
-            </div>
-            <div class="border border-base-200 dark:border-base-700 rounded-md p-4 text-center">
-                <div class="text-3xl font-bold text-primary-500">{{ stats.active_guilds }}</div>
-                <div class="text-sm text-font-subtle-light dark:text-font-subtle-dark mt-1">Active guilds</div>
-            </div>
-            <div class="border border-base-200 dark:border-base-700 rounded-md p-4 text-center">
-                <div class="text-3xl font-bold text-primary-500">${{ stats.projected_pool }}</div>
-                <div class="text-sm text-font-subtle-light dark:text-font-subtle-dark mt-1">Projected funding pool</div>
-            </div>
-        </div>
-
-        {% if stats.top_guilds %}
-        <div class="mb-6">
-            <h3 class="text-sm font-semibold mb-2 text-font-subtle-light dark:text-font-subtle-dark uppercase tracking-wider">Current vote leaders</h3>
-            <table class="w-full text-sm">
-                <thead>
-                    <tr class="border-b border-base-200 dark:border-base-700">
-                        <th class="text-left py-2 px-3 font-medium">Guild</th>
-                        <th class="text-right py-2 px-3 font-medium">1st</th>
-                        <th class="text-right py-2 px-3 font-medium">2nd</th>
-                        <th class="text-right py-2 px-3 font-medium">3rd</th>
-                        <th class="text-right py-2 px-3 font-medium">Points</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for guild in stats.top_guilds %}
-                    <tr class="border-b border-base-100 dark:border-base-800">
-                        <td class="py-2 px-3">{{ guild.name }}</td>
-                        <td class="py-2 px-3 text-right">{{ guild.first }}</td>
-                        <td class="py-2 px-3 text-right">{{ guild.second }}</td>
-                        <td class="py-2 px-3 text-right">{{ guild.third }}</td>
-                        <td class="py-2 px-3 text-right font-semibold">{{ guild.points }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% endif %}
-
-        <div class="flex gap-3">
-            <form method="post" action="{% url 'admin_take_snapshot' %}">
-                {% csrf_token %}
-                <button type="submit" class="bg-primary-500 hover:bg-primary-600 text-white font-medium py-2 px-4 rounded-md text-sm"
-                        onclick="return confirm('Take a funding snapshot for the current cycle?');">
-                    Take Snapshot Now
-                </button>
-            </form>
-            <a href="{% url 'hub_snapshot_history' %}" class="border border-base-300 dark:border-base-600 hover:bg-base-100 dark:hover:bg-base-800 font-medium py-2 px-4 rounded-md text-sm inline-flex items-center">
-                View Funding History
-            </a>
-            <a href="{% url 'hub_guild_voting' %}" class="border border-base-300 dark:border-base-600 hover:bg-base-100 dark:hover:bg-base-800 font-medium py-2 px-4 rounded-md text-sm inline-flex items-center">
-                View Member Hub
-            </a>
-        </div>
-
-        {% if stats.last_snapshot %}
-        <p class="text-xs text-font-subtle-light dark:text-font-subtle-dark mt-4">
-            Last snapshot: {{ stats.last_snapshot.cycle_label }} — ${{ stats.last_snapshot.funding_pool }} — {{ stats.last_snapshot.snapshot_at|date:"N j, Y g:i a" }}
-        </p>
-        {% endif %}
+    <div>
+        <h1 class="pl-card__title">Voting Dashboard</h1>
+        <p class="pl-text-muted">Overview of guild voting activity and funding allocation.</p>
     </div>
+
+    {# --- Stats --- #}
+    <div class="pl-stats">
+        <div class="pl-stat">
+            <div class="pl-stat__value">{{ stats.total_voters }}</div>
+            <div class="pl-stat__label">Members with votes</div>
+        </div>
+        <div class="pl-stat">
+            <div class="pl-stat__value">{{ stats.active_members }}</div>
+            <div class="pl-stat__label">Active members</div>
+        </div>
+        <div class="pl-stat">
+            <div class="pl-stat__value">{{ stats.participation_pct }}%</div>
+            <div class="pl-stat__label">Participation rate</div>
+        </div>
+    </div>
+
+    <div class="pl-stats">
+        <div class="pl-stat">
+            <div class="pl-stat__value">{{ stats.paying_voters }}</div>
+            <div class="pl-stat__label">Paying voters</div>
+        </div>
+        <div class="pl-stat">
+            <div class="pl-stat__value">{{ stats.active_guilds }}</div>
+            <div class="pl-stat__label">Active guilds</div>
+        </div>
+        <div class="pl-stat">
+            <div class="pl-stat__value">${{ stats.projected_pool }}</div>
+            <div class="pl-stat__label">Projected funding pool</div>
+        </div>
+    </div>
+
+    {# --- Vote Leaders --- #}
+    {% if stats.top_guilds %}
+    <div class="pl-card">
+        <div class="pl-section-label">Current vote leaders</div>
+        <table class="pl-table">
+            <thead>
+                <tr>
+                    <th>Guild</th>
+                    <th class="text-right">1st</th>
+                    <th class="text-right">2nd</th>
+                    <th class="text-right">3rd</th>
+                    <th class="text-right">Points</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for guild in stats.top_guilds %}
+                <tr>
+                    <td>{{ guild.name }}</td>
+                    <td class="text-right">{{ guild.first }}</td>
+                    <td class="text-right">{{ guild.second }}</td>
+                    <td class="text-right">{{ guild.third }}</td>
+                    <td class="text-right font-semibold">{{ guild.points }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {# --- Actions --- #}
+    <div class="pl-actions">
+        <form method="post" action="{% url 'admin_take_snapshot' %}">
+            {% csrf_token %}
+            <button type="submit" class="pl-btn pl-btn--primary"
+                    onclick="return confirm('Take a funding snapshot for the current cycle?');">
+                Take Snapshot Now
+            </button>
+        </form>
+        <a href="{% url 'hub_snapshot_history' %}" class="pl-btn pl-btn--secondary">
+            View Funding History
+        </a>
+        <a href="{% url 'hub_guild_voting' %}" class="pl-btn pl-btn--secondary">
+            View Member Hub
+        </a>
+    </div>
+
+    {% if stats.last_snapshot %}
+    <p class="pl-meta">
+        Last snapshot: {{ stats.last_snapshot.cycle_label }} &mdash;
+        ${{ stats.last_snapshot.funding_pool }} &mdash;
+        {{ stats.last_snapshot.snapshot_at|date:"N j, Y g:i a" }}
+    </p>
+    {% endif %}
 
 </div>
 {% endblock %}
