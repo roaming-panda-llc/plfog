@@ -3,13 +3,15 @@
  * Vanilla JS implementation for offline shell caching
  */
 
-const CACHE_NAME = 'plfog-shell-v3';
+const CACHE_NAME = 'plfog-shell-v4';
 
 // Assets to precache on install
 const PRECACHE_ASSETS = [
   '/static/offline.html',
   '/static/css/style.css',
-  '/static/css/unfold-custom.css'
+  '/static/css/unfold-custom.css',
+  '/static/js/htmx.min.js',
+  '/static/js/alpine.min.js'
 ];
 
 /**
