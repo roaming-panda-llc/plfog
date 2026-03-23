@@ -401,13 +401,13 @@ def describe_unfold_theme():
 
 
 def describe_unfold_site_identity():
-    def it_sets_site_title_to_past_lives(monkeypatch):
+    def it_sets_site_title_to_fog_admin(monkeypatch):
         unfold = _get_unfold(monkeypatch)
-        assert unfold["SITE_TITLE"] == "Past Lives"
+        assert unfold["SITE_TITLE"] == "FOG Admin"
 
-    def it_sets_site_header_to_past_lives(monkeypatch):
+    def it_sets_site_header_to_fog_admin(monkeypatch):
         unfold = _get_unfold(monkeypatch)
-        assert unfold["SITE_HEADER"] == "Past Lives"
+        assert unfold["SITE_HEADER"] == "FOG Admin"
 
     def it_sets_site_symbol(monkeypatch):
         unfold = _get_unfold(monkeypatch)

@@ -238,8 +238,8 @@ LOGGING = {
 
 # django-unfold admin theme
 UNFOLD = {
-    "SITE_TITLE": "Past Lives",
-    "SITE_HEADER": "Past Lives",
+    "SITE_TITLE": "FOG Admin",
+    "SITE_HEADER": "FOG Admin",
     "SITE_SYMBOL": "camping",
     "SITE_FAVICONS": [
         {
@@ -304,27 +304,21 @@ UNFOLD = {
         lambda request: static("css/unfold-custom.css"),
     ],
     "SIDEBAR": {
-        "show_search": True,
-        "show_all_applications": True,
+        "show_search": False,
+        "show_all_applications": False,
         "navigation": [
             {
-                "title": "Navigation",
                 "items": [
-                    {
-                        "title": "Voting Dashboard",
-                        "icon": "how_to_vote",
-                        "link": reverse_lazy("admin:index"),
-                    },
                     {
                         "title": "Member Hub",
                         "icon": "home",
                         "link": reverse_lazy("hub_guild_voting"),
                     },
-                ],
-            },
-            {
-                "title": "Makerspace",
-                "items": [
+                    {
+                        "title": "Voting Dashboard",
+                        "icon": "how_to_vote",
+                        "link": reverse_lazy("admin:index"),
+                    },
                     {
                         "title": "Members",
                         "icon": "group",
@@ -335,11 +329,6 @@ UNFOLD = {
                         "icon": "groups",
                         "link": reverse_lazy("admin:membership_guild_changelist"),
                     },
-                ],
-            },
-            {
-                "title": "Settings",
-                "items": [
                     {
                         "title": "Invites",
                         "icon": "mail",

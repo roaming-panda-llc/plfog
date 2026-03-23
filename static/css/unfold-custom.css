@@ -25,38 +25,111 @@ button,
 }
 
 /* ========================================
-   Sidebar — deeper navy, match hub sidebar
+   Sidebar — match hub sidebar exactly
    ======================================== */
+
+/* Width — match hub's 220px */
+#nav-sidebar {
+    width: 220px !important;
+}
+
+.w-\[288px\] {
+    width: 220px !important;
+}
+
 aside[class*="lg:w-"] {
     background-color: #092E4C !important;
 }
 
-/* Sidebar brand area */
-aside a[class*="flex"][class*="items-center"][class*="gap-"] {
-    color: #F4EFDD;
+#nav-sidebar {
+    background-color: #092E4C !important;
 }
 
-/* Sidebar nav links — cream text, yellow active */
-aside nav a {
+/* Sidebar brand area — match hub brand */
+#nav-sidebar .border-b {
+    border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin-bottom: 0 !important;
+}
+
+.admin-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 1.25rem 1rem;
+    color: #F4EFDD !important;
+    text-decoration: none !important;
+}
+
+.admin-brand:hover {
+    color: #F4EFDD !important;
+}
+
+.admin-brand__icon {
+    width: 24px;
+    height: 24px;
+}
+
+.admin-brand__text {
+    font-family: 'Lato', system-ui, -apple-system, sans-serif !important;
+    font-size: 1.125rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.02em !important;
+    color: #F4EFDD !important;
+}
+
+/* Sidebar nav — match hub sidebar__nav */
+#nav-sidebar-apps {
+    padding: 0.75rem 0.5rem !important;
+}
+
+#nav-sidebar-apps ol {
+    padding: 0 !important;
+    gap: 2px !important;
+}
+
+/* Nav links — match hub sidebar__link */
+#nav-sidebar-apps a {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+    font-size: 0.875rem !important;
+    font-weight: 400 !important;
     color: rgba(244, 239, 221, 0.7) !important;
-    transition: background-color 0.15s ease, color 0.15s ease;
+    border-radius: 6px !important;
+    padding: 0.5rem 0.75rem !important;
+    height: auto !important;
+    transition: background-color 0.15s ease, color 0.15s ease !important;
 }
 
-aside nav a:hover {
+#nav-sidebar-apps a:hover {
     color: #F4EFDD !important;
     background-color: rgba(255, 255, 255, 0.06) !important;
 }
 
-aside nav a[class*="bg-primary"],
-aside nav a[aria-current="page"] {
+#nav-sidebar-apps a.active {
     background-color: rgba(255, 255, 255, 0.08) !important;
     color: #F4EFDD !important;
+    font-weight: 400 !important;
 }
 
-/* Sidebar section titles */
-aside nav span[class*="uppercase"] {
-    color: rgba(244, 239, 221, 0.35) !important;
-    letter-spacing: 0.1em;
+#nav-sidebar-apps a.active .material-symbols-outlined {
+    color: #EEB44B !important;
+}
+
+/* Nav icons — match hub icon sizing */
+#nav-sidebar-apps .material-symbols-outlined {
+    font-size: 18px !important;
+    margin-right: 0.625rem !important;
+}
+
+/* Hide section group titles (no categories) */
+#nav-sidebar-apps h2 {
+    display: none !important;
+}
+
+/* Hide user profile from sidebar bottom */
+#nav-sidebar > nav > .border-t {
+    display: none !important;
 }
 
 /* ========================================
@@ -70,6 +143,101 @@ main[class*="min-h-screen"] {
 /* ========================================
    Top bar — dark, subtle border
    ======================================== */
+
+/* Admin profile avatar + dropdown (top-right, matches hub) */
+.admin-profile {
+    position: relative;
+}
+
+.admin-profile__avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: #EEB44B;
+    color: #092E4C;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: box-shadow 0.15s ease;
+}
+
+.admin-profile__avatar:hover {
+    box-shadow: 0 0 0 2px #1a1a2e, 0 0 0 4px #EEB44B;
+}
+
+.admin-profile__dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 240px;
+    background-color: #222238;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    z-index: 100;
+}
+
+.admin-profile__dropdown.open {
+    display: block;
+}
+
+.admin-profile__dropdown-header {
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-profile__dropdown-name {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #F4EFDD;
+}
+
+.admin-profile__dropdown-email {
+    font-size: 0.75rem;
+    color: #96ACBB;
+    margin-top: 2px;
+}
+
+.admin-profile__dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: #F4EFDD;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 0.15s ease;
+    text-decoration: none;
+}
+
+.admin-profile__dropdown-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: #F4EFDD;
+}
+
+.admin-profile__dropdown-item--danger {
+    color: #e05555 !important;
+}
+
+.admin-profile__dropdown-item--danger:hover {
+    color: #e05555 !important;
+}
+
+.admin-profile__dropdown-divider {
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.1);
+    margin: 0.25rem 0;
+}
 header[class*="sticky"] {
     background-color: #1a1a2e !important;
     border-bottom-color: rgba(255, 255, 255, 0.06) !important;
