@@ -26,7 +26,7 @@
     --color-cream: #F4EFDD;
 
     /* Semantic mappings */
-    --color-bg: var(--color-navy);
+    --color-bg: #1a4a2e;
     --color-surface: var(--color-navy-light);
     --color-surface-hover: var(--color-navy-hover);
     --color-text: var(--color-cream);
