@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date as date_type
 from decimal import Decimal
+from typing import Any
+
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
@@ -201,14 +203,14 @@ class Member(models.Model):
     def total_monthly_spend(self) -> Decimal:
         return self.membership_monthly_dues + self.studio_storage_total
 
-    def save(self, *args, **kwargs) -> None:  # type: ignore[override]
+    def save(self, *args: Any, **kwargs: Any) -> None:
         super().save(*args, **kwargs)
         if not getattr(self, "_skip_airtable_sync", False):
             from airtable_sync.service import sync_member_to_airtable
 
             sync_member_to_airtable(self)
 
-    def delete(self, *args, **kwargs) -> tuple[int, dict[str, int]]:  # type: ignore[override]
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
         record_id = self.airtable_record_id
         result = super().delete(*args, **kwargs)
         if record_id and not getattr(self, "_skip_airtable_sync", False):
@@ -316,14 +318,14 @@ class VotePreference(models.Model):
     def __str__(self) -> str:
         return f"{self.member.display_name}: {self.guild_1st} / {self.guild_2nd} / {self.guild_3rd}"
 
-    def save(self, *args, **kwargs) -> None:  # type: ignore[override]
+    def save(self, *args: Any, **kwargs: Any) -> None:
         super().save(*args, **kwargs)
         if not getattr(self, "_skip_airtable_sync", False):
             from airtable_sync.service import sync_vote_to_airtable
 
             sync_vote_to_airtable(self)
 
-    def delete(self, *args, **kwargs) -> tuple[int, dict[str, int]]:  # type: ignore[override]
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
         record_id = self.airtable_record_id
         result = super().delete(*args, **kwargs)
         if record_id and not getattr(self, "_skip_airtable_sync", False):
@@ -403,7 +405,7 @@ class FundingSnapshot(models.Model):
             results=calc,
         )
 
-    def save(self, *args, **kwargs) -> None:  # type: ignore[override]
+    def save(self, *args: Any, **kwargs: Any) -> None:
         super().save(*args, **kwargs)
         if not getattr(self, "_skip_airtable_sync", False):
             from airtable_sync.service import sync_snapshot_to_airtable
@@ -539,14 +541,14 @@ class Space(models.Model):
             return None
         return fp - self.actual_revenue
 
-    def save(self, *args, **kwargs) -> None:  # type: ignore[override]
+    def save(self, *args: Any, **kwargs: Any) -> None:
         super().save(*args, **kwargs)
         if not getattr(self, "_skip_airtable_sync", False):
             from airtable_sync.service import sync_space_to_airtable
 
             sync_space_to_airtable(self)
 
-    def delete(self, *args, **kwargs) -> tuple[int, dict[str, int]]:  # type: ignore[override]
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
         record_id = self.airtable_record_id
         result = super().delete(*args, **kwargs)
         if record_id and not getattr(self, "_skip_airtable_sync", False):
@@ -628,14 +630,14 @@ class Lease(models.Model):
             return False
         return True
 
-    def save(self, *args, **kwargs) -> None:  # type: ignore[override]
+    def save(self, *args: Any, **kwargs: Any) -> None:
         super().save(*args, **kwargs)
         if not getattr(self, "_skip_airtable_sync", False):
             from airtable_sync.service import sync_lease_to_airtable
 
             sync_lease_to_airtable(self)
 
-    def delete(self, *args, **kwargs) -> tuple[int, dict[str, int]]:  # type: ignore[override]
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
         record_id = self.airtable_record_id
         result = super().delete(*args, **kwargs)
         if record_id and not getattr(self, "_skip_airtable_sync", False):
