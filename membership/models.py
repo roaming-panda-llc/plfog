@@ -203,21 +203,8 @@ class Member(models.Model):
     def total_monthly_spend(self) -> Decimal:
         return self.membership_monthly_dues + self.studio_storage_total
 
-    def save(self, *args: Any, **kwargs: Any) -> None:
-        super().save(*args, **kwargs)
-        if not getattr(self, "_skip_airtable_sync", False):
-            from airtable_sync.service import sync_member_to_airtable
-
-            sync_member_to_airtable(self)
-
-    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
-        record_id = self.airtable_record_id
-        result = super().delete(*args, **kwargs)
-        if record_id and not getattr(self, "_skip_airtable_sync", False):
-            from airtable_sync.service import delete_member_from_airtable
-
-            delete_member_from_airtable(record_id)
-        return result
+    # Member records are managed in Airtable and pulled into Django via airtable_pull.
+    # No save()/delete() sync overrides — this model is read-only from Airtable's perspective.
 
 
 # ---------------------------------------------------------------------------
@@ -541,21 +528,8 @@ class Space(models.Model):
             return None
         return fp - self.actual_revenue
 
-    def save(self, *args: Any, **kwargs: Any) -> None:
-        super().save(*args, **kwargs)
-        if not getattr(self, "_skip_airtable_sync", False):
-            from airtable_sync.service import sync_space_to_airtable
-
-            sync_space_to_airtable(self)
-
-    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
-        record_id = self.airtable_record_id
-        result = super().delete(*args, **kwargs)
-        if record_id and not getattr(self, "_skip_airtable_sync", False):
-            from airtable_sync.service import delete_space_from_airtable
-
-            delete_space_from_airtable(record_id)
-        return result
+    # Space records are managed in Airtable and pulled into Django via airtable_pull.
+    # No save()/delete() sync overrides — this model is read-only from Airtable's perspective.
 
 
 # ---------------------------------------------------------------------------
@@ -630,18 +604,5 @@ class Lease(models.Model):
             return False
         return True
 
-    def save(self, *args: Any, **kwargs: Any) -> None:
-        super().save(*args, **kwargs)
-        if not getattr(self, "_skip_airtable_sync", False):
-            from airtable_sync.service import sync_lease_to_airtable
-
-            sync_lease_to_airtable(self)
-
-    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
-        record_id = self.airtable_record_id
-        result = super().delete(*args, **kwargs)
-        if record_id and not getattr(self, "_skip_airtable_sync", False):
-            from airtable_sync.service import delete_lease_from_airtable
-
-            delete_lease_from_airtable(record_id)
-        return result
+    # Lease records are managed in Airtable and pulled into Django via airtable_pull.
+    # No save()/delete() sync overrides — this model is read-only from Airtable's perspective.
