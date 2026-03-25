@@ -53,10 +53,19 @@
         {% endif %}
     </form>
 
-    {% if cl.paginator.num_pages > 1 %}
     <div class="pl-admin-list__pagination">
-        {{ cl.result_count }} total &middot; Page {{ cl.page_num|add:"1" }} of {{ cl.paginator.num_pages }}
+        {{ cl.result_count }} total
+        {% if cl.paginator.num_pages > 1 %}
+        &middot; Page {{ cl.page_num|add:"1" }} of {{ cl.paginator.num_pages }}
+        <span class="pl-admin-list__pagination-links">
+            {% if cl.page_num > 0 %}
+                <a href="?{% for key, value in cl.params.items %}{% if key != 'p' %}{{ key }}={{ value }}&{% endif %}{% endfor %}p={{ cl.page_num|add:"-1" }}">&#8592; Prev</a>
+            {% endif %}
+            {% if cl.page_num < cl.paginator.num_pages|add:"-1" %}
+                <a href="?{% for key, value in cl.params.items %}{% if key != 'p' %}{{ key }}={{ value }}&{% endif %}{% endfor %}p={{ cl.page_num|add:"1" }}">Next &#8594;</a>
+            {% endif %}
+        </span>
+        {% endif %}
     </div>
-    {% endif %}
 </div>
 {% endblock %}

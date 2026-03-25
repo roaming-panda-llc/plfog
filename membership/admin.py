@@ -3,6 +3,8 @@ from __future__ import annotations
 from django.contrib import admin
 from django.db.models import QuerySet
 from django.http import HttpRequest
+from django.utils import timezone
+from django.utils.safestring import mark_safe
 from unfold.admin import ModelAdmin
 
 from .models import FundingSnapshot, Guild, Member, VotePreference
@@ -11,6 +13,26 @@ from .models import FundingSnapshot, Guild, Member, VotePreference
 # ---------------------------------------------------------------------------
 # MemberAdmin
 # ---------------------------------------------------------------------------
+
+
+class ActiveStatusFilter(admin.SimpleListFilter):
+    """Default filter that shows only active members unless another status is selected."""
+
+    title = "status"
+    parameter_name = "status"
+
+    def lookups(self, request: HttpRequest, model_admin: ModelAdmin) -> list[tuple[str, str]]:  # type: ignore[override]
+        return [
+            ("all", "All"),
+            *Member.Status.choices,
+        ]
+
+    def queryset(self, request: HttpRequest, queryset: QuerySet[Member]) -> QuerySet[Member]:
+        if self.value() is None:
+            return queryset.filter(status=Member.Status.ACTIVE)
+        if self.value() == "all":
+            return queryset
+        return queryset.filter(status=self.value())
 
 
 @admin.register(Member)
@@ -23,9 +45,13 @@ class MemberAdmin(ModelAdmin):
         "status",
         "role",
         "join_date",
+        "last_login_display",
     ]
-    list_filter = ["status", "role", "membership_plan"]
+    list_display_links = ["display_name"]
+    list_filter = [ActiveStatusFilter, "role", "membership_plan"]
     search_fields = ["full_legal_name", "preferred_name", "email"]
+    list_per_page = 100
+    ordering = ["full_legal_name"]
     fieldsets = [
         (
             "Personal Info",
@@ -73,11 +99,23 @@ class MemberAdmin(ModelAdmin):
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Member]:
         qs = super().get_queryset(request)
-        return qs.select_related("membership_plan")
+        return qs.select_related("membership_plan", "user")
 
-    @admin.display(description="Name")
+    @admin.display(description="Name", ordering="full_legal_name")
     def display_name(self, obj: Member) -> str:
         return obj.display_name
+
+    @admin.display(description="Last Login to FOG", ordering="user__last_login")
+    def last_login_display(self, obj: Member) -> str:
+        if obj.user is None or obj.user.last_login is None:
+            return mark_safe('<span style="opacity:0.4">Never</span>')  # noqa: S308
+        last = obj.user.last_login
+        days_ago = (timezone.now() - last).days
+        if days_ago == 0:
+            return "Today"
+        if days_ago == 1:
+            return "Yesterday"
+        return f"{days_ago} days ago"
 
 
 # ---------------------------------------------------------------------------

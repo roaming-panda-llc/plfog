@@ -5,7 +5,10 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.test import Client
 
+from django.utils import timezone
+
 from membership.admin import (
+    ActiveStatusFilter,
     FundingSnapshotAdmin,
     GuildAdmin,
     MemberAdmin,
@@ -51,6 +54,7 @@ def describe_MemberAdmin():
             "status",
             "role",
             "join_date",
+            "last_login_display",
         ]
 
     def it_has_expected_search_fields():
@@ -63,7 +67,13 @@ def describe_MemberAdmin():
 
     def it_has_expected_list_filter():
         member_admin = admin.site._registry[Member]
-        assert member_admin.list_filter == ["status", "role", "membership_plan"]
+        assert member_admin.list_filter[0] is ActiveStatusFilter
+        assert "role" in member_admin.list_filter
+        assert "membership_plan" in member_admin.list_filter
+
+    def it_has_list_per_page_set():
+        member_admin = admin.site._registry[Member]
+        assert member_admin.list_per_page == 100
 
 
 @pytest.mark.django_db
@@ -78,6 +88,73 @@ def describe_admin_member_computed_fields():
         member_admin = admin.site._registry[Member]
         result = member_admin.display_name(member)
         assert result == "Johnny"
+
+    def it_displays_last_login_never_when_no_user():
+        member = MemberFactory(user=None)
+        member_admin = admin.site._registry[Member]
+        result = member_admin.last_login_display(member)
+        assert "Never" in result
+
+    def it_displays_last_login_never_when_user_never_logged_in():
+        user = User.objects.create_user(username="nologin", password="test", email="nologin@example.com")
+        member = user.member  # auto-created by signal
+        member_admin = admin.site._registry[Member]
+        result = member_admin.last_login_display(member)
+        assert "Never" in result
+
+    def it_displays_last_login_today():
+        user = User.objects.create_user(username="today", password="test", email="today@example.com")
+        user.last_login = timezone.now()
+        user.save()
+        member = user.member
+        member_admin = admin.site._registry[Member]
+        result = member_admin.last_login_display(member)
+        assert result == "Today"
+
+    def it_displays_last_login_yesterday():
+        user = User.objects.create_user(username="yesterday", password="test", email="yesterday@example.com")
+        user.last_login = timezone.now() - timezone.timedelta(days=1)
+        user.save()
+        member = user.member
+        member_admin = admin.site._registry[Member]
+        result = member_admin.last_login_display(member)
+        assert result == "Yesterday"
+
+    def it_displays_last_login_days_ago():
+        user = User.objects.create_user(username="daysago", password="test", email="daysago@example.com")
+        user.last_login = timezone.now() - timezone.timedelta(days=15)
+        user.save()
+        member = user.member
+        member_admin = admin.site._registry[Member]
+        result = member_admin.last_login_display(member)
+        assert result == "15 days ago"
+
+
+@pytest.mark.django_db
+def describe_active_status_filter():
+    def it_defaults_to_active_members_only(admin_client):
+        MemberFactory(full_legal_name="Active Al", status=Member.Status.ACTIVE)
+        MemberFactory(full_legal_name="Former Fred", status=Member.Status.FORMER)
+        resp = admin_client.get("/admin/membership/member/")
+        content = resp.content.decode()
+        assert "Active Al" in content
+        assert "Former Fred" not in content
+
+    def it_shows_all_members_when_all_filter_selected(admin_client):
+        MemberFactory(full_legal_name="Active Al", status=Member.Status.ACTIVE)
+        MemberFactory(full_legal_name="Former Fred", status=Member.Status.FORMER)
+        resp = admin_client.get("/admin/membership/member/?status=all")
+        content = resp.content.decode()
+        assert "Active Al" in content
+        assert "Former Fred" in content
+
+    def it_shows_only_former_when_former_filter_selected(admin_client):
+        MemberFactory(full_legal_name="Active Al", status=Member.Status.ACTIVE)
+        MemberFactory(full_legal_name="Former Fred", status=Member.Status.FORMER)
+        resp = admin_client.get("/admin/membership/member/?status=former")
+        content = resp.content.decode()
+        assert "Active Al" not in content
+        assert "Former Fred" in content
 
 
 def describe_GuildAdmin():
