@@ -95,8 +95,8 @@ def member_to_airtable(member: Any) -> dict[str, Any]:
         "Member Name": member.preferred_name or member.full_legal_name,
         "Email": member.email,
         "Phone": member.phone,
-        "Status": MEMBER_STATUS_TO_AT.get(member.status, member.status),
-        "Role": MEMBER_ROLE_TO_AT.get(member.role, member.role),
+        "Status": MEMBER_STATUS_TO_AT[member.status],
+        "Role": MEMBER_ROLE_TO_AT[member.role],
         "Join Date": _date_to_str(member.join_date),
         "Cancellation Date": _date_to_str(member.cancellation_date),
         "Notes": member.notes,
@@ -168,9 +168,8 @@ def space_to_airtable(space: Any) -> dict[str, Any]:
         "Designation": space.name,
         "Size (sq ft)": _decimal_to_float(space.size_sqft),
         "Manual Price": _decimal_to_float(space.manual_price),
-        "Status": SPACE_STATUS_TO_AT.get(space.status, space.status),
+        "Status": SPACE_STATUS_TO_AT[space.status],
         "Notes": space.notes,
-        "Deposit": _decimal_to_float(getattr(space, "deposit", None)),
     }
 
 
@@ -213,7 +212,7 @@ def lease_to_airtable(lease: Any) -> dict[str, Any]:
         "Deposit Paid Date": _date_to_str(lease.deposit_paid_date),
         "Start Date": _date_to_str(lease.start_date),
         "End Date": _date_to_str(lease.end_date),
-        "Lease Type": LEASE_TYPE_TO_AT.get(lease.lease_type, lease.lease_type),
+        "Lease Type": LEASE_TYPE_TO_AT[lease.lease_type],
         "Notes": lease.notes or "",
     }
 
