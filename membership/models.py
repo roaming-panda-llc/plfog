@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date as date_type
 from decimal import Decimal
+from typing import Any
+
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
@@ -95,6 +97,14 @@ class Member(models.Model):
         CONTRACTOR = "contractor", "Contractor"
         VOLUNTEER = "volunteer", "Volunteer"
 
+    airtable_record_id = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        unique=True,
+        db_index=True,
+        help_text="Airtable record ID for bidirectional sync.",
+    )
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -193,6 +203,9 @@ class Member(models.Model):
     def total_monthly_spend(self) -> Decimal:
         return self.membership_monthly_dues + self.studio_storage_total
 
+    # Member records are managed in Airtable and pulled into Django via airtable_pull.
+    # No save()/delete() sync overrides — this model is read-only from Airtable's perspective.
+
 
 # ---------------------------------------------------------------------------
 # Guild
@@ -251,6 +264,14 @@ class Guild(models.Model):
 class VotePreference(models.Model):
     """Persistent guild funding vote per member — updated anytime, one row per member."""
 
+    airtable_record_id = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        unique=True,
+        db_index=True,
+        help_text="Airtable record ID for bidirectional sync.",
+    )
     member = models.OneToOneField(
         Member,
         on_delete=models.CASCADE,
@@ -284,10 +305,34 @@ class VotePreference(models.Model):
     def __str__(self) -> str:
         return f"{self.member.display_name}: {self.guild_1st} / {self.guild_2nd} / {self.guild_3rd}"
 
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        super().save(*args, **kwargs)
+        if not getattr(self, "_skip_airtable_sync", False):
+            from airtable_sync.service import sync_vote_to_airtable
+
+            sync_vote_to_airtable(self)
+
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
+        record_id = self.airtable_record_id
+        result = super().delete(*args, **kwargs)
+        if record_id and not getattr(self, "_skip_airtable_sync", False):
+            from airtable_sync.service import delete_vote_from_airtable
+
+            delete_vote_from_airtable(record_id)
+        return result
+
 
 class FundingSnapshot(models.Model):
     """Immutable historical record of a funding calculation at a point in time."""
 
+    airtable_record_id = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        unique=True,
+        db_index=True,
+        help_text="Airtable record ID for bidirectional sync.",
+    )
     cycle_label = models.CharField(
         max_length=100, help_text="Human-readable label for the funding cycle (e.g. 'March 2026')."
     )
@@ -347,6 +392,13 @@ class FundingSnapshot(models.Model):
             results=calc,
         )
 
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        super().save(*args, **kwargs)
+        if not getattr(self, "_skip_airtable_sync", False):
+            from airtable_sync.service import sync_snapshot_to_airtable
+
+            sync_snapshot_to_airtable(self)
+
 
 # ---------------------------------------------------------------------------
 # Space
@@ -388,6 +440,14 @@ class Space(models.Model):
         OCCUPIED = "occupied", "Occupied"
         MAINTENANCE = "maintenance", "Maintenance"
 
+    airtable_record_id = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        unique=True,
+        db_index=True,
+        help_text="Airtable record ID for bidirectional sync.",
+    )
     space_id = models.CharField(max_length=20, unique=True)
     name = models.CharField(max_length=255, blank=True)
     space_type = models.CharField(
@@ -468,6 +528,9 @@ class Space(models.Model):
             return None
         return fp - self.actual_revenue
 
+    # Space records are managed in Airtable and pulled into Django via airtable_pull.
+    # No save()/delete() sync overrides — this model is read-only from Airtable's perspective.
+
 
 # ---------------------------------------------------------------------------
 # Lease
@@ -480,6 +543,15 @@ class LeaseQuerySet(models.QuerySet):
 
 
 class Lease(models.Model):
+    airtable_record_id = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        unique=True,
+        db_index=True,
+        help_text="Airtable record ID for bidirectional sync.",
+    )
+
     class LeaseType(models.TextChoices):
         MONTH_TO_MONTH = "month_to_month", "Month-to-Month"
         ANNUAL = "annual", "Annual"
@@ -531,3 +603,6 @@ class Lease(models.Model):
         if self.end_date is not None and self.end_date < today:
             return False
         return True
+
+    # Lease records are managed in Airtable and pulled into Django via airtable_pull.
+    # No save()/delete() sync overrides — this model is read-only from Airtable's perspective.
