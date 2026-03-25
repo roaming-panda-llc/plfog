@@ -56,6 +56,18 @@
         margin-top: 0.25rem;
         letter-spacing: 0.02em;
     }
+    .pl-stat--link {
+        text-decoration: none;
+        cursor: pointer;
+        transition: background-color 0.15s ease, border-color 0.15s ease;
+        border: 1px solid transparent;
+    }
+    .pl-stat--link:hover {
+        background-color: rgba(238, 180, 75, 0.08);
+        border-color: rgba(238, 180, 75, 0.25);
+    }
+    .pl-stat--link .pl-stat__value { color: #EEB44B; }
+    .pl-stat--link .pl-stat__label { color: #96ACBB; }
     .pl-section-label {
         font-size: 0.6875rem;
         font-weight: 700;
@@ -142,14 +154,14 @@
 
     {# --- Stats --- #}
     <div class="pl-stats">
-        <div class="pl-stat">
+        <a href="{% url 'admin:membership_votepreference_changelist' %}" class="pl-stat pl-stat--link">
             <div class="pl-stat__value">{{ stats.total_voters }}</div>
             <div class="pl-stat__label">Members with votes</div>
-        </div>
-        <div class="pl-stat">
+        </a>
+        <a href="{% url 'admin:membership_member_changelist' %}?status=active" class="pl-stat pl-stat--link">
             <div class="pl-stat__value">{{ stats.active_members }}</div>
             <div class="pl-stat__label">Active members</div>
-        </div>
+        </a>
         <div class="pl-stat">
             <div class="pl-stat__value">{{ stats.participation_pct }}%</div>
             <div class="pl-stat__label">Participation rate</div>
@@ -157,14 +169,14 @@
     </div>
 
     <div class="pl-stats">
-        <div class="pl-stat">
+        <a href="{% url 'admin:membership_votepreference_changelist' %}" class="pl-stat pl-stat--link">
             <div class="pl-stat__value">{{ stats.paying_voters }}</div>
             <div class="pl-stat__label">Paying voters</div>
-        </div>
-        <div class="pl-stat">
+        </a>
+        <a href="{% url 'admin:membership_guild_changelist' %}" class="pl-stat pl-stat--link">
             <div class="pl-stat__value">{{ stats.active_guilds }}</div>
             <div class="pl-stat__label">Active guilds</div>
-        </div>
+        </a>
         <div class="pl-stat">
             <div class="pl-stat__value">${{ stats.projected_pool }}</div>
             <div class="pl-stat__label">Projected funding pool</div>
