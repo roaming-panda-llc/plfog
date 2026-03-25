@@ -89,11 +89,11 @@ class AdminRedirectAccountAdapter(DefaultAccountAdapter):
         return reverse("hub_guild_voting")
 
     def _sync_permissions(self, user: object) -> None:
-        """Sync is_staff/is_superuser from the user's Member role.
+        """Sync is_staff/is_superuser from the user's Member fog_role.
 
         Priority order:
         1. ADMIN_DOMAINS override — matching email domain always gets full admin.
-        2. Member role mapping — work_trade/employee → admin, guild_lead → staff only.
+        2. fog_role mapping — admin → full access, guild_officer → staff only.
         3. Everyone else — no staff access (member hub only).
         """
         from membership.models import Member
