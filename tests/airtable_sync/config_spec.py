@@ -147,6 +147,43 @@ def describe_member_from_airtable():
 
         assert "status" not in result
 
+    def it_handles_unknown_role_gracefully():
+        fields = {"Member Name": "Test", "Role": "Unknown"}
+
+        result = member_from_airtable(fields)
+
+        assert "role" not in result
+
+    def it_handles_empty_status_and_role():
+        fields = {"Member Name": "Test", "Status": "", "Role": ""}
+
+        result = member_from_airtable(fields)
+
+        assert "status" not in result
+        assert "role" not in result
+
+
+def describe_member_to_airtable_without_plan():
+    def it_skips_plan_fields_when_no_membership_plan():
+        member = MagicMock(spec=[])  # no attributes by default
+        member.preferred_name = "Test"
+        member.full_legal_name = "Test User"
+        member.email = "test@example.com"
+        member.phone = ""
+        member.status = "active"
+        member.role = "standard"
+        member.join_date = None
+        member.cancellation_date = None
+        member.notes = ""
+        member.emergency_contact_name = ""
+        member.emergency_contact_phone = ""
+        member.emergency_contact_relationship = ""
+
+        fields = member_to_airtable(member)
+
+        assert "Membership Plan" not in fields
+        assert "Monthly Membership $" not in fields
+
 
 def describe_space_to_airtable():
     def it_converts_space():
@@ -185,6 +222,27 @@ def describe_space_from_airtable():
         assert result["size_sqft"] == Decimal("200")
         assert result["manual_price"] == Decimal("750.0")
         assert result["status"] == "available"
+
+    def it_handles_missing_optional_fields():
+        fields = {
+            "Space Code": "B1",
+            "Designation": "Studio B1",
+            "Notes": "",
+        }
+
+        result = space_from_airtable(fields)
+
+        assert result["space_id"] == "B1"
+        assert "size_sqft" not in result
+        assert "manual_price" not in result
+        assert "status" not in result
+
+    def it_handles_unknown_status():
+        fields = {"Space Code": "B1", "Status": "Unknown"}
+
+        result = space_from_airtable(fields)
+
+        assert "status" not in result
 
 
 def describe_lease_to_airtable():
@@ -258,6 +316,26 @@ def describe_lease_from_airtable():
         assert result["lease_type"] == "month_to_month"
         assert result["_member_record_ids"] == ["recMEM123"]
         assert result["_space_record_ids"] == ["recSPC456"]
+
+    def it_handles_missing_optional_fields():
+        fields = {
+            "Notes": "",
+            "Start Date": "2024-01-01",
+        }
+
+        result = lease_from_airtable(fields)
+
+        assert result["start_date"] == date(2024, 1, 1)
+        assert "monthly_rent" not in result
+        assert "deposit_required" not in result
+        assert "lease_type" not in result
+
+    def it_handles_unknown_lease_type():
+        fields = {"Lease Type": "Unknown"}
+
+        result = lease_from_airtable(fields)
+
+        assert "lease_type" not in result
 
 
 def describe_vote_preference_to_airtable():
