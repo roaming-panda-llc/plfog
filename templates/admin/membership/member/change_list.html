@@ -20,35 +20,39 @@
         </form>
         {% endif %}
 
-        {% if cl.has_filters %}
-        <div class="pl-admin-list__filters">
-            {% for spec in cl.filter_specs %}
-            <select onchange="window.location.href=this.value" class="pl-admin-list__filter-select">
-                <option value="">{{ spec.title|capfirst }}</option>
-                {% for choice in spec.choices %}
-                <option value="{{ choice.query_string }}" {% if choice.selected %}selected{% endif %}>
-                    {{ choice.display }}
-                </option>
-                {% endfor %}
-            </select>
-            {% endfor %}
+        <div class="pl-admin-list__actions">
+            <a href="{% url 'admin_invite_member' %}" class="pl-admin-list__invite-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                    <polyline points="22,6 12,13 2,6"/>
+                </svg>
+                Invite
+            </a>
+            {% if has_add_permission %}
+            <a href="{% url cl.opts|admin_urlname:'add' %}" class="pl-admin-list__add-btn">
+                + Add
+            </a>
+            {% endif %}
         </div>
-        {% endif %}
+    </div>
 
-        <a href="{% url 'admin_invite_member' %}" class="pl-admin-list__invite-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                <polyline points="22,6 12,13 2,6"/>
-            </svg>
-            Invite Member
-        </a>
-
-        {% if has_add_permission %}
-        <a href="{% url cl.opts|admin_urlname:'add' %}" class="pl-admin-list__add-btn">
-            + Add {{ cl.opts.verbose_name }}
-        </a>
+    {% if cl.has_filters %}
+    <div class="pl-admin-list__filter-bar">
+        {% for spec in cl.filter_specs %}
+        <select onchange="window.location.href=this.value" class="pl-admin-list__filter-select">
+            <option value="">{{ spec.title|capfirst }}</option>
+            {% for choice in spec.choices %}
+            <option value="{{ choice.query_string }}" {% if choice.selected %}selected{% endif %}>
+                {{ choice.display }}
+            </option>
+            {% endfor %}
+        </select>
+        {% endfor %}
+        {% if cl.params %}
+        <a href="?" class="pl-admin-list__filter-clear">Clear filters</a>
         {% endif %}
     </div>
+    {% endif %}
 
     <form id="changelist-form" method="post">
         {% csrf_token %}
