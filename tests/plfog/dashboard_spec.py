@@ -54,6 +54,20 @@ def describe_dashboard_callback():
         assert stats["projected_pool"] == 10
         assert len(stats["top_guilds"]) > 0
 
+    def it_excludes_non_standard_members_from_paying_voters(admin_client):
+        g1, g2, g3 = GuildFactory(), GuildFactory(), GuildFactory()
+        standard = MemberFactory(member_type=Member.MemberType.STANDARD)
+        work_trade = MemberFactory(member_type=Member.MemberType.WORK_TRADE)
+        VotePreferenceFactory(member=standard, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        VotePreferenceFactory(member=work_trade, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+
+        resp = admin_client.get("/admin/")
+        stats = resp.context["stats"]
+
+        assert stats["total_voters"] == 2
+        assert stats["paying_voters"] == 1
+        assert stats["projected_pool"] == 10
+
     def it_handles_no_votes(admin_client):
         resp = admin_client.get("/admin/")
         stats = resp.context["stats"]

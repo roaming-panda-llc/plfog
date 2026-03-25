@@ -231,39 +231,33 @@ def describe_VotePreferenceAdmin():
 @pytest.mark.django_db
 def describe_paying_member_filter():
     def it_shows_all_by_default(admin_client):
-        paying_plan = MembershipPlanFactory(monthly_price=Decimal("150.00"))
-        free_plan = MembershipPlanFactory(monthly_price=Decimal("0.00"))
         g1, g2, g3 = GuildFactory(), GuildFactory(), GuildFactory()
-        paying_member = MemberFactory(membership_plan=paying_plan, full_legal_name="Paying Pat")
-        free_member = MemberFactory(membership_plan=free_plan, full_legal_name="Free Fred")
-        VotePreferenceFactory(member=paying_member, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
-        VotePreferenceFactory(member=free_member, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        standard = MemberFactory(member_type=Member.MemberType.STANDARD, full_legal_name="Paying Pat")
+        work_trade = MemberFactory(member_type=Member.MemberType.WORK_TRADE, full_legal_name="Free Fred")
+        VotePreferenceFactory(member=standard, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        VotePreferenceFactory(member=work_trade, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
         resp = admin_client.get("/admin/membership/votepreference/")
         content = resp.content.decode()
         assert "Paying Pat" in content
         assert "Free Fred" in content
 
     def it_filters_paying_only(admin_client):
-        paying_plan = MembershipPlanFactory(monthly_price=Decimal("150.00"))
-        free_plan = MembershipPlanFactory(monthly_price=Decimal("0.00"))
         g1, g2, g3 = GuildFactory(), GuildFactory(), GuildFactory()
-        paying_member = MemberFactory(membership_plan=paying_plan, full_legal_name="Paying Pat")
-        free_member = MemberFactory(membership_plan=free_plan, full_legal_name="Free Fred")
-        VotePreferenceFactory(member=paying_member, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
-        VotePreferenceFactory(member=free_member, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        standard = MemberFactory(member_type=Member.MemberType.STANDARD, full_legal_name="Paying Pat")
+        work_trade = MemberFactory(member_type=Member.MemberType.WORK_TRADE, full_legal_name="Free Fred")
+        VotePreferenceFactory(member=standard, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        VotePreferenceFactory(member=work_trade, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
         resp = admin_client.get("/admin/membership/votepreference/?paying=yes")
         content = resp.content.decode()
         assert "Paying Pat" in content
         assert "Free Fred" not in content
 
     def it_filters_non_paying_only(admin_client):
-        paying_plan = MembershipPlanFactory(monthly_price=Decimal("150.00"))
-        free_plan = MembershipPlanFactory(monthly_price=Decimal("0.00"))
         g1, g2, g3 = GuildFactory(), GuildFactory(), GuildFactory()
-        paying_member = MemberFactory(membership_plan=paying_plan, full_legal_name="Paying Pat")
-        free_member = MemberFactory(membership_plan=free_plan, full_legal_name="Free Fred")
-        VotePreferenceFactory(member=paying_member, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
-        VotePreferenceFactory(member=free_member, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        standard = MemberFactory(member_type=Member.MemberType.STANDARD, full_legal_name="Paying Pat")
+        work_trade = MemberFactory(member_type=Member.MemberType.WORK_TRADE, full_legal_name="Free Fred")
+        VotePreferenceFactory(member=standard, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        VotePreferenceFactory(member=work_trade, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
         resp = admin_client.get("/admin/membership/votepreference/?paying=no")
         content = resp.content.decode()
         assert "Paying Pat" not in content

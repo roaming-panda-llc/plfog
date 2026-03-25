@@ -548,10 +548,12 @@ body {
 .pl-admin-table thead th a {
     color: #96ACBB;
     text-decoration: none;
+    cursor: pointer;
 }
 
 .pl-admin-table thead th a:hover {
-    color: #F4EFDD;
+    color: #EEB44B;
+    text-decoration: underline;
 }
 
 .pl-admin-table tbody td,
@@ -1318,6 +1320,7 @@ textarea:focus {
 
 [data-theme="light"] .pl-admin-table thead th a:hover {
     color: #1D1E1E;
+    text-decoration: underline;
 }
 
 [data-theme="light"] .pl-admin-table tbody td,

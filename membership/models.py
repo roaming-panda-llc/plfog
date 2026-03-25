@@ -63,6 +63,10 @@ class MemberQuerySet(models.QuerySet):
     def active(self) -> MemberQuerySet:
         return self.filter(status=Member.Status.ACTIVE)
 
+    def paying(self) -> MemberQuerySet:
+        """Only standard members count as paying."""
+        return self.filter(member_type=Member.MemberType.STANDARD)
+
     def with_lease_totals(self) -> MemberQuerySet:
         active_filter = _active_lease_q(prefix="leases__")
         return self.annotate(
@@ -214,6 +218,11 @@ class Member(models.Model):
     @property
     def total_monthly_spend(self) -> Decimal:
         return self.membership_monthly_dues + self.studio_storage_total
+
+    @property
+    def is_paying(self) -> bool:
+        """Only standard members are paying members."""
+        return self.member_type == self.MemberType.STANDARD
 
     @property
     def is_fog_admin(self) -> bool:
@@ -417,7 +426,7 @@ class FundingSnapshot(models.Model):
         if not preferences.exists():
             return None
 
-        paying_count = preferences.filter(member__membership_plan__monthly_price__gt=0).count()
+        paying_count = preferences.filter(member__member_type=Member.MemberType.STANDARD).count()
 
         votes = [
             {
