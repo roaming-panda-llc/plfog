@@ -16,6 +16,16 @@ Repo: https://github.com/Past-Lives-Makerspace/plfog
 
 BDD/spec style with pytest-describe. Test files named `*_spec.py`. Functions named `it_*` inside `describe_*` blocks.
 
+## Environments
+
+| Environment | Platform | Purpose | DB |
+|---|---|---|---|
+| **Production** | Render.com | Live app for members | PostgreSQL (via `DATABASE_URL`) |
+| **QA / Staging** | Hetzner VPS (`pastlives.plaza.codes`) | Testing before prod | PostgreSQL |
+| **Local dev** | WSL2 | Development | SQLite (default) |
+
+Hetzner is **NOT production**. Render is production. Do not confuse these.
+
 ## Settings
 
 All configuration via environment variables. See `plfog/settings.py` for available env vars.

@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     "core",
     "hub",
     "membership",
+    "airtable_sync",
 ]
 
 MIDDLEWARE = [
@@ -209,6 +210,11 @@ BETA_FEEDBACK_EMAILS: list[str] = [
     e.strip() for e in os.environ.get("BETA_FEEDBACK_EMAILS", "josh@plaza.codes").split(",") if e.strip()
 ]
 
+# Airtable sync — bidirectional sync between Django and Airtable
+AIRTABLE_API_TOKEN = os.environ.get("AIRTABLE_API_TOKEN", "")
+AIRTABLE_BASE_ID = os.environ.get("AIRTABLE_BASE_ID", "")
+AIRTABLE_SYNC_ENABLED = os.environ.get("AIRTABLE_SYNC_ENABLED", "false").lower() == "true"
+
 # Logging — ensure tracebacks reach stderr (captured by Render/Gunicorn)
 LOGGING = {
     "version": 1,
@@ -231,6 +237,11 @@ LOGGING = {
         "django.request": {
             "handlers": ["console"],
             "level": "ERROR",
+            "propagate": False,
+        },
+        "airtable_sync": {
+            "handlers": ["console"],
+            "level": "INFO" if DEBUG else "WARNING",
             "propagate": False,
         },
     },

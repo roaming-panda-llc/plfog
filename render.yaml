@@ -43,3 +43,16 @@ services:
     # Preview environments for pull requests
     previews:
       generation: automatic
+
+  # Nightly Airtable → Django sync (pulls AT changes into the database)
+  # Requires env vars: DATABASE_URL, DJANGO_SECRET_KEY, AIRTABLE_API_TOKEN,
+  # AIRTABLE_BASE_ID, AIRTABLE_SYNC_ENABLED=true (set in Render dashboard)
+  - type: cron
+    name: airtable-pull
+    runtime: python
+    schedule: "0 10 * * *"
+    buildCommand: pip install -r requirements.txt
+    command: python manage.py airtable_pull
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.0"
