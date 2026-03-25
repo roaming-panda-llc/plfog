@@ -8,7 +8,7 @@ from io import StringIO
 import pytest
 from django.core.management import call_command
 
-from membership.models import FundingSnapshot
+from membership.models import FundingSnapshot, Member
 from tests.membership.factories import (
     GuildFactory,
     MemberFactory,
@@ -45,15 +45,13 @@ def describe_take_funding_snapshot_command():
         assert "No vote preferences found" in out.getvalue()
 
     def it_only_counts_paying_members_in_pool():
-        paying_plan = MembershipPlanFactory(monthly_price=Decimal("150.00"))
-        free_plan = MembershipPlanFactory(monthly_price=Decimal("0.00"))
         g1 = GuildFactory(name="G1")
         g2 = GuildFactory(name="G2")
         g3 = GuildFactory(name="G3")
-        paying = MemberFactory(membership_plan=paying_plan)
-        free_member = MemberFactory(membership_plan=free_plan)
+        paying = MemberFactory(member_type=Member.MemberType.STANDARD)
+        non_paying = MemberFactory(member_type=Member.MemberType.WORK_TRADE)
         VotePreferenceFactory(member=paying, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
-        VotePreferenceFactory(member=free_member, guild_1st=g2, guild_2nd=g1, guild_3rd=g3)
+        VotePreferenceFactory(member=non_paying, guild_1st=g2, guild_2nd=g1, guild_3rd=g3)
 
         call_command("take_funding_snapshot", stdout=StringIO())
 

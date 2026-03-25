@@ -705,6 +705,45 @@ def describe_guild_sublet_revenue():
 
 
 # ---------------------------------------------------------------------------
+# Member paying status
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def describe_member_is_paying():
+    def it_is_true_for_standard():
+        member = MemberFactory(member_type=Member.MemberType.STANDARD)
+        assert member.is_paying is True
+
+    def it_is_false_for_work_trade():
+        member = MemberFactory(member_type=Member.MemberType.WORK_TRADE)
+        assert member.is_paying is False
+
+    def it_is_false_for_employee():
+        member = MemberFactory(member_type=Member.MemberType.EMPLOYEE)
+        assert member.is_paying is False
+
+    def it_is_false_for_volunteer():
+        member = MemberFactory(member_type=Member.MemberType.VOLUNTEER)
+        assert member.is_paying is False
+
+    def it_is_false_for_guild_lead():
+        member = MemberFactory(member_type=Member.MemberType.GUILD_LEAD)
+        assert member.is_paying is False
+
+
+@pytest.mark.django_db
+def describe_member_queryset_paying():
+    def it_returns_only_standard_members():
+        standard = MemberFactory(member_type=Member.MemberType.STANDARD)
+        MemberFactory(member_type=Member.MemberType.WORK_TRADE)
+        MemberFactory(member_type=Member.MemberType.EMPLOYEE)
+
+        paying = Member.objects.paying()
+        assert list(paying) == [standard]
+
+
+# ---------------------------------------------------------------------------
 # Member FOG roles
 # ---------------------------------------------------------------------------
 

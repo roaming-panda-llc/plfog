@@ -148,7 +148,7 @@ class GuildAdmin(ModelAdmin):
 
 
 class PayingMemberFilter(admin.SimpleListFilter):
-    """Filter vote preferences by whether the member is on a paying plan."""
+    """Filter vote preferences by whether the member is a paying (standard) member."""
 
     title = "paying status"
     parameter_name = "paying"
@@ -161,9 +161,9 @@ class PayingMemberFilter(admin.SimpleListFilter):
 
     def queryset(self, request: HttpRequest, queryset: QuerySet[VotePreference]) -> QuerySet[VotePreference]:
         if self.value() == "yes":
-            return queryset.filter(member__membership_plan__monthly_price__gt=0)
+            return queryset.filter(member__member_type=Member.MemberType.STANDARD)
         if self.value() == "no":
-            return queryset.filter(member__membership_plan__monthly_price=0)
+            return queryset.exclude(member__member_type=Member.MemberType.STANDARD)
         return queryset
 
 

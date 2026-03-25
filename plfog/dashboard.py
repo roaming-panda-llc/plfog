@@ -13,7 +13,7 @@ def dashboard_callback(request: HttpRequest, context: dict) -> dict:
     active_members = Member.objects.filter(status=Member.Status.ACTIVE).count()
     total_voters = VotePreference.objects.count()
     paying_voters = VotePreference.objects.filter(
-        member__membership_plan__monthly_price__gt=0,
+        member__member_type=Member.MemberType.STANDARD,
     ).count()
     active_guilds = Guild.objects.filter(is_active=True).count()
     projected_pool = paying_voters * 10
