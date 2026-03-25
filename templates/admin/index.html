@@ -224,6 +224,9 @@
         <a href="{% url 'hub_snapshot_history' %}" class="pl-btn pl-btn--secondary">
             View Funding History
         </a>
+        <a href="{% url 'admin:membership_votepreference_changelist' %}" class="pl-btn pl-btn--secondary">
+            Voter Preferences
+        </a>
     </div>
 
     {% if stats.last_snapshot %}
