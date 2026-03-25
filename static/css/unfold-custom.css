@@ -404,6 +404,33 @@ body {
     align-items: center;
     gap: 1rem;
     margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.pl-admin-list__filters {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.pl-admin-list__filter-select {
+    background-color: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    color: #F4EFDD;
+    font-size: 0.8125rem;
+    padding: 0.4rem 0.6rem;
+    cursor: pointer;
+    appearance: auto;
+}
+
+.pl-admin-list__filter-select:hover {
+    border-color: rgba(238, 180, 75, 0.4);
+}
+
+.pl-admin-list__filter-select:focus {
+    outline: none;
+    border-color: #EEB44B;
 }
 
 .pl-admin-list__search {
@@ -1298,6 +1325,12 @@ textarea:focus {
 
 [data-theme="light"] .pl-admin-list__pagination {
     color: #666;
+}
+
+[data-theme="light"] .pl-admin-list__filter-select {
+    background-color: #fff;
+    border-color: #ccc;
+    color: #333;
 }
 
 /* Form pages */
