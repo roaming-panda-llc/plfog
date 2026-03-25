@@ -5,10 +5,14 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.test import Client
 
+from django.utils import timezone
+
 from membership.admin import (
+    ActiveStatusFilter,
     FundingSnapshotAdmin,
     GuildAdmin,
     MemberAdmin,
+    PayingMemberFilter,
     VotePreferenceAdmin,
 )
 from membership.models import FundingSnapshot, Guild, Member, VotePreference
@@ -51,6 +55,7 @@ def describe_MemberAdmin():
             "status",
             "role",
             "join_date",
+            "last_login_display",
         ]
 
     def it_has_expected_search_fields():
@@ -63,7 +68,13 @@ def describe_MemberAdmin():
 
     def it_has_expected_list_filter():
         member_admin = admin.site._registry[Member]
-        assert member_admin.list_filter == ["status", "role", "membership_plan"]
+        assert member_admin.list_filter[0] is ActiveStatusFilter
+        assert "role" in member_admin.list_filter
+        assert "membership_plan" in member_admin.list_filter
+
+    def it_has_list_per_page_set():
+        member_admin = admin.site._registry[Member]
+        assert member_admin.list_per_page == 100
 
 
 @pytest.mark.django_db
@@ -78,6 +89,73 @@ def describe_admin_member_computed_fields():
         member_admin = admin.site._registry[Member]
         result = member_admin.display_name(member)
         assert result == "Johnny"
+
+    def it_displays_last_login_never_when_no_user():
+        member = MemberFactory(user=None)
+        member_admin = admin.site._registry[Member]
+        result = member_admin.last_login_display(member)
+        assert "Never" in result
+
+    def it_displays_last_login_never_when_user_never_logged_in():
+        user = User.objects.create_user(username="nologin", password="test", email="nologin@example.com")
+        member = user.member  # auto-created by signal
+        member_admin = admin.site._registry[Member]
+        result = member_admin.last_login_display(member)
+        assert "Never" in result
+
+    def it_displays_last_login_today():
+        user = User.objects.create_user(username="today", password="test", email="today@example.com")
+        user.last_login = timezone.now()
+        user.save()
+        member = user.member
+        member_admin = admin.site._registry[Member]
+        result = member_admin.last_login_display(member)
+        assert result == "Today"
+
+    def it_displays_last_login_yesterday():
+        user = User.objects.create_user(username="yesterday", password="test", email="yesterday@example.com")
+        user.last_login = timezone.now() - timezone.timedelta(days=1)
+        user.save()
+        member = user.member
+        member_admin = admin.site._registry[Member]
+        result = member_admin.last_login_display(member)
+        assert result == "Yesterday"
+
+    def it_displays_last_login_days_ago():
+        user = User.objects.create_user(username="daysago", password="test", email="daysago@example.com")
+        user.last_login = timezone.now() - timezone.timedelta(days=15)
+        user.save()
+        member = user.member
+        member_admin = admin.site._registry[Member]
+        result = member_admin.last_login_display(member)
+        assert result == "15 days ago"
+
+
+@pytest.mark.django_db
+def describe_active_status_filter():
+    def it_defaults_to_active_members_only(admin_client):
+        MemberFactory(full_legal_name="Active Al", status=Member.Status.ACTIVE)
+        MemberFactory(full_legal_name="Former Fred", status=Member.Status.FORMER)
+        resp = admin_client.get("/admin/membership/member/")
+        content = resp.content.decode()
+        assert "Active Al" in content
+        assert "Former Fred" not in content
+
+    def it_shows_all_members_when_all_filter_selected(admin_client):
+        MemberFactory(full_legal_name="Active Al", status=Member.Status.ACTIVE)
+        MemberFactory(full_legal_name="Former Fred", status=Member.Status.FORMER)
+        resp = admin_client.get("/admin/membership/member/?status=all")
+        content = resp.content.decode()
+        assert "Active Al" in content
+        assert "Former Fred" in content
+
+    def it_shows_only_former_when_former_filter_selected(admin_client):
+        MemberFactory(full_legal_name="Active Al", status=Member.Status.ACTIVE)
+        MemberFactory(full_legal_name="Former Fred", status=Member.Status.FORMER)
+        resp = admin_client.get("/admin/membership/member/?status=former")
+        content = resp.content.decode()
+        assert "Active Al" not in content
+        assert "Former Fred" in content
 
 
 def describe_GuildAdmin():
@@ -121,6 +199,52 @@ def describe_VotePreferenceAdmin():
     def it_has_expected_search_fields():
         pref_admin = admin.site._registry[VotePreference]
         assert pref_admin.search_fields == ["member__full_legal_name", "member__preferred_name"]
+
+    def it_has_paying_member_filter():
+        pref_admin = admin.site._registry[VotePreference]
+        assert PayingMemberFilter in pref_admin.list_filter
+
+
+@pytest.mark.django_db
+def describe_paying_member_filter():
+    def it_shows_all_by_default(admin_client):
+        paying_plan = MembershipPlanFactory(monthly_price=Decimal("150.00"))
+        free_plan = MembershipPlanFactory(monthly_price=Decimal("0.00"))
+        g1, g2, g3 = GuildFactory(), GuildFactory(), GuildFactory()
+        paying_member = MemberFactory(membership_plan=paying_plan, full_legal_name="Paying Pat")
+        free_member = MemberFactory(membership_plan=free_plan, full_legal_name="Free Fred")
+        VotePreferenceFactory(member=paying_member, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        VotePreferenceFactory(member=free_member, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        resp = admin_client.get("/admin/membership/votepreference/")
+        content = resp.content.decode()
+        assert "Paying Pat" in content
+        assert "Free Fred" in content
+
+    def it_filters_paying_only(admin_client):
+        paying_plan = MembershipPlanFactory(monthly_price=Decimal("150.00"))
+        free_plan = MembershipPlanFactory(monthly_price=Decimal("0.00"))
+        g1, g2, g3 = GuildFactory(), GuildFactory(), GuildFactory()
+        paying_member = MemberFactory(membership_plan=paying_plan, full_legal_name="Paying Pat")
+        free_member = MemberFactory(membership_plan=free_plan, full_legal_name="Free Fred")
+        VotePreferenceFactory(member=paying_member, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        VotePreferenceFactory(member=free_member, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        resp = admin_client.get("/admin/membership/votepreference/?paying=yes")
+        content = resp.content.decode()
+        assert "Paying Pat" in content
+        assert "Free Fred" not in content
+
+    def it_filters_non_paying_only(admin_client):
+        paying_plan = MembershipPlanFactory(monthly_price=Decimal("150.00"))
+        free_plan = MembershipPlanFactory(monthly_price=Decimal("0.00"))
+        g1, g2, g3 = GuildFactory(), GuildFactory(), GuildFactory()
+        paying_member = MemberFactory(membership_plan=paying_plan, full_legal_name="Paying Pat")
+        free_member = MemberFactory(membership_plan=free_plan, full_legal_name="Free Fred")
+        VotePreferenceFactory(member=paying_member, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        VotePreferenceFactory(member=free_member, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        resp = admin_client.get("/admin/membership/votepreference/?paying=no")
+        content = resp.content.decode()
+        assert "Paying Pat" not in content
+        assert "Free Fred" in content
 
 
 def describe_FundingSnapshotAdmin():

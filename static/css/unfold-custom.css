@@ -402,8 +402,9 @@ body {
 .pl-admin-list__toolbar {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
     margin-bottom: 1.5rem;
+    flex-wrap: wrap;
 }
 
 .pl-admin-list__search {
@@ -414,9 +415,45 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 6px;
     padding: 0 0.75rem;
+    min-width: 200px;
+    max-width: 320px;
     flex: 1;
-    max-width: 400px;
 }
+
+.pl-admin-list__filters {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.pl-admin-list__actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+.pl-admin-list__filter-select {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    color: #F4EFDD;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 0.8125rem;
+    padding: 0.45rem 0.75rem;
+    min-width: 130px;
+    cursor: pointer;
+    appearance: auto;
+    transition: border-color 0.15s ease;
+}
+
+.pl-admin-list__filter-select:hover {
+    border-color: rgba(238, 180, 75, 0.4);
+}
+
+.pl-admin-list__filter-select:focus {
+    outline: none;
+    border-color: #EEB44B;
+}
+
 
 .pl-admin-list__search input,
 .pl-admin-list__search input[type="text"] {
@@ -450,7 +487,6 @@ body {
     text-decoration: none;
     white-space: nowrap;
     transition: background-color 0.15s ease;
-    margin-left: auto;
 }
 
 .pl-admin-list__add-btn:hover {
@@ -461,7 +497,7 @@ body {
 .pl-admin-list__invite-btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
     padding: 0.5rem 1rem;
     font-family: 'Inter', system-ui, sans-serif;
     font-size: 0.875rem;
@@ -472,7 +508,6 @@ body {
     border-radius: 6px;
     text-decoration: none;
     white-space: nowrap;
-    margin-left: auto;
     transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
@@ -545,6 +580,27 @@ body {
     margin-top: 1rem;
     font-size: 0.8125rem;
     color: #96ACBB;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.pl-admin-list__pagination-links {
+    display: inline-flex;
+    gap: 0.75rem;
+    margin-left: 0.5rem;
+}
+
+.pl-admin-list__pagination-links a {
+    color: #EEB44B;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.pl-admin-list__pagination-links a:hover {
+    color: #d4a043;
+    text-decoration: underline;
 }
 
 /* Checkboxes — simple style */
@@ -1278,6 +1334,13 @@ textarea:focus {
 [data-theme="light"] .pl-admin-list__pagination {
     color: #666;
 }
+
+[data-theme="light"] .pl-admin-list__filter-select {
+    background-color: #fff;
+    border-color: #ccc;
+    color: #333;
+}
+
 
 /* Form pages */
 [data-theme="light"] .pl-admin-form__back {

@@ -1,5 +1,5 @@
 {% extends "admin/change_list.html" %}
-{% load i18n admin_urls admin_list %}
+{% load i18n admin_urls admin_list member_filters %}
 
 {% block content %}
 <div class="pl-admin-list">
@@ -20,19 +20,34 @@
         </form>
         {% endif %}
 
-        <a href="{% url 'admin_invite_member' %}" class="pl-admin-list__invite-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                <polyline points="22,6 12,13 2,6"/>
-            </svg>
-            Invite Member
-        </a>
-
-        {% if has_add_permission %}
-        <a href="{% url cl.opts|admin_urlname:'add' %}" class="pl-admin-list__add-btn">
-            + Add {{ cl.opts.verbose_name }}
-        </a>
+        {% if cl.has_filters %}
+        <div class="pl-admin-list__filters">
+            {% for spec in cl.filter_specs %}
+            <select onchange="window.location.href=this.value" class="pl-admin-list__filter-select">
+                {% for choice in spec|filter_choices:cl %}
+                <option value="{{ choice.query_string }}" {% if choice.selected %}selected{% endif %}>
+                    {{ choice.display }}
+                </option>
+                {% endfor %}
+            </select>
+            {% endfor %}
+        </div>
         {% endif %}
+
+        <div class="pl-admin-list__actions">
+            <a href="{% url 'admin_invite_member' %}" class="pl-admin-list__invite-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                    <polyline points="22,6 12,13 2,6"/>
+                </svg>
+                Invite
+            </a>
+            {% if has_add_permission %}
+            <a href="{% url cl.opts|admin_urlname:'add' %}" class="pl-admin-list__add-btn">
+                + Add
+            </a>
+            {% endif %}
+        </div>
     </div>
 
     <form id="changelist-form" method="post">
@@ -53,10 +68,19 @@
         {% endif %}
     </form>
 
-    {% if cl.paginator.num_pages > 1 %}
     <div class="pl-admin-list__pagination">
-        {{ cl.result_count }} total &middot; Page {{ cl.page_num|add:"1" }} of {{ cl.paginator.num_pages }}
+        {{ cl.result_count }} total
+        {% if cl.paginator.num_pages > 1 %}
+        &middot; Page {{ cl.page_num|add:"1" }} of {{ cl.paginator.num_pages }}
+        <span class="pl-admin-list__pagination-links">
+            {% if cl.page_num > 0 %}
+                <a href="?{% for key, value in cl.params.items %}{% if key != 'p' %}{{ key }}={{ value }}&{% endif %}{% endfor %}p={{ cl.page_num|add:"-1" }}">&#8592; Prev</a>
+            {% endif %}
+            {% if cl.page_num < cl.paginator.num_pages|add:"-1" %}
+                <a href="?{% for key, value in cl.params.items %}{% if key != 'p' %}{{ key }}={{ value }}&{% endif %}{% endfor %}p={{ cl.page_num|add:"1" }}">Next &#8594;</a>
+            {% endif %}
+        </span>
+        {% endif %}
     </div>
-    {% endif %}
 </div>
 {% endblock %}
