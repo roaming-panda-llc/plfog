@@ -415,9 +415,9 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 6px;
     padding: 0 0.75rem;
-    min-width: 180px;
-    max-width: 280px;
-    flex-shrink: 1;
+    min-width: 200px;
+    max-width: 320px;
+    flex: 1;
 }
 
 .pl-admin-list__filters {
@@ -439,6 +439,7 @@ body {
     font-family: 'Inter', system-ui, sans-serif;
     font-size: 0.8125rem;
     padding: 0.45rem 0.75rem;
+    min-width: 130px;
     cursor: pointer;
     appearance: auto;
     transition: border-color 0.15s ease;

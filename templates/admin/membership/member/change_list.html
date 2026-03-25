@@ -1,5 +1,5 @@
 {% extends "admin/change_list.html" %}
-{% load i18n admin_urls admin_list %}
+{% load i18n admin_urls admin_list member_filters %}
 
 {% block content %}
 <div class="pl-admin-list">
@@ -24,8 +24,7 @@
         <div class="pl-admin-list__filters">
             {% for spec in cl.filter_specs %}
             <select onchange="window.location.href=this.value" class="pl-admin-list__filter-select">
-                <option value="">{{ spec.title|capfirst }}</option>
-                {% for choice in spec.choices %}
+                {% for choice in spec|filter_choices:cl %}
                 <option value="{{ choice.query_string }}" {% if choice.selected %}selected{% endif %}>
                     {{ choice.display }}
                 </option>
