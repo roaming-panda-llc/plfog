@@ -2,7 +2,7 @@
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.test import Client, RequestFactory
+from django.test import Client
 
 from core.admin import SiteConfigurationAdmin
 from core.models import SiteConfiguration
@@ -19,28 +19,32 @@ def describe_SiteConfigurationAdmin():
 
         return SiteConfigurationAdmin(SiteConfiguration, AdminSite())
 
-    def it_prevents_add_when_singleton_exists(admin_instance):
+    @pytest.fixture()
+    def superuser_request(rf):
+        request = rf.get("/admin/")
+        request.user = User(is_staff=True, is_superuser=True)
+        return request
+
+    @pytest.fixture()
+    def staff_request(rf):
+        request = rf.get("/admin/")
+        request.user = User(is_staff=True, is_superuser=False)
+        return request
+
+    def it_prevents_add_when_singleton_exists(admin_instance, superuser_request):
         SiteConfiguration.load()  # Ensure singleton exists
-        rf = RequestFactory()
-        request = rf.get("/admin/")
-        assert admin_instance.has_add_permission(request) is False
+        assert admin_instance.has_add_permission(superuser_request) is False
 
-    def it_allows_add_when_no_singleton(admin_instance):
+    def it_allows_add_when_no_singleton(admin_instance, superuser_request):
         SiteConfiguration.objects.all().delete()
-        rf = RequestFactory()
-        request = rf.get("/admin/")
-        assert admin_instance.has_add_permission(request) is True
+        assert admin_instance.has_add_permission(superuser_request) is True
 
-    def it_never_allows_delete(admin_instance):
-        rf = RequestFactory()
-        request = rf.get("/admin/")
-        assert admin_instance.has_delete_permission(request) is False
+    def it_never_allows_delete(admin_instance, superuser_request):
+        assert admin_instance.has_delete_permission(superuser_request) is False
 
-    def it_never_allows_delete_for_object(admin_instance):
+    def it_never_allows_delete_for_object(admin_instance, superuser_request):
         config = SiteConfiguration.load()
-        rf = RequestFactory()
-        request = rf.get("/admin/")
-        assert admin_instance.has_delete_permission(request, obj=config) is False
+        assert admin_instance.has_delete_permission(superuser_request, obj=config) is False
 
     def it_redirects_changelist_to_edit_form():
         SiteConfiguration.load()
@@ -50,3 +54,26 @@ def describe_SiteConfigurationAdmin():
         resp = client.get("/admin/core/siteconfiguration/")
         assert resp.status_code == 302
         assert "/admin/core/siteconfiguration/1/change/" in resp.url
+
+    def describe_permission_restrictions():
+        def it_denies_module_access_for_non_superuser(admin_instance, staff_request):
+            assert admin_instance.has_module_permission(staff_request) is False
+
+        def it_allows_module_access_for_superuser(admin_instance, superuser_request):
+            assert admin_instance.has_module_permission(superuser_request) is True
+
+        def it_denies_view_for_non_superuser(admin_instance, staff_request):
+            assert admin_instance.has_view_permission(staff_request) is False
+
+        def it_allows_view_for_superuser(admin_instance, superuser_request):
+            assert admin_instance.has_view_permission(superuser_request) is True
+
+        def it_denies_change_for_non_superuser(admin_instance, staff_request):
+            assert admin_instance.has_change_permission(staff_request) is False
+
+        def it_allows_change_for_superuser(admin_instance, superuser_request):
+            assert admin_instance.has_change_permission(superuser_request) is True
+
+        def it_denies_add_for_non_superuser(admin_instance, staff_request):
+            SiteConfiguration.objects.all().delete()
+            assert admin_instance.has_add_permission(staff_request) is False

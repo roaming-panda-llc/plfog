@@ -342,6 +342,7 @@ UNFOLD = {
                         "title": "Site Settings",
                         "icon": "settings",
                         "link": reverse_lazy("admin:core_siteconfiguration_changelist"),
+                        "permission": lambda request: request.user.is_superuser,
                     },
                 ],
             },

@@ -9,8 +9,8 @@ from unittest.mock import MagicMock
 from airtable_sync.config import (
     LEASE_TYPE_FROM_AT,
     LEASE_TYPE_TO_AT,
-    MEMBER_ROLE_FROM_AT,
-    MEMBER_ROLE_TO_AT,
+    MEMBER_TYPE_FROM_AT,
+    MEMBER_TYPE_TO_AT,
     MEMBER_STATUS_FROM_AT,
     MEMBER_STATUS_TO_AT,
     SPACE_STATUS_FROM_AT,
@@ -32,8 +32,8 @@ def describe_enum_mappings():
             assert MEMBER_STATUS_FROM_AT[at_val] == django_val
 
     def it_has_bidirectional_member_role_mapping():
-        for django_val, at_val in MEMBER_ROLE_TO_AT.items():
-            assert MEMBER_ROLE_FROM_AT[at_val] == django_val
+        for django_val, at_val in MEMBER_TYPE_TO_AT.items():
+            assert MEMBER_TYPE_FROM_AT[at_val] == django_val
 
     def it_has_bidirectional_space_status_mapping():
         for django_val, at_val in SPACE_STATUS_TO_AT.items():
@@ -52,7 +52,7 @@ def describe_member_to_airtable():
         member.email = "jd@example.com"
         member.phone = "555-1234"
         member.status = "active"
-        member.role = "standard"
+        member.member_type = "standard"
         member.join_date = date(2024, 1, 15)
         member.cancellation_date = None
         member.notes = "Test member"
@@ -81,7 +81,7 @@ def describe_member_to_airtable():
         member.email = "jd@example.com"
         member.phone = ""
         member.status = "invited"
-        member.role = "guild_lead"
+        member.member_type = "guild_lead"
         member.join_date = None
         member.cancellation_date = None
         member.notes = ""
@@ -122,7 +122,7 @@ def describe_member_from_airtable():
         assert result["preferred_name"] == "JD"
         assert result["email"] == "jd@example.com"
         assert result["status"] == "active"
-        assert result["role"] == "standard"
+        assert result["member_type"] == "standard"
         assert result["join_date"] == date(2024, 1, 15)
 
     def it_converts_at_fields_without_legal_name():
@@ -138,7 +138,7 @@ def describe_member_from_airtable():
         assert result["full_legal_name"] == "John Doe"
         assert result["preferred_name"] == ""
         assert result["status"] == "former"
-        assert result["role"] == "work_trade"
+        assert result["member_type"] == "work_trade"
 
     def it_handles_unknown_status_gracefully():
         fields = {"Member Name": "Test", "Status": "Unknown"}
@@ -152,7 +152,7 @@ def describe_member_from_airtable():
 
         result = member_from_airtable(fields)
 
-        assert "role" not in result
+        assert "member_type" not in result
 
     def it_handles_empty_status_and_role():
         fields = {"Member Name": "Test", "Status": "", "Role": ""}
@@ -160,7 +160,7 @@ def describe_member_from_airtable():
         result = member_from_airtable(fields)
 
         assert "status" not in result
-        assert "role" not in result
+        assert "member_type" not in result
 
 
 def describe_member_to_airtable_without_plan():
@@ -171,7 +171,7 @@ def describe_member_to_airtable_without_plan():
         member.email = "test@example.com"
         member.phone = ""
         member.status = "active"
-        member.role = "standard"
+        member.member_type = "standard"
         member.join_date = None
         member.cancellation_date = None
         member.notes = ""

@@ -75,9 +75,13 @@ def describe_member():
         member = MemberFactory()
         assert member.status == Member.Status.ACTIVE
 
-    def it_defaults_to_standard_role():
+    def it_defaults_to_standard_member_type():
         member = MemberFactory()
-        assert member.role == Member.Role.STANDARD
+        assert member.member_type == Member.MemberType.STANDARD
+
+    def it_defaults_to_member_fog_role():
+        member = MemberFactory()
+        assert member.fog_role == Member.FogRole.MEMBER
 
     def it_allows_null_user():
         member = MemberFactory(user=None)
@@ -698,3 +702,90 @@ def describe_guild_sublet_revenue():
             start_date=today - timedelta(days=10),
         )
         assert guild.sublet_revenue == Decimal("250.00")
+
+
+# ---------------------------------------------------------------------------
+# Member FOG roles
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def describe_member_fog_roles():
+    def describe_is_fog_admin():
+        def it_is_true_for_admin_fog_role():
+            member = MemberFactory(fog_role=Member.FogRole.ADMIN)
+            assert member.is_fog_admin is True
+
+        def it_is_false_for_guild_officer():
+            member = MemberFactory(fog_role=Member.FogRole.GUILD_OFFICER)
+            assert member.is_fog_admin is False
+
+        def it_is_false_for_member():
+            member = MemberFactory(fog_role=Member.FogRole.MEMBER)
+            assert member.is_fog_admin is False
+
+    def describe_is_guild_officer():
+        def it_is_true_for_guild_officer():
+            member = MemberFactory(fog_role=Member.FogRole.GUILD_OFFICER)
+            assert member.is_guild_officer is True
+
+        def it_is_false_for_admin():
+            member = MemberFactory(fog_role=Member.FogRole.ADMIN)
+            assert member.is_guild_officer is False
+
+        def it_is_false_for_member():
+            member = MemberFactory(fog_role=Member.FogRole.MEMBER)
+            assert member.is_guild_officer is False
+
+    def describe_sync_user_permissions():
+        def it_grants_full_admin_for_admin_fog_role():
+            user = User.objects.create_user(username="sync_adm", email="sync_adm@example.com", password="pass")
+            member = user.member
+            member.fog_role = Member.FogRole.ADMIN
+            member.save(update_fields=["fog_role"])
+
+            member.sync_user_permissions()
+            user.refresh_from_db()
+
+            assert user.is_staff is True
+            assert user.is_superuser is True
+
+        def it_grants_staff_only_for_guild_officer():
+            user = User.objects.create_user(username="sync_go", email="sync_go@example.com", password="pass")
+            member = user.member
+            member.fog_role = Member.FogRole.GUILD_OFFICER
+            member.save(update_fields=["fog_role"])
+
+            member.sync_user_permissions()
+            user.refresh_from_db()
+
+            assert user.is_staff is True
+            assert user.is_superuser is False
+
+        def it_removes_privileges_for_member():
+            user = User.objects.create_user(username="sync_mem", email="sync_mem@example.com", password="pass")
+            user.is_staff = True
+            user.is_superuser = True
+            user.save()
+
+            member = user.member
+            # fog_role defaults to MEMBER, already correct
+
+            member.sync_user_permissions()
+            user.refresh_from_db()
+
+            assert user.is_staff is False
+            assert user.is_superuser is False
+
+        def it_skips_save_when_already_correct():
+            user = User.objects.create_user(username="sync_noop", email="sync_noop@example.com", password="pass")
+            # fog_role=member, is_staff=False, is_superuser=False — already correct
+            member = user.member
+
+            with patch.object(User, "save") as mock_save:
+                member.sync_user_permissions()
+                mock_save.assert_not_called()
+
+        def it_does_nothing_when_user_is_none():
+            member = MemberFactory(user=None, fog_role=Member.FogRole.ADMIN)
+            member.sync_user_permissions()  # Should not raise

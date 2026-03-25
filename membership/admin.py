@@ -41,61 +41,68 @@ class MemberAdmin(ModelAdmin):
     list_display = [
         "display_name",
         "email",
-        "membership_plan",
         "status",
-        "role",
+        "member_type",
+        "fog_role",
         "join_date",
         "last_login_display",
     ]
     list_display_links = ["display_name"]
-    list_filter = [ActiveStatusFilter, "role", "membership_plan"]
+    list_filter = [ActiveStatusFilter, "member_type"]
     search_fields = ["full_legal_name", "preferred_name", "email"]
     list_per_page = 100
     ordering = ["full_legal_name"]
-    fieldsets = [
-        (
-            "Personal Info",
-            {
-                "fields": [
-                    "user",
-                    "full_legal_name",
-                    "preferred_name",
-                    "email",
-                    "phone",
-                    "billing_name",
-                ],
-            },
-        ),
-        (
-            "Membership",
-            {
-                "fields": [
-                    "membership_plan",
-                    "status",
-                    "role",
-                    "join_date",
-                    "cancellation_date",
-                    "committed_until",
-                ],
-            },
-        ),
-        (
-            "Emergency Contact",
-            {
-                "fields": [
-                    "emergency_contact_name",
-                    "emergency_contact_phone",
-                    "emergency_contact_relationship",
-                ],
-            },
-        ),
-        (
-            "Notes",
-            {
-                "fields": ["notes"],
-            },
-        ),
-    ]
+
+    def get_fieldsets(self, request: HttpRequest, obj: object = None) -> list[tuple[str, dict]]:
+        """Build fieldsets dynamically — fog_role only visible to superusers."""
+        membership_fields = [
+            "membership_plan",
+            "status",
+            "member_type",
+            "join_date",
+            "cancellation_date",
+            "committed_until",
+        ]
+        if request.user.is_superuser:
+            membership_fields.insert(3, "fog_role")
+
+        return [
+            (
+                "Personal Info",
+                {
+                    "fields": [
+                        "user",
+                        "full_legal_name",
+                        "preferred_name",
+                        "email",
+                        "phone",
+                        "billing_name",
+                    ],
+                },
+            ),
+            (
+                "Membership",
+                {
+                    "fields": membership_fields,
+                },
+            ),
+            (
+                "Emergency Contact",
+                {
+                    "fields": [
+                        "emergency_contact_name",
+                        "emergency_contact_phone",
+                        "emergency_contact_relationship",
+                    ],
+                },
+            ),
+            (
+                "Notes",
+                {
+                    "fields": ["notes"],
+                },
+            ),
+        ]
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Member]:
         qs = super().get_queryset(request)
