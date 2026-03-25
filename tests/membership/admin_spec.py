@@ -12,6 +12,7 @@ from membership.admin import (
     FundingSnapshotAdmin,
     GuildAdmin,
     MemberAdmin,
+    PayingMemberFilter,
     VotePreferenceAdmin,
 )
 from membership.models import FundingSnapshot, Guild, Member, VotePreference
@@ -198,6 +199,52 @@ def describe_VotePreferenceAdmin():
     def it_has_expected_search_fields():
         pref_admin = admin.site._registry[VotePreference]
         assert pref_admin.search_fields == ["member__full_legal_name", "member__preferred_name"]
+
+    def it_has_paying_member_filter():
+        pref_admin = admin.site._registry[VotePreference]
+        assert PayingMemberFilter in pref_admin.list_filter
+
+
+@pytest.mark.django_db
+def describe_paying_member_filter():
+    def it_shows_all_by_default(admin_client):
+        paying_plan = MembershipPlanFactory(monthly_price=Decimal("150.00"))
+        free_plan = MembershipPlanFactory(monthly_price=Decimal("0.00"))
+        g1, g2, g3 = GuildFactory(), GuildFactory(), GuildFactory()
+        paying_member = MemberFactory(membership_plan=paying_plan, full_legal_name="Paying Pat")
+        free_member = MemberFactory(membership_plan=free_plan, full_legal_name="Free Fred")
+        VotePreferenceFactory(member=paying_member, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        VotePreferenceFactory(member=free_member, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        resp = admin_client.get("/admin/membership/votepreference/")
+        content = resp.content.decode()
+        assert "Paying Pat" in content
+        assert "Free Fred" in content
+
+    def it_filters_paying_only(admin_client):
+        paying_plan = MembershipPlanFactory(monthly_price=Decimal("150.00"))
+        free_plan = MembershipPlanFactory(monthly_price=Decimal("0.00"))
+        g1, g2, g3 = GuildFactory(), GuildFactory(), GuildFactory()
+        paying_member = MemberFactory(membership_plan=paying_plan, full_legal_name="Paying Pat")
+        free_member = MemberFactory(membership_plan=free_plan, full_legal_name="Free Fred")
+        VotePreferenceFactory(member=paying_member, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        VotePreferenceFactory(member=free_member, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        resp = admin_client.get("/admin/membership/votepreference/?paying=yes")
+        content = resp.content.decode()
+        assert "Paying Pat" in content
+        assert "Free Fred" not in content
+
+    def it_filters_non_paying_only(admin_client):
+        paying_plan = MembershipPlanFactory(monthly_price=Decimal("150.00"))
+        free_plan = MembershipPlanFactory(monthly_price=Decimal("0.00"))
+        g1, g2, g3 = GuildFactory(), GuildFactory(), GuildFactory()
+        paying_member = MemberFactory(membership_plan=paying_plan, full_legal_name="Paying Pat")
+        free_member = MemberFactory(membership_plan=free_plan, full_legal_name="Free Fred")
+        VotePreferenceFactory(member=paying_member, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        VotePreferenceFactory(member=free_member, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        resp = admin_client.get("/admin/membership/votepreference/?paying=no")
+        content = resp.content.decode()
+        assert "Paying Pat" not in content
+        assert "Free Fred" in content
 
 
 def describe_FundingSnapshotAdmin():

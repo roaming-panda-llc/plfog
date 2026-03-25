@@ -140,9 +140,30 @@ class GuildAdmin(ModelAdmin):
 # ---------------------------------------------------------------------------
 
 
+class PayingMemberFilter(admin.SimpleListFilter):
+    """Filter vote preferences by whether the member is on a paying plan."""
+
+    title = "paying status"
+    parameter_name = "paying"
+
+    def lookups(self, request: HttpRequest, model_admin: ModelAdmin) -> list[tuple[str, str]]:  # type: ignore[override]
+        return [
+            ("yes", "Paying members"),
+            ("no", "Non-paying members"),
+        ]
+
+    def queryset(self, request: HttpRequest, queryset: QuerySet[VotePreference]) -> QuerySet[VotePreference]:
+        if self.value() == "yes":
+            return queryset.filter(member__membership_plan__monthly_price__gt=0)
+        if self.value() == "no":
+            return queryset.filter(member__membership_plan__monthly_price=0)
+        return queryset
+
+
 @admin.register(VotePreference)
 class VotePreferenceAdmin(ModelAdmin):
     list_display = ["member", "guild_1st", "guild_2nd", "guild_3rd", "updated_at"]
+    list_filter = [PayingMemberFilter]
     search_fields = ["member__full_legal_name", "member__preferred_name"]
 
 
