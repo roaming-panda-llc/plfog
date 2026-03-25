@@ -89,13 +89,18 @@ class Member(models.Model):
         FORMER = "former", "Former"
         SUSPENDED = "suspended", "Suspended"
 
-    class Role(models.TextChoices):
+    class MemberType(models.TextChoices):
         STANDARD = "standard", "Standard"
         GUILD_LEAD = "guild_lead", "Guild Lead"
         WORK_TRADE = "work_trade", "Work-Trade"
         EMPLOYEE = "employee", "Employee"
         CONTRACTOR = "contractor", "Contractor"
         VOLUNTEER = "volunteer", "Volunteer"
+
+    class FogRole(models.TextChoices):
+        MEMBER = "member", "Member"
+        GUILD_OFFICER = "guild_officer", "Guild Officer"
+        ADMIN = "admin", "Admin"
 
     airtable_record_id = models.CharField(
         max_length=20,
@@ -128,10 +133,17 @@ class Member(models.Model):
         choices=Status.choices,
         default=Status.ACTIVE,
     )
-    role = models.CharField(
+    member_type = models.CharField(
         max_length=20,
-        choices=Role.choices,
-        default=Role.STANDARD,
+        choices=MemberType.choices,
+        default=MemberType.STANDARD,
+        help_text="What kind of member (standard, guild lead, work-trade, etc.).",
+    )
+    fog_role = models.CharField(
+        max_length=20,
+        choices=FogRole.choices,
+        default=FogRole.MEMBER,
+        help_text="FOG access level: admin (full access), guild officer (no site settings), member (hub only).",
     )
     join_date = models.DateField(null=True, blank=True)
     cancellation_date = models.DateField(null=True, blank=True)
@@ -202,6 +214,39 @@ class Member(models.Model):
     @property
     def total_monthly_spend(self) -> Decimal:
         return self.membership_monthly_dues + self.studio_storage_total
+
+    @property
+    def is_fog_admin(self) -> bool:
+        """True when fog_role is admin (full access)."""
+        return self.fog_role == self.FogRole.ADMIN
+
+    @property
+    def is_guild_officer(self) -> bool:
+        """True when fog_role is guild_officer (admin access without site settings)."""
+        return self.fog_role == self.FogRole.GUILD_OFFICER
+
+    def sync_user_permissions(self) -> None:
+        """Set is_staff/is_superuser on the linked User based on fog_role.
+
+        Admin gets full access. Guild officers get staff access but not
+        superuser. Members lose staff access. Skips save if nothing changed.
+        """
+        if self.user is None:
+            return
+
+        if self.is_fog_admin:
+            new_staff, new_super = True, True
+        elif self.is_guild_officer:
+            new_staff, new_super = True, False
+        else:
+            new_staff, new_super = False, False
+
+        if self.user.is_staff == new_staff and self.user.is_superuser == new_super:
+            return
+
+        self.user.is_staff = new_staff
+        self.user.is_superuser = new_super
+        self.user.save(update_fields=["is_staff", "is_superuser"])
 
     # Member records are managed in Airtable and pulled into Django via airtable_pull.
     # No save()/delete() sync overrides — this model is read-only from Airtable's perspective.

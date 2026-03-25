@@ -34,7 +34,7 @@ MEMBER_STATUS_TO_AT: dict[str, str] = {
 }
 MEMBER_STATUS_FROM_AT: dict[str, str] = {v: k for k, v in MEMBER_STATUS_TO_AT.items()}
 
-MEMBER_ROLE_TO_AT: dict[str, str] = {
+MEMBER_TYPE_TO_AT: dict[str, str] = {
     "standard": "Standard Member",
     "guild_lead": "Guild Lead",
     "work_trade": "Work Trade",
@@ -42,7 +42,7 @@ MEMBER_ROLE_TO_AT: dict[str, str] = {
     "contractor": "Contractor",
     "volunteer": "Volunteer",
 }
-MEMBER_ROLE_FROM_AT: dict[str, str] = {v: k for k, v in MEMBER_ROLE_TO_AT.items()}
+MEMBER_TYPE_FROM_AT: dict[str, str] = {v: k for k, v in MEMBER_TYPE_TO_AT.items()}
 
 SPACE_STATUS_TO_AT: dict[str, str] = {
     "available": "Available",
@@ -96,7 +96,7 @@ def member_to_airtable(member: Any) -> dict[str, Any]:
         "Email": member.email,
         "Phone": member.phone,
         "Status": MEMBER_STATUS_TO_AT[member.status],
-        "Role": MEMBER_ROLE_TO_AT[member.role],
+        "Role": MEMBER_TYPE_TO_AT[member.member_type],
         "Join Date": _date_to_str(member.join_date),
         "Cancellation Date": _date_to_str(member.cancellation_date),
         "Notes": member.notes,
@@ -150,8 +150,8 @@ def member_from_airtable(fields: dict[str, Any]) -> dict[str, Any]:
         result["status"] = MEMBER_STATUS_FROM_AT[at_status]
 
     at_role = fields.get("Role", "")
-    if at_role and at_role in MEMBER_ROLE_FROM_AT:
-        result["role"] = MEMBER_ROLE_FROM_AT[at_role]
+    if at_role and at_role in MEMBER_TYPE_FROM_AT:
+        result["member_type"] = MEMBER_TYPE_FROM_AT[at_role]
 
     return result
 

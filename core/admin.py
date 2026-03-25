@@ -24,9 +24,19 @@ class SiteConfigurationAdmin(ModelAdmin):
         ),
     ]
 
+    def has_module_permission(self, request: HttpRequest) -> bool:
+        """Only FOG admins (superusers) can see site settings."""
+        return request.user.is_superuser
+
+    def has_view_permission(self, request: HttpRequest, obj: object = None) -> bool:
+        return request.user.is_superuser
+
+    def has_change_permission(self, request: HttpRequest, obj: object = None) -> bool:
+        return request.user.is_superuser
+
     def has_add_permission(self, request: HttpRequest) -> bool:
         """Prevent adding if the singleton already exists."""
-        return not SiteConfiguration.objects.exists()
+        return request.user.is_superuser and not SiteConfiguration.objects.exists()
 
     def has_delete_permission(self, request: HttpRequest, obj: object = None) -> bool:
         """Never allow deleting the singleton."""

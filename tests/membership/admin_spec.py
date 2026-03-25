@@ -51,9 +51,9 @@ def describe_MemberAdmin():
         assert member_admin.list_display == [
             "display_name",
             "email",
-            "membership_plan",
             "status",
-            "role",
+            "member_type",
+            "fog_role",
             "join_date",
             "last_login_display",
         ]
@@ -69,12 +69,35 @@ def describe_MemberAdmin():
     def it_has_expected_list_filter():
         member_admin = admin.site._registry[Member]
         assert member_admin.list_filter[0] is ActiveStatusFilter
-        assert "role" in member_admin.list_filter
-        assert "membership_plan" in member_admin.list_filter
+        assert "member_type" in member_admin.list_filter
 
     def it_has_list_per_page_set():
         member_admin = admin.site._registry[Member]
         assert member_admin.list_per_page == 100
+
+    @pytest.mark.django_db
+    def it_shows_fog_role_field_for_superusers():
+        from django.test import RequestFactory
+
+        rf = RequestFactory()
+        request = rf.get("/admin/membership/member/add/")
+        request.user = User(is_staff=True, is_superuser=True)
+        member_admin = admin.site._registry[Member]
+        fieldsets = member_admin.get_fieldsets(request)
+        membership_fields = fieldsets[1][1]["fields"]
+        assert "fog_role" in membership_fields
+
+    @pytest.mark.django_db
+    def it_hides_fog_role_field_for_non_superusers():
+        from django.test import RequestFactory
+
+        rf = RequestFactory()
+        request = rf.get("/admin/membership/member/add/")
+        request.user = User(is_staff=True, is_superuser=False)
+        member_admin = admin.site._registry[Member]
+        fieldsets = member_admin.get_fieldsets(request)
+        membership_fields = fieldsets[1][1]["fields"]
+        assert "fog_role" not in membership_fields
 
 
 @pytest.mark.django_db

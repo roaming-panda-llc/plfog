@@ -47,8 +47,8 @@ class AdminRedirectAccountAdapter(DefaultAccountAdapter):
         return Invite.objects.filter(email__iexact=email, accepted_at__isnull=True).exists()
 
     def login(self, request: HttpRequest, user: object) -> None:
-        """Grant admin privileges if email domain matches, then log in."""
-        self._maybe_grant_admin(user)
+        """Sync permissions from Member role (and admin-domain override), then log in."""
+        self._sync_permissions(user)
         super().login(request, user)
 
     def pre_login(
@@ -88,25 +88,31 @@ class AdminRedirectAccountAdapter(DefaultAccountAdapter):
             return reverse("admin:index")
         return reverse("hub_guild_voting")
 
-    def _maybe_grant_admin(self, user: object) -> None:
-        """Check user's email domain and grant admin if it matches ADMIN_DOMAINS.
+    def _sync_permissions(self, user: object) -> None:
+        """Sync is_staff/is_superuser from the user's Member fog_role.
 
-        Skips the database save if the user already has both ``is_staff``
-        and ``is_superuser`` set to ``True``.
+        Priority order:
+        1. ADMIN_DOMAINS override — matching email domain always gets full admin.
+        2. fog_role mapping — admin → full access, guild_officer → staff only.
+        3. Everyone else — no staff access (member hub only).
         """
+        from membership.models import Member
+
+        # 1. ADMIN_DOMAINS override (e.g. @plaza.codes always gets superuser)
         admin_domains: list[str] = getattr(settings, "ADMIN_DOMAINS", [])
-        if not admin_domains:
-            return
-
         email: str = getattr(user, "email", "") or ""
-        if not email or "@" not in email:
-            return
-
-        domain = email.rsplit("@", 1)[1].lower()
-        if domain in admin_domains:
-            if user.is_staff and user.is_superuser:  # type: ignore[attr-defined]
+        if admin_domains and email and "@" in email:
+            domain = email.rsplit("@", 1)[1].lower()
+            if domain in admin_domains:
+                if not (user.is_staff and user.is_superuser):  # type: ignore[attr-defined]
+                    user.is_staff = True  # type: ignore[attr-defined]
+                    user.is_superuser = True  # type: ignore[attr-defined]
+                    user.save(update_fields=["is_staff", "is_superuser"])  # type: ignore[attr-defined]
+                    logger.info("Auto-admin granted to %s (domain: %s)", email, domain)
                 return
-            user.is_staff = True  # type: ignore[attr-defined]
-            user.is_superuser = True  # type: ignore[attr-defined]
-            user.save(update_fields=["is_staff", "is_superuser"])  # type: ignore[attr-defined]
-            logger.info("Auto-admin granted to %s (domain: %s)", email, domain)
+
+        # 2. Sync from Member fog_role
+        member: Member | None = getattr(user, "member", None)
+        if member is not None:
+            member.sync_user_permissions()
+            logger.info("Permissions synced for %s (fog_role: %s)", email, member.fog_role)
