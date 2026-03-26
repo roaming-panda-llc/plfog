@@ -101,6 +101,14 @@ def describe_deduplicate_votes():
         ]
         assert _deduplicate_votes(records) == {}
 
+    def it_keeps_earlier_record_when_later_duplicate_is_older():
+        records = [
+            _at_vote_record("Alice", ["recCCC", "recBBB", "recAAA"], "2025-06-01T00:00:00.000Z"),
+            _at_vote_record("Alice", ["recAAA", "recBBB", "recCCC"], "2024-01-01T00:00:00.000Z"),
+        ]
+        result = _deduplicate_votes(records)
+        assert result["Alice"]["createdTime"] == "2025-06-01T00:00:00.000Z"
+
     def it_strips_whitespace_from_names():
         records = [_at_vote_record("  Bob  ", ["recAAA", "recBBB", "recCCC"])]
         result = _deduplicate_votes(records)
