@@ -1,0 +1,7 @@
+{% load i18n %}{% autoescape off %}Hi there,
+
+{% block content %}{% endblock content %}
+
+Past Lives Makerspace
+Do It Together
+{% endautoescape %}
