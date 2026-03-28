@@ -8,10 +8,10 @@ CHANGELOG: list[dict[str, str | list[str]]] = [
     {
         "version": "1.1.1",
         "date": "2026-03-28",
-        "title": "Richer Discord Notifications",
+        "title": "Better Discord Announcements",
         "changes": [
-            "Discord notifications now show PR number, summary, and commit details instead of just the title",
-            "Merge notifications reframed as deploys with short SHA, author, and change summary",
+            "Discord now gets a friendly release announcement when updates go live — with version and what changed",
+            "Removed noisy PR-opened notifications so the channel stays clean",
         ],
     },
     {
