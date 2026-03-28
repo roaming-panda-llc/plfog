@@ -2,9 +2,19 @@
 
 from __future__ import annotations
 
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.0.3",
+        "date": "2026-03-28",
+        "title": "Login & Email Fixes",
+        "changes": [
+            "Members synced from Airtable can now log in immediately — no signup step needed",
+            "All emails from Past Lives are now properly branded (no more 'example.com')",
+            "Table columns in the admin panel are now left-aligned for easier reading",
+        ],
+    },
     {
         "version": "1.0.2",
         "date": "2026-03-28",
