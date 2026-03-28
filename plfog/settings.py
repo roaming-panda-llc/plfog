@@ -176,7 +176,7 @@ ACCOUNT_ADAPTER = "plfog.adapters.AdminRedirectAccountAdapter"
 # Login-by-code (passwordless email login)
 ACCOUNT_LOGIN_BY_CODE_ENABLED = True
 ACCOUNT_LOGIN_BY_CODE_TIMEOUT = 300  # 5 minutes
-ACCOUNT_LOGIN_BY_CODE_MAX_ATTEMPTS = 3
+ACCOUNT_LOGIN_BY_CODE_MAX_ATTEMPTS = 5
 
 # Auto-admin: comma-separated list of email domains that get admin privileges on login.
 # Empty/unset means no auto-admin. Malformed values raise ValueError at startup.

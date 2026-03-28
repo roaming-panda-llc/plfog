@@ -617,13 +617,13 @@ def describe_login_by_code_settings():
             )
             assert settings_module.ACCOUNT_LOGIN_BY_CODE_TIMEOUT == 300
 
-    def it_sets_login_by_code_max_attempts_to_3(monkeypatch):
+    def it_sets_login_by_code_max_attempts_to_5(monkeypatch):
         with patch("sentry_sdk.init"):
             settings_module = _reload_settings(
                 monkeypatch,
                 {"DJANGO_DEBUG": "True", "SENTRY_DSN": None},
             )
-            assert settings_module.ACCOUNT_LOGIN_BY_CODE_MAX_ATTEMPTS == 3
+            assert settings_module.ACCOUNT_LOGIN_BY_CODE_MAX_ATTEMPTS == 5
 
 
 def describe_anymail():
