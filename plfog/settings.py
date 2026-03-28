@@ -173,6 +173,8 @@ LOGOUT_REDIRECT_URL = "/"
 
 ACCOUNT_ADAPTER = "plfog.adapters.AdminRedirectAccountAdapter"
 
+ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
+
 # Login-by-code (passwordless email login)
 ACCOUNT_LOGIN_BY_CODE_ENABLED = True
 ACCOUNT_LOGIN_BY_CODE_TIMEOUT = 300  # 5 minutes
