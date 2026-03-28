@@ -11,6 +11,7 @@ from django.contrib.auth.models import User
 from django.test import Client
 
 from hub.forms import VotePreferenceForm
+from hub.views import _compute_live_standings
 from membership.cycle import get_cycle_context
 from membership.models import Member, VotePreference
 from tests.membership.factories import (
@@ -366,3 +367,84 @@ def describe_vote_preference_form():
 
         assert g_active in guild_choices
         assert all(g.is_active for g in guild_choices)
+
+
+# ---------------------------------------------------------------------------
+# describe_compute_live_standings
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def describe_compute_live_standings():
+    def it_returns_empty_list_when_no_votes_exist():
+        GuildFactory(name="Empty Guild")
+
+        result = _compute_live_standings()
+
+        assert result == []
+
+    def it_calculates_points_with_correct_weights():
+        g1 = GuildFactory(name="First Pick")
+        g2 = GuildFactory(name="Second Pick")
+        g3 = GuildFactory(name="Third Pick")
+        VotePreferenceFactory(guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+
+        result = _compute_live_standings()
+
+        by_name = {r["guild_name"]: r for r in result}
+        assert by_name["First Pick"]["total_points"] == 5
+        assert by_name["Second Pick"]["total_points"] == 3
+        assert by_name["Third Pick"]["total_points"] == 2
+
+    def it_sorts_by_total_points_descending():
+        g1 = GuildFactory(name="Top")
+        g2 = GuildFactory(name="Mid")
+        g3 = GuildFactory(name="Low")
+        VotePreferenceFactory(guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+
+        result = _compute_live_standings()
+
+        names = [r["guild_name"] for r in result]
+        assert names == ["Top", "Mid", "Low"]
+
+    def it_sets_bar_pct_relative_to_leader():
+        g1 = GuildFactory(name="Leader")
+        g2 = GuildFactory(name="Follower")
+        g3 = GuildFactory(name="Trailing")
+        VotePreferenceFactory(guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+
+        result = _compute_live_standings()
+
+        by_name = {r["guild_name"]: r for r in result}
+        # Leader (5 pts) gets 100%, others scale proportionally
+        assert by_name["Leader"]["bar_pct"] == 100.0
+        assert by_name["Follower"]["bar_pct"] == round(3 / 5 * 100, 1)  # 60.0
+        assert by_name["Trailing"]["bar_pct"] == round(2 / 5 * 100, 1)  # 40.0
+
+    def it_excludes_guilds_with_zero_votes():
+        g1 = GuildFactory(name="Voted")
+        g2 = GuildFactory(name="Also Voted")
+        g3 = GuildFactory(name="Also Also Voted")
+        GuildFactory(name="No Votes")
+        VotePreferenceFactory(guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+
+        result = _compute_live_standings()
+
+        names = [r["guild_name"] for r in result]
+        assert "No Votes" not in names
+        assert len(names) == 3
+
+    def it_aggregates_points_across_multiple_voters():
+        g1 = GuildFactory(name="Popular")
+        g2 = GuildFactory(name="Moderate")
+        g3 = GuildFactory(name="Niche")
+        VotePreferenceFactory(guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        VotePreferenceFactory(guild_1st=g1, guild_2nd=g3, guild_3rd=g2)
+
+        result = _compute_live_standings()
+
+        by_name = {r["guild_name"]: r for r in result}
+        # g1: 5+5=10, g2: 3+2=5, g3: 2+3=5
+        assert by_name["Popular"]["total_points"] == 10
+        assert by_name["Moderate"]["total_points"] == 5
+        assert by_name["Niche"]["total_points"] == 5
