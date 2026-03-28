@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Check Your Email - Past Lives{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <h1 class="auth-page__title">Check Your Email</h1>
+    <p class="auth-page__subtitle">If we found a matching account, we've sent a login link to the email on file.</p>
+    <div class="auth-card">
+        <p style="text-align: center; color: var(--color-text-muted); font-size: 0.95rem; margin: 0;">
+            Didn't get an email? Double-check the name you entered, or contact a board member for help.
+        </p>
+        <div class="auth-links">
+            <p><a href="{% url 'find_account' %}">Try again</a></p>
+            <p><a href="{% url 'account_login' %}">Back to login</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

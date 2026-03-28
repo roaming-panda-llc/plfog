@@ -62,7 +62,7 @@
                     <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
                     <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
                 </svg>
-                Members
+                Member Directory
             </a>
 
             {% has_active_guild guilds as guild_is_active %}
@@ -99,7 +99,7 @@
                 </svg>
             </button>
             <span class="pl-topbar__divider"></span>
-            <span class="pl-badge--beta">BETA</span>
+            <button class="pl-badge--beta" onclick="document.getElementById('changelog-modal').style.display='flex'">BETA v{{ app_version }}</button>
             {% if user.is_staff %}
             <span class="pl-topbar__divider"></span>
             <a href="{% url 'admin:index' %}" class="pl-view-switcher" hx-boost="false" title="Switch to Admin View">
@@ -148,6 +148,7 @@
         </main>
     </div>
 
+    {% include "includes/changelog_modal.html" %}
     <script src="{% static 'js/htmx.min.js' %}"></script>
     <script>
         document.body.addEventListener('htmx:configRequest', function(event) {

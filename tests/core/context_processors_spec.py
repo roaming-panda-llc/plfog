@@ -1,9 +1,9 @@
-"""BDD-style tests for core.context_processors — registration_mode."""
+"""BDD-style tests for core.context_processors."""
 
 import pytest
 from django.test import RequestFactory
 
-from core.context_processors import registration_mode
+from core.context_processors import app_version, registration_mode
 from core.models import SiteConfiguration
 
 pytestmark = pytest.mark.django_db
@@ -35,3 +35,19 @@ def describe_registration_mode():
         request = rf.get("/")
         result = registration_mode(request)
         assert result == {"registration_is_open": False}
+
+
+def describe_app_version():
+    def it_returns_version_string():
+        rf = RequestFactory()
+        request = rf.get("/")
+        result = app_version(request)
+        assert result["app_version"] == "1.0.0"
+
+    def it_returns_changelog_list():
+        rf = RequestFactory()
+        request = rf.get("/")
+        result = app_version(request)
+        assert isinstance(result["changelog"], list)
+        assert len(result["changelog"]) >= 1
+        assert result["changelog"][0]["version"] == "1.0.0"

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Find Your Account - Past Lives{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <h1 class="auth-page__title">Find Your Account</h1>
+    <p class="auth-page__subtitle">Enter your name and we'll send a login link to the email we have on file.</p>
+    <div class="auth-card">
+        {% if form.non_field_errors %}
+        <ul class="errorlist">
+            {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        <form method="POST">
+            {% csrf_token %}
+            <label for="id_name">Your name</label>
+            <input type="text" name="name" id="id_name" required autofocus placeholder="Full legal or preferred name"
+                   value="{{ form.name.value|default:'' }}">
+            {% if form.name.errors %}
+            <ul class="errorlist">
+                {% for error in form.name.errors %}
+                <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+            <button type="submit" class="btn btn--primary btn--full">Find My Account</button>
+        </form>
+        <div class="auth-links">
+            <p><a href="{% url 'account_login' %}">Back to login</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

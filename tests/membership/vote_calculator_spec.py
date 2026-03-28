@@ -130,6 +130,18 @@ def describe_calculate_results():
         # Funding is $0 since pool is $0
         assert all(r["funding"] == 0 for r in result["results"])
 
+    def it_uses_pool_override_instead_of_calculating():
+        votes = [{"guild_1st": "Ceramics", "guild_2nd": "Glass", "guild_3rd": "Wood"}]
+        result = calculate_results(votes=votes, pool_override=1000)
+        assert result["total_pool"] == 1000
+        total_funding = sum(r["funding"] for r in result["results"])
+        assert total_funding == 1000
+
+    def it_ignores_paying_count_when_pool_override_set():
+        votes = [{"guild_1st": "Ceramics", "guild_2nd": "Glass", "guild_3rd": "Wood"}]
+        result = calculate_results(votes=votes, paying_voter_count=5, pool_override=500)
+        assert result["total_pool"] == 500
+
     def it_ensures_funding_sums_to_pool():
         """Funding invariant: sum of all guild funding must equal pool."""
         votes = [

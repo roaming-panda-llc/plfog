@@ -12,6 +12,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from allauth.account.internal.stagekit import clear_login
 
+from .forms import FindAccountForm
 from .models import PushSubscription
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,18 @@ def restart_login(request: HttpRequest) -> HttpResponse:
     """Clear any pending login stage and redirect to the login page."""
     clear_login(request)
     return redirect("account_login")
+
+
+def find_account(request: HttpRequest) -> HttpResponse:
+    """Look up a member by name and send a login link to the email on file."""
+    if request.method == "POST":
+        form = FindAccountForm(request.POST)
+        if form.is_valid():
+            form.send_login_email()
+            return render(request, "account/find_account_done.html")
+    else:
+        form = FindAccountForm()
+    return render(request, "account/find_account.html", {"form": form})
 
 
 def home(request):

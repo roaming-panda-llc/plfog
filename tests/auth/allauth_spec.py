@@ -36,6 +36,17 @@ def describe_allauth_urls():
         assert "google" not in content.lower()
         assert "Continue with Google" not in content
 
+    def it_login_page_shows_version_badge(client):
+        response = client.get("/accounts/login/")
+        content = response.content.decode()
+        assert "BETA v1.0.0" in content
+
+    def it_login_page_includes_changelog_modal(client):
+        response = client.get("/accounts/login/")
+        content = response.content.decode()
+        assert "changelog-modal" in content
+        assert "Launch Day" in content
+
 
 def describe_signup_gating():
     def it_shows_signup_closed_page_in_invite_only_mode(client):
