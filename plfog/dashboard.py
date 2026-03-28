@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from django.db.models import Count
 from django.http import HttpRequest
+from django.utils import timezone
 
 from membership.models import FundingSnapshot, Guild, Member, VotePreference
 
@@ -56,5 +57,6 @@ def dashboard_callback(request: HttpRequest, context: dict) -> dict:
         "participation_pct": participation_pct,
         "top_guilds": top_guilds,
         "last_snapshot": last_snapshot,
+        "current_month": timezone.now().strftime("%B %Y"),
     }
     return context

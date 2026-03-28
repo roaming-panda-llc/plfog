@@ -20,7 +20,7 @@
     <header class="site-header">
         <nav class="site-nav" aria-label="Main navigation">
             <a href="{% url 'home' %}" class="site-nav__brand">Past Lives</a>
-            <span class="site-beta-badge">BETA</span>
+            <button class="site-beta-badge" onclick="document.getElementById('changelog-modal').style.display='flex'">BETA v{{ app_version }}</button>
             {% if user.is_authenticated %}
                 <span class="site-nav__user">{{ user.email }}</span>
                 <a href="{% url 'account_logout' %}" class="site-nav__link">Log out</a>
@@ -41,6 +41,7 @@
         <p class="site-footer__tagline">Do It Together</p>
         <p class="site-footer__copy">&copy; 2026 Past Lives Makerspace</p>
     </footer>
+    {% include "includes/changelog_modal.html" %}
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {

@@ -229,6 +229,14 @@ body {
     border-radius: 10px;
     background-color: rgba(238, 180, 75, 0.15);
     color: #EEB44B;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background-color 0.15s ease;
+}
+
+.pl-badge--beta:hover {
+    background-color: rgba(238, 180, 75, 0.3);
 }
 
 /* View switcher — distinct button to switch between admin/hub */
@@ -1497,4 +1505,127 @@ textarea:focus {
 
 [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
     background-color: rgba(0, 0, 0, 0.25);
+}
+
+/* ========================================
+   Changelog Modal
+   ======================================== */
+.changelog-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.6);
+    padding: 1rem;
+}
+
+.changelog-modal {
+    background-color: #092E4C;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    max-width: 520px;
+    width: 100%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.changelog-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.changelog-modal__title {
+    font-family: 'Lato', system-ui, sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #F4EFDD;
+    margin: 0;
+}
+
+.changelog-modal__close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #96ACBB;
+    padding: 0;
+    line-height: 1;
+}
+
+.changelog-modal__close:hover {
+    color: #F4EFDD;
+}
+
+.changelog-modal__body {
+    padding: 1.5rem;
+    overflow-y: auto;
+}
+
+.changelog-entry + .changelog-entry {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.changelog-entry__header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.changelog-entry__version {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0.125rem 0.5rem;
+    border-radius: 10px;
+    background-color: rgba(238, 180, 75, 0.15);
+    color: #EEB44B;
+}
+
+.changelog-entry__date {
+    font-size: 0.8rem;
+    color: #96ACBB;
+}
+
+.changelog-entry__title {
+    font-family: 'Lato', system-ui, sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #F4EFDD;
+    margin: 0 0 0.5rem 0;
+}
+
+.changelog-entry__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.changelog-entry__list li {
+    font-size: 0.9rem;
+    color: #96ACBB;
+    padding: 0.3rem 0;
+    padding-left: 1rem;
+    position: relative;
+}
+
+.changelog-entry__list li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.7rem;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background-color: #EEB44B;
 }

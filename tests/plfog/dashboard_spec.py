@@ -113,6 +113,72 @@ def describe_take_snapshot_admin():
         resp = admin_client.get("/admin/take-snapshot/")
         assert resp.status_code == 405
 
+    def it_uses_custom_title(admin_client):
+        g1, g2, g3 = GuildFactory(), GuildFactory(), GuildFactory()
+        m = MemberFactory()
+        VotePreferenceFactory(member=m, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+
+        admin_client.post("/admin/take-snapshot/", {"title": "Beta Test Funding March 2026"})
+
+        snap = FundingSnapshot.objects.first()
+        assert snap is not None
+        assert snap.cycle_label == "Beta Test Funding March 2026"
+
+    def it_uses_default_title_when_blank(admin_client):
+        from django.utils import timezone
+
+        g1, g2, g3 = GuildFactory(), GuildFactory(), GuildFactory()
+        m = MemberFactory()
+        VotePreferenceFactory(member=m, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+
+        admin_client.post("/admin/take-snapshot/", {"title": ""})
+
+        snap = FundingSnapshot.objects.first()
+        assert snap is not None
+        assert snap.cycle_label == timezone.now().strftime("%B %Y")
+
+    def it_filters_to_officers_only(admin_client):
+        g1, g2, g3 = GuildFactory(), GuildFactory(), GuildFactory()
+        officer = MemberFactory(fog_role=Member.FogRole.GUILD_OFFICER)
+        regular = MemberFactory(fog_role=Member.FogRole.MEMBER)
+        VotePreferenceFactory(member=officer, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        VotePreferenceFactory(member=regular, guild_1st=g2, guild_2nd=g1, guild_3rd=g3)
+
+        admin_client.post("/admin/take-snapshot/", {"voter_filter": "officers_only"})
+
+        snap = FundingSnapshot.objects.first()
+        assert snap is not None
+        assert snap.results["votes_cast"] == 1  # only officer vote counted
+
+    def it_uses_custom_pool_override(admin_client):
+        g1, g2, g3 = GuildFactory(), GuildFactory(), GuildFactory()
+        m = MemberFactory()
+        VotePreferenceFactory(member=m, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+
+        admin_client.post("/admin/take-snapshot/", {"pool_override": "1000"})
+
+        snap = FundingSnapshot.objects.first()
+        assert snap is not None
+        assert snap.funding_pool == Decimal("1000")
+
+    def it_rejects_negative_pool(admin_client):
+        g1, g2, g3 = GuildFactory(), GuildFactory(), GuildFactory()
+        m = MemberFactory()
+        VotePreferenceFactory(member=m, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+
+        admin_client.post("/admin/take-snapshot/", {"pool_override": "-100"})
+
+        assert FundingSnapshot.objects.count() == 0
+
+    def it_rejects_non_numeric_pool(admin_client):
+        g1, g2, g3 = GuildFactory(), GuildFactory(), GuildFactory()
+        m = MemberFactory()
+        VotePreferenceFactory(member=m, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+
+        admin_client.post("/admin/take-snapshot/", {"pool_override": "abc"})
+
+        assert FundingSnapshot.objects.count() == 0
+
 
 @pytest.mark.django_db
 def describe_invite_member_view():

@@ -828,3 +828,66 @@ def describe_member_fog_roles():
         def it_does_nothing_when_user_is_none():
             member = MemberFactory(user=None, fog_role=Member.FogRole.ADMIN)
             member.sync_user_permissions()  # Should not raise
+
+    def describe_set_fog_role():
+        def it_allows_admin_to_set_any_role():
+            admin = MemberFactory(fog_role=Member.FogRole.ADMIN)
+            target = MemberFactory(fog_role=Member.FogRole.MEMBER)
+
+            target.set_fog_role(Member.FogRole.ADMIN, changed_by=admin)
+
+            target.refresh_from_db()
+            assert target.fog_role == Member.FogRole.ADMIN
+
+        def it_allows_guild_officer_to_set_member():
+            officer = MemberFactory(fog_role=Member.FogRole.GUILD_OFFICER)
+            target = MemberFactory(fog_role=Member.FogRole.GUILD_OFFICER)
+
+            target.set_fog_role(Member.FogRole.MEMBER, changed_by=officer)
+
+            target.refresh_from_db()
+            assert target.fog_role == Member.FogRole.MEMBER
+
+        def it_allows_guild_officer_to_set_guild_officer():
+            officer = MemberFactory(fog_role=Member.FogRole.GUILD_OFFICER)
+            target = MemberFactory(fog_role=Member.FogRole.MEMBER)
+
+            target.set_fog_role(Member.FogRole.GUILD_OFFICER, changed_by=officer)
+
+            target.refresh_from_db()
+            assert target.fog_role == Member.FogRole.GUILD_OFFICER
+
+        def it_prevents_guild_officer_from_granting_admin():
+            officer = MemberFactory(fog_role=Member.FogRole.GUILD_OFFICER)
+            target = MemberFactory(fog_role=Member.FogRole.MEMBER)
+
+            with pytest.raises(PermissionError, match="cannot grant admin"):
+                target.set_fog_role(Member.FogRole.ADMIN, changed_by=officer)
+
+            target.refresh_from_db()
+            assert target.fog_role == Member.FogRole.MEMBER
+
+        def it_prevents_regular_member_from_changing_roles():
+            member = MemberFactory(fog_role=Member.FogRole.MEMBER)
+            target = MemberFactory(fog_role=Member.FogRole.MEMBER)
+
+            with pytest.raises(PermissionError, match="Only admins and guild officers"):
+                target.set_fog_role(Member.FogRole.GUILD_OFFICER, changed_by=member)
+
+        def it_raises_on_invalid_role():
+            admin = MemberFactory(fog_role=Member.FogRole.ADMIN)
+            target = MemberFactory()
+
+            with pytest.raises(ValueError, match="Invalid role"):
+                target.set_fog_role("superadmin", changed_by=admin)
+
+        def it_syncs_user_permissions_after_change():
+            user = User.objects.create_user(username="sync_target", email="sync@example.com", password="pass")
+            target = user.member
+            admin = MemberFactory(fog_role=Member.FogRole.ADMIN)
+
+            target.set_fog_role(Member.FogRole.GUILD_OFFICER, changed_by=admin)
+
+            user.refresh_from_db()
+            assert user.is_staff is True
+            assert user.is_superuser is False

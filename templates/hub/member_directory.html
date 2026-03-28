@@ -1,28 +1,76 @@
 {% extends "hub/base.html" %}
-{% block title %}Members{% endblock %}
+{% block title %}Member Directory{% endblock %}
 
 {% block content %}
 <h1 class="hub-page-title">Member Directory</h1>
 <p class="hub-text-muted" style="margin-bottom: 1.5rem;">{{ members|length }} active member{{ members|length|pluralize }}.</p>
 
-<div class="hub-card">
-    <table style="width: 100%; border-collapse: collapse;">
-        <thead>
-            <tr>
-                <th style="text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--hub-border); font-weight: 500;">Name</th>
-                <th style="text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--hub-border); font-weight: 500;">Role</th>
-                <th style="text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--hub-border); font-weight: 500;">Joined</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for member in members %}
-            <tr>
-                <td style="padding: 0.5rem 0.75rem;">{{ member.display_name }}</td>
-                <td style="padding: 0.5rem 0.75rem;">{{ member.get_role_display }}</td>
-                <td style="padding: 0.5rem 0.75rem; font-size: 0.85rem;">{{ member.join_date|date:"N Y"|default:"—" }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<div class="directory-grid">
+    {% for member in members %}
+    <div class="directory-card">
+        <div class="directory-card__header">
+            <div class="directory-card__avatar">{{ member.initials }}</div>
+            <div class="directory-card__identity">
+                <div class="directory-card__name">{{ member.display_name }}</div>
+                {% if member.preferred_name and member.preferred_name != member.full_legal_name %}
+                <div class="directory-card__preferred">{{ member.preferred_name }}</div>
+                {% endif %}
+                <div class="directory-card__meta">
+                    <span class="directory-card__role">{{ member.get_member_type_display }}</span>
+                    {% if member.join_date %}
+                    <span class="directory-card__joined">Joined {{ member.join_date|date:"N Y" }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% if member.about_me %}
+        <p class="directory-card__about">{{ member.about_me }}</p>
+        {% endif %}
+        {% if member.email or member.phone or member.discord_handle or member.other_contact_info %}
+        <div class="directory-card__contact">
+            {% if member.email %}
+            <div class="directory-card__contact-row">
+                <span class="directory-card__contact-label">Email</span>
+                <a href="mailto:{{ member.email }}">{{ member.email }}</a>
+            </div>
+            {% endif %}
+            {% if member.phone %}
+            <div class="directory-card__contact-row">
+                <span class="directory-card__contact-label">Phone</span>
+                <span>{{ member.phone }}</span>
+            </div>
+            {% endif %}
+            {% if member.discord_handle %}
+            <div class="directory-card__contact-row">
+                <span class="directory-card__contact-label">Discord</span>
+                <span>{{ member.discord_handle }}</span>
+            </div>
+            {% endif %}
+            {% if member.other_contact_info %}
+            <div class="directory-card__contact-row">
+                <span class="directory-card__contact-label">Other</span>
+                <span>{{ member.other_contact_info }}</span>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% if can_manage_roles and member.pk != current_member.pk %}
+        <div class="directory-card__role-mgmt">
+            <span class="directory-card__contact-label">Role</span>
+            <form method="POST" action="{% url 'hub_set_member_role' member.pk %}" class="directory-card__role-form">
+                {% csrf_token %}
+                <select name="fog_role" class="directory-card__role-select">
+                    <option value="member" {% if member.fog_role == "member" %}selected{% endif %}>Member</option>
+                    <option value="guild_officer" {% if member.fog_role == "guild_officer" %}selected{% endif %}>Guild Officer</option>
+                    {% if current_member.is_fog_admin %}
+                    <option value="admin" {% if member.fog_role == "admin" %}selected{% endif %}>Admin</option>
+                    {% endif %}
+                </select>
+                <button type="submit" class="directory-card__role-btn">Update</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
 </div>
 {% endblock %}

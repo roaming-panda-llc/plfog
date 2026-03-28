@@ -117,6 +117,101 @@ def describe_member_directory():
         assert m2 in members
         assert len(members) == 2
 
+    def it_shows_role_controls_for_guild_officers(client: Client):
+        user = User.objects.create_user(username="officer", password="pass")
+        member = user.member
+        member.fog_role = Member.FogRole.GUILD_OFFICER
+        member.show_in_directory = True
+        member.save(update_fields=["fog_role", "show_in_directory"])
+        MemberFactory(full_legal_name="Regular", show_in_directory=True)
+        client.login(username="officer", password="pass")
+
+        response = client.get("/members/")
+        assert response.context["can_manage_roles"] is True
+
+    def it_hides_role_controls_for_regular_members(client: Client):
+        user = User.objects.create_user(username="member", password="pass")
+        member = user.member
+        member.show_in_directory = True
+        member.save(update_fields=["show_in_directory"])
+        client.login(username="member", password="pass")
+
+        response = client.get("/members/")
+        assert response.context["can_manage_roles"] is False
+
+
+@pytest.mark.django_db
+def describe_set_member_role():
+    def it_requires_login(client: Client):
+        member = MemberFactory()
+        response = client.post(f"/members/{member.pk}/set-role/", {"fog_role": "guild_officer"})
+        assert response.status_code == 302
+        assert "/accounts/login/" in response.url
+
+    def it_allows_guild_officer_to_promote_to_guild_officer(client: Client):
+        user = User.objects.create_user(username="officer", password="pass")
+        member = user.member
+        member.fog_role = Member.FogRole.GUILD_OFFICER
+        member.save(update_fields=["fog_role"])
+        target = MemberFactory(fog_role=Member.FogRole.MEMBER)
+        client.login(username="officer", password="pass")
+
+        response = client.post(f"/members/{target.pk}/set-role/", {"fog_role": "guild_officer"})
+
+        assert response.status_code == 302
+        target.refresh_from_db()
+        assert target.fog_role == Member.FogRole.GUILD_OFFICER
+
+    def it_allows_guild_officer_to_demote_to_member(client: Client):
+        user = User.objects.create_user(username="officer", password="pass")
+        member = user.member
+        member.fog_role = Member.FogRole.GUILD_OFFICER
+        member.save(update_fields=["fog_role"])
+        target = MemberFactory(fog_role=Member.FogRole.GUILD_OFFICER)
+        client.login(username="officer", password="pass")
+
+        response = client.post(f"/members/{target.pk}/set-role/", {"fog_role": "member"})
+
+        assert response.status_code == 302
+        target.refresh_from_db()
+        assert target.fog_role == Member.FogRole.MEMBER
+
+    def it_prevents_guild_officer_from_granting_admin(client: Client):
+        user = User.objects.create_user(username="officer", password="pass")
+        member = user.member
+        member.fog_role = Member.FogRole.GUILD_OFFICER
+        member.save(update_fields=["fog_role"])
+        target = MemberFactory(fog_role=Member.FogRole.MEMBER)
+        client.login(username="officer", password="pass")
+
+        client.post(f"/members/{target.pk}/set-role/", {"fog_role": "admin"})
+
+        target.refresh_from_db()
+        assert target.fog_role == Member.FogRole.MEMBER  # unchanged
+
+    def it_prevents_regular_members_from_changing_roles(client: Client):
+        User.objects.create_user(username="member", password="pass")
+        target = MemberFactory(fog_role=Member.FogRole.MEMBER)
+        client.login(username="member", password="pass")
+
+        client.post(f"/members/{target.pk}/set-role/", {"fog_role": "guild_officer"})
+
+        target.refresh_from_db()
+        assert target.fog_role == Member.FogRole.MEMBER  # unchanged
+
+    def it_allows_admin_to_grant_admin(client: Client):
+        user = User.objects.create_user(username="admin", password="pass")
+        member = user.member
+        member.fog_role = Member.FogRole.ADMIN
+        member.save(update_fields=["fog_role"])
+        target = MemberFactory(fog_role=Member.FogRole.MEMBER)
+        client.login(username="admin", password="pass")
+
+        client.post(f"/members/{target.pk}/set-role/", {"fog_role": "admin"})
+
+        target.refresh_from_db()
+        assert target.fog_role == Member.FogRole.ADMIN
+
 
 @pytest.mark.django_db
 def describe_guild_detail():

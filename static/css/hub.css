@@ -313,6 +313,14 @@ a:hover { color: var(--color-yellow-hover); }
     border-radius: 10px;
     background-color: rgba(238, 180, 75, 0.15);
     color: var(--color-tuscan-yellow);
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-body);
+    transition: background-color 0.15s ease;
+}
+
+.pl-badge--beta:hover {
+    background-color: rgba(238, 180, 75, 0.3);
 }
 
 /* View switcher — distinct button to switch between admin/hub */
@@ -838,4 +846,281 @@ a:hover { color: var(--color-yellow-hover); }
     .hub-card {
         padding: 1.25rem;
     }
+}
+
+/* ========================================
+   Member Directory
+   ======================================== */
+.directory-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1rem;
+}
+
+.directory-card {
+    background-color: var(--hub-card-bg);
+    border: 1px solid var(--hub-input-border);
+    border-radius: 10px;
+    padding: 1.25rem;
+}
+
+.directory-card__header {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+}
+
+.directory-card__avatar {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: rgba(238, 180, 75, 0.15);
+    color: var(--color-tuscan-yellow);
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    letter-spacing: 0.03em;
+}
+
+.directory-card__identity {
+    min-width: 0;
+}
+
+.directory-card__name {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--hub-text);
+    line-height: 1.3;
+}
+
+.directory-card__preferred {
+    font-size: 0.85rem;
+    color: var(--hub-text-muted);
+    font-style: italic;
+}
+
+.directory-card__meta {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--hub-text-muted);
+}
+
+.directory-card__role {
+    font-weight: 500;
+}
+
+.directory-card__about {
+    margin: 0.75rem 0 0;
+    font-size: 0.9rem;
+    color: var(--hub-text-muted);
+    line-height: 1.5;
+}
+
+.directory-card__contact {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--hub-input-border);
+}
+
+.directory-card__contact-row {
+    display: flex;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    padding: 0.2rem 0;
+    color: var(--hub-text-muted);
+}
+
+.directory-card__contact-row a {
+    color: var(--color-tuscan-yellow);
+    text-decoration: none;
+}
+
+.directory-card__contact-row a:hover {
+    text-decoration: underline;
+}
+
+.directory-card__contact-label {
+    font-weight: 500;
+    color: var(--hub-text);
+    min-width: 4rem;
+    flex-shrink: 0;
+}
+
+.directory-card__role-mgmt {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--hub-input-border);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.directory-card__role-form {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+}
+
+.directory-card__role-select {
+    flex: 1;
+    padding: 0.375rem 0.5rem;
+    font-size: 0.8rem;
+    font-family: var(--font-body);
+    color: var(--hub-text);
+    background-color: var(--hub-input-bg);
+    border: 1px solid var(--hub-input-border);
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.directory-card__role-select:focus {
+    outline: none;
+    border-color: var(--color-tuscan-yellow);
+}
+
+.directory-card__role-btn {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-family: var(--font-body);
+    color: var(--color-navy);
+    background-color: var(--color-tuscan-yellow);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+    white-space: nowrap;
+}
+
+.directory-card__role-btn:hover {
+    background-color: var(--color-yellow-hover);
+}
+
+/* ========================================
+   Changelog Modal
+   ======================================== */
+.changelog-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.6);
+    padding: 1rem;
+}
+
+.changelog-modal {
+    background-color: var(--hub-card-bg);
+    border-radius: 12px;
+    border: 1px solid var(--hub-input-border);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-width: 520px;
+    width: 100%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.changelog-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--hub-input-border);
+}
+
+.changelog-modal__title {
+    font-family: var(--font-heading);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--hub-text);
+    margin: 0;
+}
+
+.changelog-modal__close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--hub-text-muted);
+    padding: 0;
+    line-height: 1;
+}
+
+.changelog-modal__close:hover {
+    color: var(--hub-text);
+}
+
+.changelog-modal__body {
+    padding: 1.5rem;
+    overflow-y: auto;
+}
+
+.changelog-entry + .changelog-entry {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--hub-input-border);
+}
+
+.changelog-entry__header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.changelog-entry__version {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0.125rem 0.5rem;
+    border-radius: 10px;
+    background-color: rgba(238, 180, 75, 0.15);
+    color: var(--color-tuscan-yellow);
+}
+
+.changelog-entry__date {
+    font-size: 0.8rem;
+    color: var(--hub-text-muted);
+}
+
+.changelog-entry__title {
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--hub-text);
+    margin: 0 0 0.5rem 0;
+}
+
+.changelog-entry__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.changelog-entry__list li {
+    font-size: 0.9rem;
+    color: var(--hub-text-muted);
+    padding: 0.3rem 0;
+    padding-left: 1rem;
+    position: relative;
+}
+
+.changelog-entry__list li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.7rem;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background-color: var(--color-tuscan-yellow);
 }

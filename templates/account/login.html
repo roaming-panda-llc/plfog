@@ -6,6 +6,9 @@
 <div class="auth-page">
     <h1 class="auth-page__title">Welcome Back</h1>
     <p class="auth-page__subtitle">Enter your email to receive a login code</p>
+    <div class="auth-page__version">
+        <button class="site-beta-badge" onclick="document.getElementById('changelog-modal').style.display='flex'">BETA v{{ app_version }}</button>
+    </div>
     <div class="auth-card">
         <form method="POST" action="{% url 'account_request_login_code' %}">
             {% csrf_token %}
@@ -13,11 +16,12 @@
             <input type="email" name="email" id="id_email" required autofocus placeholder="you@example.com">
             <button type="submit" class="btn btn--primary btn--full">Send Login Code</button>
         </form>
-        {% if registration_is_open %}
         <div class="auth-links">
+            <p><a href="{% url 'find_account' %}">Don't know which email is on file?</a></p>
+            {% if registration_is_open %}
             <p>Don't have an account? <a href="{% url 'account_signup' %}">Sign up</a></p>
+            {% endif %}
         </div>
-        {% endif %}
     </div>
 </div>
 {% endblock %}

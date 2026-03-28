@@ -124,6 +124,13 @@ class Member(models.Model):
     preferred_name = models.CharField(max_length=255, blank=True)
     email = models.EmailField(blank=True, default="")
     phone = models.CharField(max_length=20, blank=True)
+    discord_handle = models.CharField(
+        max_length=100, blank=True, help_text="Discord username (e.g. user#1234 or @user)."
+    )
+    other_contact_info = models.CharField(
+        max_length=255, blank=True, help_text="Other ways to reach this member (Instagram, Signal, etc.)."
+    )
+    about_me = models.TextField(blank=True, help_text="Short bio shown in the member directory.")
     billing_name = models.CharField(max_length=255, blank=True)
 
     # Emergency contact
@@ -233,6 +240,35 @@ class Member(models.Model):
     def is_guild_officer(self) -> bool:
         """True when fog_role is guild_officer (admin access without site settings)."""
         return self.fog_role == self.FogRole.GUILD_OFFICER
+
+    def set_fog_role(self, new_role: str, *, changed_by: Member) -> None:
+        """Change this member's fog_role with permission checks.
+
+        Admins can assign any role. Guild officers can assign member or guild_officer
+        but not admin. Regular members cannot change roles.
+
+        Args:
+            new_role: The FogRole value to set.
+            changed_by: The Member performing the change.
+
+        Raises:
+            PermissionError: If the caller lacks permission.
+            ValueError: If the role value is invalid.
+        """
+        if new_role not in {c.value for c in self.FogRole}:
+            raise ValueError(f"Invalid role: {new_role}")
+
+        if changed_by.is_fog_admin:
+            pass  # admins can do anything
+        elif changed_by.is_guild_officer:
+            if new_role == self.FogRole.ADMIN:
+                raise PermissionError("Guild officers cannot grant admin access.")
+        else:
+            raise PermissionError("Only admins and guild officers can change roles.")
+
+        self.fog_role = new_role
+        self.save(update_fields=["fog_role"])
+        self.sync_user_permissions()
 
     def sync_user_permissions(self) -> None:
         """Set is_staff/is_superuser on the linked User based on fog_role.
@@ -407,9 +443,26 @@ class FundingSnapshot(models.Model):
     def __str__(self) -> str:
         return f"{self.cycle_label} — ${self.funding_pool}"
 
+    class VoterFilter(models.TextChoices):
+        ALL_MEMBERS = "all", "All Members"
+        OFFICERS_ONLY = "officers_only", "Officers Only (Admins + Guild Officers)"
+
     @classmethod
-    def take(cls) -> FundingSnapshot | None:
+    def take(
+        cls,
+        *,
+        title: str = "",
+        voter_filter: str = "",
+        pool_override: int | None = None,
+    ) -> FundingSnapshot | None:
         """Create a snapshot from current vote preferences.
+
+        Args:
+            title: Custom label for the snapshot. Defaults to current month/year.
+            voter_filter: One of VoterFilter values. 'officers_only' limits votes
+                to admin + guild_officer roles. Default includes all members.
+            pool_override: Custom dollar amount for the funding pool. If None,
+                calculates from paying_voter_count × $10.
 
         Returns:
             The created FundingSnapshot, or None if no votes exist.
@@ -422,6 +475,11 @@ class FundingSnapshot(models.Model):
             "guild_2nd",
             "guild_3rd",
         ).all()
+
+        if voter_filter == cls.VoterFilter.OFFICERS_ONLY:
+            preferences = preferences.filter(
+                member__fog_role__in=[Member.FogRole.ADMIN, Member.FogRole.GUILD_OFFICER],
+            )
 
         if not preferences.exists():
             return None
@@ -437,10 +495,12 @@ class FundingSnapshot(models.Model):
             for pref in preferences
         ]
 
-        calc = calculate_results(votes, paying_voter_count=paying_count)
+        calc = calculate_results(votes, paying_voter_count=paying_count, pool_override=pool_override)
+
+        cycle_label = title.strip() if title.strip() else timezone.now().strftime("%B %Y")
 
         return cls.objects.create(
-            cycle_label=timezone.now().strftime("%B %Y"),
+            cycle_label=cycle_label,
             contributor_count=paying_count,
             funding_pool=calc["total_pool"],
             results=calc,

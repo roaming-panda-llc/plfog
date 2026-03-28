@@ -19,13 +19,26 @@ class ProfileSettingsForm(forms.ModelForm):
 
     class Meta:
         model = Member
-        fields = ["preferred_name", "phone", "show_in_directory"]
+        fields = [
+            "preferred_name",
+            "phone",
+            "discord_handle",
+            "other_contact_info",
+            "about_me",
+            "show_in_directory",
+        ]
         widgets = {
             "preferred_name": forms.TextInput(attrs={"placeholder": "How should we call you?"}),
             "phone": forms.TextInput(attrs={"placeholder": "(optional)"}),
+            "discord_handle": forms.TextInput(attrs={"placeholder": "@username"}),
+            "other_contact_info": forms.TextInput(attrs={"placeholder": "Instagram, Signal, etc."}),
+            "about_me": forms.Textarea(attrs={"rows": 3, "placeholder": "Tell other members a bit about yourself..."}),
         }
         labels = {
             "show_in_directory": "Show me in the member directory",
+            "discord_handle": "Discord",
+            "other_contact_info": "Other contact info",
+            "about_me": "About me",
         }
 
 

@@ -40,7 +40,14 @@ def describe_profile_settings_form():
 
     def it_only_includes_expected_fields():
         form = ProfileSettingsForm()
-        assert list(form.fields.keys()) == ["preferred_name", "phone", "show_in_directory"]
+        assert list(form.fields.keys()) == [
+            "preferred_name",
+            "phone",
+            "discord_handle",
+            "other_contact_info",
+            "about_me",
+            "show_in_directory",
+        ]
 
 
 def describe_email_preferences_form():

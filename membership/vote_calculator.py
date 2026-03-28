@@ -22,6 +22,7 @@ DOLLARS_PER_MEMBER = sum(WEIGHTS.values())  # $10
 def calculate_results(
     votes: list[dict[str, Any]],
     paying_voter_count: int | None = None,
+    pool_override: int | None = None,
 ) -> dict[str, Any]:
     """Calculate proportional guild funding from ranked votes.
 
@@ -29,6 +30,8 @@ def calculate_results(
         votes: list of dicts with guild_1st, guild_2nd, guild_3rd (guild names)
         paying_voter_count: number of voters who contribute to the funding pool.
             Defaults to len(votes) if not provided (all voters are paying).
+        pool_override: if set, use this dollar amount as the total pool instead
+            of calculating from paying_voter_count × $10.
 
     Returns:
         dict with total_pool, results list, votes_cast.
@@ -52,7 +55,7 @@ def calculate_results(
 
     votes_cast = len(votes)
     pool_contributors = paying_voter_count if paying_voter_count is not None else votes_cast
-    total_pool = DOLLARS_PER_MEMBER * pool_contributors
+    total_pool = pool_override if pool_override is not None else DOLLARS_PER_MEMBER * pool_contributors
     total_points = sum(s["total_points"] for s in guild_scores.values())
 
     results: list[dict[str, Any]] = []

@@ -1,0 +1,13 @@
+{% load i18n %}{% autoescape off %}Hi there,
+
+Your login code for Past Lives Makerspace is:
+
+{{ code }}
+
+Enter this code in your browser to sign in. It expires in 5 minutes.
+
+If you didn't request this, you can safely ignore this email.
+
+Past Lives Makerspace
+Do It Together
+{% endautoescape %}
