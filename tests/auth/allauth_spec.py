@@ -111,7 +111,7 @@ def describe_auto_create_user_on_login():
 
         assert not User.objects.filter(email__iexact="synced@example.com").exists()
 
-        resp = client.post("/accounts/login/code/", {"email": "synced@example.com"})
+        client.post("/accounts/login/code/", {"email": "synced@example.com"})
 
         assert User.objects.filter(email__iexact="synced@example.com").exists()
         user = User.objects.get(email__iexact="synced@example.com")

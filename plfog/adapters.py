@@ -7,7 +7,6 @@ from typing import Any
 
 from allauth.account.adapter import DefaultAccountAdapter
 from allauth.account.forms import RequestLoginCodeForm
-from allauth.account.utils import filter_users_by_email
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.http import HttpRequest
