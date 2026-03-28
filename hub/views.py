@@ -9,7 +9,6 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_POST
 
 from hub.forms import BetaFeedbackForm, EmailPreferencesForm, ProfileSettingsForm, VotePreferenceForm
 from membership.cycle import get_cycle_context
@@ -115,35 +114,11 @@ def member_directory(request: HttpRequest) -> HttpResponse:
         .select_related("membership_plan")
         .order_by("full_legal_name")
     )
-    can_manage_roles = current_member is not None and (current_member.is_fog_admin or current_member.is_guild_officer)
     return render(
         request,
         "hub/member_directory.html",
-        {**ctx, "members": members, "current_member": current_member, "can_manage_roles": can_manage_roles},
+        {**ctx, "members": members, "current_member": current_member},
     )
-
-
-@require_POST
-@login_required
-def set_member_role(request: HttpRequest, pk: int) -> HttpResponse:
-    """Set a member's fog_role. Requires guild officer or admin."""
-    current_member = _get_member(request)
-    if current_member is None:
-        messages.error(request, "Your account is not linked to a membership.")
-        return redirect("hub_member_directory")
-
-    target = get_object_or_404(Member, pk=pk)
-    new_role = request.POST.get("fog_role", "")
-
-    try:
-        target.set_fog_role(new_role, changed_by=current_member)
-        messages.success(request, f"{target.display_name}'s role updated to {target.get_fog_role_display()}.")
-    except PermissionError as e:
-        messages.error(request, str(e))
-    except ValueError as e:
-        messages.error(request, str(e))
-
-    return redirect("hub_member_directory")
 
 
 @login_required

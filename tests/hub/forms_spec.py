@@ -42,6 +42,7 @@ def describe_profile_settings_form():
         form = ProfileSettingsForm()
         assert list(form.fields.keys()) == [
             "preferred_name",
+            "pronouns",
             "phone",
             "discord_handle",
             "other_contact_info",

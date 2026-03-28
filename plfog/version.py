@@ -2,9 +2,18 @@
 
 from __future__ import annotations
 
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.0.2",
+        "date": "2026-03-28",
+        "title": "Admin Fixes",
+        "changes": [
+            "Role management moved out of the member directory — it now lives in the admin panel only",
+            "Login code entry allows up to 5 attempts before locking out (was 3)",
+        ],
+    },
     {
         "version": "1.0.1",
         "date": "2026-03-27",

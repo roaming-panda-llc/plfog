@@ -117,136 +117,23 @@ def describe_member_directory():
         assert m2 in members
         assert len(members) == 2
 
-    def it_shows_role_controls_for_guild_officers(client: Client):
-        user = User.objects.create_user(username="officer", password="pass")
-        member = user.member
-        member.fog_role = Member.FogRole.GUILD_OFFICER
-        member.show_in_directory = True
-        member.save(update_fields=["fog_role", "show_in_directory"])
-        MemberFactory(full_legal_name="Regular", show_in_directory=True)
-        client.login(username="officer", password="pass")
+    def it_shows_pronouns_in_directory(client: Client):
+        User.objects.create_user(username="viewer", password="pass")
+        MemberFactory(full_legal_name="Sam", show_in_directory=True, pronouns=Member.Pronouns.THEY_THEM)
+        client.login(username="viewer", password="pass")
 
         response = client.get("/members/")
-        assert response.context["can_manage_roles"] is True
 
-    def it_hides_role_controls_for_regular_members(client: Client):
-        user = User.objects.create_user(username="member", password="pass")
-        member = user.member
-        member.show_in_directory = True
-        member.save(update_fields=["show_in_directory"])
-        client.login(username="member", password="pass")
+        assert "they/them" in response.content.decode()
+
+    def it_hides_prefer_not_to_share_pronouns(client: Client):
+        User.objects.create_user(username="viewer2", password="pass")
+        MemberFactory(full_legal_name="Alex", show_in_directory=True, pronouns=Member.Pronouns.PREFER_NOT)
+        client.login(username="viewer2", password="pass")
 
         response = client.get("/members/")
-        assert response.context["can_manage_roles"] is False
 
-
-@pytest.mark.django_db
-def describe_set_member_role():
-    def it_requires_login(client: Client):
-        member = MemberFactory()
-        response = client.post(f"/members/{member.pk}/set-role/", {"fog_role": "guild_officer"})
-        assert response.status_code == 302
-        assert "/accounts/login/" in response.url
-
-    def it_allows_guild_officer_to_promote_to_guild_officer(client: Client):
-        user = User.objects.create_user(username="officer", password="pass")
-        member = user.member
-        member.fog_role = Member.FogRole.GUILD_OFFICER
-        member.save(update_fields=["fog_role"])
-        target = MemberFactory(fog_role=Member.FogRole.MEMBER)
-        client.login(username="officer", password="pass")
-
-        response = client.post(f"/members/{target.pk}/set-role/", {"fog_role": "guild_officer"})
-
-        assert response.status_code == 302
-        target.refresh_from_db()
-        assert target.fog_role == Member.FogRole.GUILD_OFFICER
-
-    def it_allows_guild_officer_to_demote_to_member(client: Client):
-        user = User.objects.create_user(username="officer", password="pass")
-        member = user.member
-        member.fog_role = Member.FogRole.GUILD_OFFICER
-        member.save(update_fields=["fog_role"])
-        target = MemberFactory(fog_role=Member.FogRole.GUILD_OFFICER)
-        client.login(username="officer", password="pass")
-
-        response = client.post(f"/members/{target.pk}/set-role/", {"fog_role": "member"})
-
-        assert response.status_code == 302
-        target.refresh_from_db()
-        assert target.fog_role == Member.FogRole.MEMBER
-
-    def it_prevents_guild_officer_from_granting_admin(client: Client):
-        user = User.objects.create_user(username="officer", password="pass")
-        member = user.member
-        member.fog_role = Member.FogRole.GUILD_OFFICER
-        member.save(update_fields=["fog_role"])
-        target = MemberFactory(fog_role=Member.FogRole.MEMBER)
-        client.login(username="officer", password="pass")
-
-        client.post(f"/members/{target.pk}/set-role/", {"fog_role": "admin"})
-
-        target.refresh_from_db()
-        assert target.fog_role == Member.FogRole.MEMBER  # unchanged
-
-    def it_prevents_regular_members_from_changing_roles(client: Client):
-        User.objects.create_user(username="member", password="pass")
-        target = MemberFactory(fog_role=Member.FogRole.MEMBER)
-        client.login(username="member", password="pass")
-
-        client.post(f"/members/{target.pk}/set-role/", {"fog_role": "guild_officer"})
-
-        target.refresh_from_db()
-        assert target.fog_role == Member.FogRole.MEMBER  # unchanged
-
-    def it_allows_admin_to_grant_admin(client: Client):
-        user = User.objects.create_user(username="admin", password="pass")
-        member = user.member
-        member.fog_role = Member.FogRole.ADMIN
-        member.save(update_fields=["fog_role"])
-        target = MemberFactory(fog_role=Member.FogRole.MEMBER)
-        client.login(username="admin", password="pass")
-
-        client.post(f"/members/{target.pk}/set-role/", {"fog_role": "admin"})
-
-        target.refresh_from_db()
-        assert target.fog_role == Member.FogRole.ADMIN
-
-    def it_handles_user_with_no_member(client: Client):
-        from django.db.models.signals import post_save
-
-        from membership.signals import ensure_user_has_member
-
-        user = User.objects.create_user(username="orphan", password="pass")
-        user.member.delete()
-        client.login(username="orphan", password="pass")
-        # Disconnect the signal so login's last_login save doesn't recreate the member
-        post_save.disconnect(ensure_user_has_member, sender=User)
-        try:
-            # Delete the member that was re-created by login's post_save
-            Member.objects.filter(user=user).delete()
-            target = MemberFactory(fog_role=Member.FogRole.MEMBER)
-
-            response = client.post(f"/members/{target.pk}/set-role/", {"fog_role": "guild_officer"})
-
-            assert response.status_code == 302
-            target.refresh_from_db()
-            assert target.fog_role == Member.FogRole.MEMBER  # unchanged
-        finally:
-            post_save.connect(ensure_user_has_member, sender=User)
-
-    def it_handles_invalid_role_value(client: Client):
-        user = User.objects.create_user(username="admin2", password="pass")
-        member = user.member
-        member.fog_role = Member.FogRole.ADMIN
-        member.save(update_fields=["fog_role"])
-        target = MemberFactory(fog_role=Member.FogRole.MEMBER)
-        client.login(username="admin2", password="pass")
-
-        client.post(f"/members/{target.pk}/set-role/", {"fog_role": "superadmin"}, follow=True)
-
-        target.refresh_from_db()
-        assert target.fog_role == Member.FogRole.MEMBER  # unchanged
+        assert "prefer not to share" not in response.content.decode()
 
 
 @pytest.mark.django_db
@@ -357,6 +244,27 @@ def describe_profile_settings():
 
         assert response.status_code == 200
         assert response.context["form"].errors
+
+    def it_saves_pronouns(client: Client):
+        user = User.objects.create_user(username="pronounuser", password="pass")
+        member = user.member
+        client.login(username="pronounuser", password="pass")
+
+        client.post(
+            "/settings/profile/",
+            {
+                "preferred_name": "",
+                "pronouns": "she/her",
+                "phone": "",
+                "discord_handle": "",
+                "other_contact_info": "",
+                "about_me": "",
+                "show_in_directory": False,
+            },
+        )
+
+        member.refresh_from_db()
+        assert member.pronouns == "she/her"
 
 
 @pytest.mark.django_db
