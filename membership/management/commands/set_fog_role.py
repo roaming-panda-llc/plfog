@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from django.core.management.base import BaseCommand, CommandError
+from typing import Any
+
+from django.core.management.base import BaseCommand, CommandError, CommandParser
 
 from membership.models import Member
 
@@ -12,7 +14,7 @@ class Command(BaseCommand):
 
     help = "Set a member's FOG role (member, guild_officer, admin)."
 
-    def add_arguments(self, parser: object) -> None:
+    def add_arguments(self, parser: CommandParser) -> None:
         """Define positional arguments."""
         parser.add_argument("email", type=str, help="Email address of the member.")
         parser.add_argument(
@@ -22,7 +24,7 @@ class Command(BaseCommand):
             help="FOG role to assign.",
         )
 
-    def handle(self, *args: object, **options: object) -> None:
+    def handle(self, *args: Any, **options: Any) -> None:
         """Execute the command."""
         email: str = options["email"]
         role: str = options["role"]
