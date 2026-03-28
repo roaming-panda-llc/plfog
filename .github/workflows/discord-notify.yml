@@ -27,8 +27,8 @@ jobs:
           from plfog.version import VERSION, CHANGELOG
 
           entry = CHANGELOG[0]
-          title = entry.get('title', 'New Update')
-          changes = entry.get('changes', [])
+          title = entry['title']
+          changes = entry['changes']
           bullets = '\n'.join(f'• {c}' for c in changes)
           print(f'VERSION={VERSION}')
           print(f'TITLE={title}')
