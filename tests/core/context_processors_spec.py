@@ -5,6 +5,7 @@ from django.test import RequestFactory
 
 from core.context_processors import app_version, registration_mode
 from core.models import SiteConfiguration
+from plfog.version import CHANGELOG, VERSION
 
 pytestmark = pytest.mark.django_db
 
@@ -42,7 +43,7 @@ def describe_app_version():
         rf = RequestFactory()
         request = rf.get("/")
         result = app_version(request)
-        assert result["app_version"] == "1.0.0"
+        assert result["app_version"] == VERSION
 
     def it_returns_changelog_list():
         rf = RequestFactory()
@@ -50,4 +51,4 @@ def describe_app_version():
         result = app_version(request)
         assert isinstance(result["changelog"], list)
         assert len(result["changelog"]) >= 1
-        assert result["changelog"][0]["version"] == "1.0.0"
+        assert result["changelog"][0]["version"] == CHANGELOG[0]["version"]

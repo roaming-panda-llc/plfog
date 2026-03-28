@@ -2,6 +2,7 @@ import pytest
 from django.contrib.auth.models import User
 
 from core.models import Invite, SiteConfiguration
+from plfog.version import VERSION
 
 pytestmark = pytest.mark.django_db
 
@@ -39,7 +40,7 @@ def describe_allauth_urls():
     def it_login_page_shows_version_badge(client):
         response = client.get("/accounts/login/")
         content = response.content.decode()
-        assert "BETA v1.0.0" in content
+        assert f"BETA v{VERSION}" in content
 
     def it_login_page_includes_changelog_modal(client):
         response = client.get("/accounts/login/")
