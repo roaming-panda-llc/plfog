@@ -78,3 +78,8 @@ def describe_find_account():
             client.post("/accounts/find-account/", {"name": "No Email"})
 
             mock_send_mail.assert_not_called()
+
+        def it_re_renders_form_when_name_is_blank(client: Client):
+            resp = client.post("/accounts/find-account/", {"name": ""})
+            assert resp.status_code == 200
+            assert b"Find Your Account" in resp.content

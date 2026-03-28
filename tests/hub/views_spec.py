@@ -212,6 +212,42 @@ def describe_set_member_role():
         target.refresh_from_db()
         assert target.fog_role == Member.FogRole.ADMIN
 
+    def it_handles_user_with_no_member(client: Client):
+        from django.db.models.signals import post_save
+
+        from membership.signals import ensure_user_has_member
+
+        user = User.objects.create_user(username="orphan", password="pass")
+        user.member.delete()
+        client.login(username="orphan", password="pass")
+        # Disconnect the signal so login's last_login save doesn't recreate the member
+        post_save.disconnect(ensure_user_has_member, sender=User)
+        try:
+            # Delete the member that was re-created by login's post_save
+            Member.objects.filter(user=user).delete()
+            target = MemberFactory(fog_role=Member.FogRole.MEMBER)
+
+            response = client.post(f"/members/{target.pk}/set-role/", {"fog_role": "guild_officer"})
+
+            assert response.status_code == 302
+            target.refresh_from_db()
+            assert target.fog_role == Member.FogRole.MEMBER  # unchanged
+        finally:
+            post_save.connect(ensure_user_has_member, sender=User)
+
+    def it_handles_invalid_role_value(client: Client):
+        user = User.objects.create_user(username="admin2", password="pass")
+        member = user.member
+        member.fog_role = Member.FogRole.ADMIN
+        member.save(update_fields=["fog_role"])
+        target = MemberFactory(fog_role=Member.FogRole.MEMBER)
+        client.login(username="admin2", password="pass")
+
+        response = client.post(f"/members/{target.pk}/set-role/", {"fog_role": "superadmin"}, follow=True)
+
+        target.refresh_from_db()
+        assert target.fog_role == Member.FogRole.MEMBER  # unchanged
+
 
 @pytest.mark.django_db
 def describe_guild_detail():
