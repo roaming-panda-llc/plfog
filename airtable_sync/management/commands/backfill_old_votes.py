@@ -22,6 +22,23 @@ OLD_BASE_ID = "appETKQa6ueJsZ2gC"
 OLD_GUILDS_TABLE_ID = "tbla02m2GnUAsg3eW"
 OLD_GUILD_VOTES_TABLE_ID = "tblbIhlUK55xeqISc"
 
+OLD_TO_NEW_GUILD_NAME: dict[str, str] = {
+    "art framing": "Art Framing Guild",
+    "ceramics": "Ceramics Guild",
+    "community garden": "Gardeners Guild",
+    "food independence": "Food Independence Guild",
+    "gallery & retail": "Gallery & Retail Guild",
+    "jewelry": "Jewelry Guild",
+    "leatherworking": "Leatherwork Guild",
+    "metalworkers": "Metalworkers Guild",
+    "prison outreach": "Prison Outreach Guild",
+    "stained glass": "Glass Guild",
+    "textile arts": "Textiles Guild",
+    "visual arts": "Visual Arts Guild",
+    "woodworkers": "Woodworking Guild",
+    "writing guild": "Writers Guild",
+}
+
 
 def _resolve_guild_names(fields: dict[str, Any], guild_id_to_name: dict[str, str]) -> list[str] | None:
     """Extract 3 guild names from a vote record's fields. Returns None if fewer than 3."""
@@ -176,22 +193,16 @@ class Command(BaseCommand):
     def _lookup_guilds(
         self, guild_names: list[str], django_guilds: dict[str, Any], member_name: str, dry_run: bool
     ) -> list[Any] | None:
-        """Resolve guild name strings to Django Guild objects, creating missing ones."""
-        from membership.models import Guild
-
+        """Resolve old guild name strings to current Django Guild objects via name mapping."""
         result = []
         for gn in guild_names:
             if not gn:
                 self.stdout.write(self.style.WARNING(f"  SKIP (blank guild name resolved from AT): {member_name}"))
                 return None
-            g = django_guilds.get(gn.lower())
+            resolved = OLD_TO_NEW_GUILD_NAME.get(gn.lower(), gn)
+            g = django_guilds.get(resolved.lower())
             if not g:
-                if dry_run:
-                    self.stdout.write(self.style.WARNING(f"  WOULD CREATE guild: {gn!r}"))
-                    return None
-                g, created = Guild.objects.get_or_create(name=gn)
-                if created:
-                    self.stdout.write(self.style.SUCCESS(f"  Created guild: {gn!r}"))
-                django_guilds[gn.lower()] = g
+                self.stdout.write(self.style.WARNING(f"  SKIP (no current guild for {gn!r}): {member_name}"))
+                return None
             result.append(g)
         return result

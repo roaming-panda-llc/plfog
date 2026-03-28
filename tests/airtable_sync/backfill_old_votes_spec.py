@@ -14,7 +14,7 @@ from tests.membership.factories import GuildFactory, MemberFactory, VotePreferen
 # Helpers
 # ---------------------------------------------------------------------------
 
-GUILD_ID_MAP = {"recAAA": "Woodworkers", "recBBB": "Metalworkers", "recCCC": "Tech Guild"}
+GUILD_ID_MAP = {"recAAA": "Woodworkers", "recBBB": "Metalworkers", "recCCC": "Art Framing"}
 
 
 def _at_guild_record(record_id: str, name: str) -> dict:
@@ -60,12 +60,12 @@ def describe_resolve_guild_names():
             "Guild Rankings Multiselect": ["recCCC", "recBBB", "recAAA"],
         }
         result = _resolve_guild_names(fields, GUILD_ID_MAP)
-        assert result == ["Woodworkers", "Metalworkers", "Tech Guild"]
+        assert result == ["Woodworkers", "Metalworkers", "Art Framing"]
 
     def it_falls_back_to_multiselect():
         fields = {"Guild Rankings Multiselect": ["recBBB", "recCCC", "recAAA"]}
         result = _resolve_guild_names(fields, GUILD_ID_MAP)
-        assert result == ["Metalworkers", "Tech Guild", "Woodworkers"]
+        assert result == ["Metalworkers", "Art Framing", "Woodworkers"]
 
     def it_returns_none_when_fewer_than_3():
         assert _resolve_guild_names({"Guild Rankings Multiselect": ["recAAA"]}, GUILD_ID_MAP) is None
@@ -124,9 +124,9 @@ def describe_backfill_old_votes_command():
     @pytest.fixture()
     def three_guilds(db):
         return (
-            GuildFactory(name="Woodworkers"),
-            GuildFactory(name="Metalworkers"),
-            GuildFactory(name="Tech Guild"),
+            GuildFactory(name="Woodworking Guild"),
+            GuildFactory(name="Metalworkers Guild"),
+            GuildFactory(name="Art Framing Guild"),
         )
 
     def it_creates_vote_preferences(three_guilds, settings):
@@ -231,13 +231,14 @@ def describe_backfill_old_votes_command():
 
         assert VotePreference.objects.count() == 0
 
-    def it_creates_missing_guild_and_vote_preference(db, settings):
-        from membership.models import Guild
-
-        MemberFactory(full_legal_name="New Member")
+    def it_maps_old_guild_names_to_current_names(db, settings):
+        GuildFactory(name="Woodworking Guild")
+        GuildFactory(name="Metalworkers Guild")
+        GuildFactory(name="Art Framing Guild")
+        member = MemberFactory(full_legal_name="Name Mapper")
 
         guild_records = [_at_guild_record(k, v) for k, v in GUILD_ID_MAP.items()]
-        vote_records = [_at_vote_record("New Member", ["recAAA", "recBBB", "recCCC"])]
+        vote_records = [_at_vote_record("Name Mapper", ["recAAA", "recBBB", "recCCC"])]
 
         with patch(
             "pyairtable.Api",
@@ -245,24 +246,24 @@ def describe_backfill_old_votes_command():
         ):
             call_command("backfill_old_votes")
 
-        assert Guild.objects.filter(name="Woodworkers").exists()
-        assert Guild.objects.filter(name="Metalworkers").exists()
-        assert Guild.objects.filter(name="Tech Guild").exists()
-        assert VotePreference.objects.count() == 1
+        vote = VotePreference.objects.get(member=member)
+        assert vote.guild_1st.name == "Woodworking Guild"
+        assert vote.guild_2nd.name == "Metalworkers Guild"
+        assert vote.guild_3rd.name == "Art Framing Guild"
 
-    def it_does_not_create_guild_in_dry_run(db, settings):
-        from membership.models import Guild
+    def it_skips_votes_with_no_current_guild_equivalent(db, settings):
+        GuildFactory(name="Woodworking Guild")
+        GuildFactory(name="Metalworkers Guild")
+        MemberFactory(full_legal_name="No Match")
 
-        MemberFactory(full_legal_name="New Member")
-
-        guild_records = [_at_guild_record(k, v) for k, v in GUILD_ID_MAP.items()]
-        vote_records = [_at_vote_record("New Member", ["recAAA", "recBBB", "recCCC"])]
+        old_guild_map = {"recAAA": "Woodworkers", "recBBB": "Metalworkers", "recXXX": "Some Defunct Guild"}
+        guild_records = [_at_guild_record(k, v) for k, v in old_guild_map.items()]
+        vote_records = [_at_vote_record("No Match", ["recAAA", "recBBB", "recXXX"])]
 
         with patch(
             "pyairtable.Api",
             return_value=_mock_api(guild_records, vote_records),
         ):
-            call_command("backfill_old_votes", dry_run=True)
+            call_command("backfill_old_votes")
 
-        assert Guild.objects.count() == 0
         assert VotePreference.objects.count() == 0
