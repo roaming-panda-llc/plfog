@@ -21,6 +21,7 @@ class ProfileSettingsForm(forms.ModelForm):
         model = Member
         fields = [
             "preferred_name",
+            "pronouns",
             "phone",
             "discord_handle",
             "other_contact_info",

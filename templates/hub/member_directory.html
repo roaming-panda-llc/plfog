@@ -17,6 +17,9 @@
                 {% endif %}
                 <div class="directory-card__meta">
                     <span class="directory-card__role">{{ member.get_member_type_display }}</span>
+                    {% if member.pronouns and member.pronouns != "prefer not to share" %}
+                    <span class="directory-card__pronouns">{{ member.pronouns }}</span>
+                    {% endif %}
                     {% if member.join_date %}
                     <span class="directory-card__joined">Joined {{ member.join_date|date:"N Y" }}</span>
                     {% endif %}
