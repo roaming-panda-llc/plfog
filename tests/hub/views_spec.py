@@ -119,7 +119,7 @@ def describe_member_directory():
 
 
     def it_shows_pronouns_in_directory(client: Client):
-        user = User.objects.create_user(username="viewer", password="pass")
+        User.objects.create_user(username="viewer", password="pass")
         MemberFactory(full_legal_name="Sam", show_in_directory=True, pronouns=Member.Pronouns.THEY_THEM)
         client.login(username="viewer", password="pass")
 
@@ -128,37 +128,13 @@ def describe_member_directory():
         assert "they/them" in response.content.decode()
 
     def it_hides_prefer_not_to_share_pronouns(client: Client):
-        user = User.objects.create_user(username="viewer2", password="pass")
+        User.objects.create_user(username="viewer2", password="pass")
         MemberFactory(full_legal_name="Alex", show_in_directory=True, pronouns=Member.Pronouns.PREFER_NOT)
         client.login(username="viewer2", password="pass")
 
         response = client.get("/members/")
 
         assert "prefer not to share" not in response.content.decode()
-
-
-@pytest.mark.django_db
-def describe_profile_settings():
-    def it_saves_pronouns(client: Client):
-        user = User.objects.create_user(username="member", password="pass")
-        member = user.member
-        client.login(username="member", password="pass")
-
-        client.post(
-            "/settings/profile/",
-            {
-                "preferred_name": "",
-                "pronouns": "she/her",
-                "phone": "",
-                "discord_handle": "",
-                "other_contact_info": "",
-                "about_me": "",
-                "show_in_directory": False,
-            },
-        )
-
-        member.refresh_from_db()
-        assert member.pronouns == "she/her"
 
 
 @pytest.mark.django_db
@@ -269,6 +245,27 @@ def describe_profile_settings():
 
         assert response.status_code == 200
         assert response.context["form"].errors
+
+    def it_saves_pronouns(client: Client):
+        user = User.objects.create_user(username="pronounuser", password="pass")
+        member = user.member
+        client.login(username="pronounuser", password="pass")
+
+        client.post(
+            "/settings/profile/",
+            {
+                "preferred_name": "",
+                "pronouns": "she/her",
+                "phone": "",
+                "discord_handle": "",
+                "other_contact_info": "",
+                "about_me": "",
+                "show_in_directory": False,
+            },
+        )
+
+        member.refresh_from_db()
+        assert member.pronouns == "she/her"
 
 
 @pytest.mark.django_db
