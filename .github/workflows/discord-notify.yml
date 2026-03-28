@@ -15,17 +15,24 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           curl -H "Content-Type: application/json" \
-            -d "{\"embeds\": [{\"title\": \"New PR: ${{ github.event.pull_request.title }}\", \"url\": \"${{ github.event.pull_request.html_url }}\", \"description\": \"Opened by ${{ github.event.pull_request.user.login }}\", \"color\": 5814783}]}" \
+            -d "$(jq -n --arg title "New PR: $PR_TITLE" --arg url "$PR_URL" --arg desc "Opened by $PR_AUTHOR" \
+              '{embeds: [{title: $title, url: $url, description: $desc, color: 5814783}]}')" \
             "$DISCORD_WEBHOOK_URL"
 
       - name: Notify Discord — Merged to main
         if: github.event_name == 'push'
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+          COMMIT_URL: ${{ github.event.head_commit.url }}
         run: |
-          COMMIT_MSG=$(echo '${{ github.event.head_commit.message }}' | head -1)
+          MSG=$(echo "$COMMIT_MSG" | head -1)
           curl -H "Content-Type: application/json" \
-            -d "{\"embeds\": [{\"title\": \"Merged to main\", \"url\": \"${{ github.event.head_commit.url }}\", \"description\": \"$COMMIT_MSG\", \"color\": 3066993}]}" \
+            -d "$(jq -n --arg title "Merged to main" --arg url "$COMMIT_URL" --arg desc "$MSG" \
+              '{embeds: [{title: $title, url: $url, description: $desc, color: 3066993}]}')" \
             "$DISCORD_WEBHOOK_URL"
