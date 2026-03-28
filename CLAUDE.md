@@ -30,6 +30,18 @@ Hetzner is **NOT production**. Render is production. Do not confuse these.
 
 All configuration via environment variables. See `plfog/settings.py` for available env vars.
 
+## Versioning & Changelog
+
+Every PR must bump the version in `plfog/version.py` and add a changelog entry. The changelog is the source of truth for Discord release announcements.
+
+- Version lives in `plfog/version.py` as `VERSION` and `CHANGELOG`
+- Changelog entries should be written in **plain, member-friendly language** — no technical jargon, PR numbers, or commit hashes. These get posted to the Discord channel as release announcements visible to all makerspace members.
+- The GitHub Actions workflow (`.github/workflows/discord-notify.yml`) reads the latest `CHANGELOG` entry on merge to main and posts it to Discord automatically.
+
+## Discord Notifications
+
+A GitHub Actions workflow posts to the Past Lives Discord channel when code is merged to main. It reads the latest changelog entry from `plfog/version.py` and posts a friendly release announcement. No notifications are sent for PR activity — only merged releases.
+
 ---
 
 # PLFOG Django Coding Standards
