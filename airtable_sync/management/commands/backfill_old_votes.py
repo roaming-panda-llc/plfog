@@ -153,7 +153,7 @@ class Command(BaseCommand):
                 stats["skipped_no_guild"] += 1
                 continue
 
-            guild_objs = self._lookup_guilds(guild_names, django_guilds, name, dry_run)
+            guild_objs = self._lookup_guilds(guild_names, django_guilds, name)
             if not guild_objs:
                 stats["skipped_no_guild"] += 1
                 continue
@@ -191,7 +191,7 @@ class Command(BaseCommand):
         return stats
 
     def _lookup_guilds(
-        self, guild_names: list[str], django_guilds: dict[str, Any], member_name: str, dry_run: bool
+        self, guild_names: list[str], django_guilds: dict[str, Any], member_name: str
     ) -> list[Any] | None:
         """Resolve old guild name strings to current Django Guild objects via name mapping."""
         result = []
