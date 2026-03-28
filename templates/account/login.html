@@ -13,7 +13,7 @@
         <form method="POST" action="{% url 'account_request_login_code' %}">
             {% csrf_token %}
             <label for="id_email">Email address</label>
-            <input type="email" name="email" id="id_email" required autofocus placeholder="you@example.com">
+            <input type="email" name="email" id="id_email" required autofocus placeholder="you@pastlives.space">
             <button type="submit" class="btn btn--primary btn--full">Send Login Code</button>
         </form>
         <div class="auth-links">

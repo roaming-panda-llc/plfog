@@ -230,3 +230,39 @@ def describe_backfill_old_votes_command():
             call_command("backfill_old_votes")
 
         assert VotePreference.objects.count() == 0
+
+    def it_creates_missing_guild_and_vote_preference(db, settings):
+        from membership.models import Guild
+
+        MemberFactory(full_legal_name="New Member")
+
+        guild_records = [_at_guild_record(k, v) for k, v in GUILD_ID_MAP.items()]
+        vote_records = [_at_vote_record("New Member", ["recAAA", "recBBB", "recCCC"])]
+
+        with patch(
+            "pyairtable.Api",
+            return_value=_mock_api(guild_records, vote_records),
+        ):
+            call_command("backfill_old_votes")
+
+        assert Guild.objects.filter(name="Woodworkers").exists()
+        assert Guild.objects.filter(name="Metalworkers").exists()
+        assert Guild.objects.filter(name="Tech Guild").exists()
+        assert VotePreference.objects.count() == 1
+
+    def it_does_not_create_guild_in_dry_run(db, settings):
+        from membership.models import Guild
+
+        MemberFactory(full_legal_name="New Member")
+
+        guild_records = [_at_guild_record(k, v) for k, v in GUILD_ID_MAP.items()]
+        vote_records = [_at_vote_record("New Member", ["recAAA", "recBBB", "recCCC"])]
+
+        with patch(
+            "pyairtable.Api",
+            return_value=_mock_api(guild_records, vote_records),
+        ):
+            call_command("backfill_old_votes", dry_run=True)
+
+        assert Guild.objects.count() == 0
+        assert VotePreference.objects.count() == 0

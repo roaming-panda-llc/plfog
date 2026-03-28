@@ -136,7 +136,7 @@ class Command(BaseCommand):
                 stats["skipped_no_guild"] += 1
                 continue
 
-            guild_objs = self._lookup_guilds(guild_names, django_guilds, name)
+            guild_objs = self._lookup_guilds(guild_names, django_guilds, name, dry_run)
             if not guild_objs:
                 stats["skipped_no_guild"] += 1
                 continue
@@ -174,14 +174,24 @@ class Command(BaseCommand):
         return stats
 
     def _lookup_guilds(
-        self, guild_names: list[str], django_guilds: dict[str, Any], member_name: str
+        self, guild_names: list[str], django_guilds: dict[str, Any], member_name: str, dry_run: bool
     ) -> list[Any] | None:
-        """Resolve guild name strings to Django Guild objects. Returns None on any miss."""
+        """Resolve guild name strings to Django Guild objects, creating missing ones."""
+        from membership.models import Guild
+
         result = []
         for gn in guild_names:
+            if not gn:
+                self.stdout.write(self.style.WARNING(f"  SKIP (blank guild name resolved from AT): {member_name}"))
+                return None
             g = django_guilds.get(gn.lower())
             if not g:
-                self.stdout.write(self.style.WARNING(f"  SKIP (guild not found: {gn!r}): {member_name}"))
-                return None
+                if dry_run:
+                    self.stdout.write(self.style.WARNING(f"  WOULD CREATE guild: {gn!r}"))
+                    return None
+                g, created = Guild.objects.get_or_create(name=gn)
+                if created:
+                    self.stdout.write(self.style.SUCCESS(f"  Created guild: {gn!r}"))
+                django_guilds[gn.lower()] = g
             result.append(g)
         return result
