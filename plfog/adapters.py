@@ -1,4 +1,4 @@
-"""Custom allauth adapter for auto-admin domain privileges and login redirect."""
+"""Custom allauth adapter and forms for auto-admin domain privileges and login redirect."""
 
 from __future__ import annotations
 
@@ -6,12 +6,15 @@ import logging
 from typing import Any
 
 from allauth.account.adapter import DefaultAccountAdapter
+from allauth.account.forms import RequestLoginCodeForm
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.http import HttpRequest
 from django.urls import reverse
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+User = get_user_model()
 
 
 class AdminRedirectAccountAdapter(DefaultAccountAdapter):
@@ -116,3 +119,25 @@ class AdminRedirectAccountAdapter(DefaultAccountAdapter):
         if member is not None:
             member.sync_user_permissions()
             logger.info("Permissions synced for %s (fog_role: %s)", email, member.fog_role)
+
+
+class AutoCreateUserLoginCodeForm(RequestLoginCodeForm):
+    """Extend the login-by-code form to auto-create a User for known Members.
+
+    When a member enters their email on the login page and no User exists,
+    but a Member record does exist (from Airtable sync or admin invite),
+    auto-create the User so they can receive a login code immediately.
+    The post_save signal (ensure_user_has_member) links the Member automatically.
+    """
+
+    def clean_email(self) -> str:
+        """Auto-create User for known Members, then run normal allauth lookup."""
+        from membership.models import Member
+
+        email: str = self.cleaned_data.get("email", "")
+        if email and not User.objects.filter(email__iexact=email).exists():
+            if Member.objects.filter(email__iexact=email, user__isnull=True).exists():
+                User.objects.create_user(username=email, email=email)
+                logger.info("Auto-created User for existing Member: %s", email)
+
+        return super().clean_email()

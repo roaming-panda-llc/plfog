@@ -164,7 +164,7 @@ AUTHENTICATION_BACKENDS = [
 # Allauth (v65+ format)
 ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*"]
-ACCOUNT_EMAIL_VERIFICATION = "optional"
+ACCOUNT_EMAIL_VERIFICATION = "none"
 ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_SESSION_REMEMBER = True
 
@@ -174,6 +174,7 @@ LOGOUT_REDIRECT_URL = "/"
 ACCOUNT_ADAPTER = "plfog.adapters.AdminRedirectAccountAdapter"
 
 ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
+ACCOUNT_FORMS = {"request_login_code": "plfog.adapters.AutoCreateUserLoginCodeForm"}
 
 # Login-by-code (passwordless email login)
 ACCOUNT_LOGIN_BY_CODE_ENABLED = True

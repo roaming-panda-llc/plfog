@@ -1,8 +1,11 @@
 import pytest
 from django.contrib.auth.models import User
+from django.template.loader import render_to_string
 
 from core.models import Invite, SiteConfiguration
+from membership.models import Member
 from plfog.version import VERSION
+from tests.membership.factories import MemberFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -100,3 +103,81 @@ def describe_signup_gating():
         assert response.status_code == 200
         template_names = [t.name for t in response.templates]
         assert "account/signup.html" in template_names
+
+
+def describe_auto_create_user_on_login():
+    def it_creates_user_when_member_exists_without_user(client):
+        MemberFactory(email="synced@example.com", user=None)
+
+        assert not User.objects.filter(email__iexact="synced@example.com").exists()
+
+        client.post("/accounts/login/code/", {"email": "synced@example.com"})
+
+        assert User.objects.filter(email__iexact="synced@example.com").exists()
+        user = User.objects.get(email__iexact="synced@example.com")
+        member = Member.objects.get(email="synced@example.com")
+        assert member.user == user
+
+    def it_does_not_create_user_when_no_member_exists(client):
+        client.post("/accounts/login/code/", {"email": "nobody@example.com"})
+
+        assert not User.objects.filter(email__iexact="nobody@example.com").exists()
+
+    def it_handles_empty_email(client):
+        resp = client.post("/accounts/login/code/", {"email": ""})
+        assert resp.status_code == 200  # re-renders form with errors
+
+    def it_does_not_duplicate_user_when_user_already_exists(client):
+        MemberFactory(email="existing@example.com")
+        User.objects.create_user(username="existing@example.com", email="existing@example.com")
+
+        client.post("/accounts/login/code/", {"email": "existing@example.com"})
+
+        assert User.objects.filter(email__iexact="existing@example.com").count() == 1
+
+
+def describe_email_templates():
+    def it_base_message_uses_past_lives_branding():
+        content = render_to_string("account/email/base_message.txt", {"current_site": None})
+        assert "Past Lives Makerspace" in content
+        assert "example.com" not in content
+
+    def it_unknown_account_txt_is_branded():
+        content = render_to_string(
+            "account/email/unknown_account_message.txt",
+            {"email": "test@test.com", "signup_url": "https://example.com/signup/"},
+        )
+        assert "Past Lives Makerspace" in content
+        assert "example.com" not in content.replace("https://example.com/signup/", "")
+
+    def it_unknown_account_html_is_branded():
+        content = render_to_string(
+            "account/email/unknown_account_message.html",
+            {"email": "test@test.com", "signup_url": "https://example.com/signup/"},
+        )
+        assert "Past Lives" in content
+        assert "No Account Found" in content
+
+    def it_unknown_account_subject_is_branded():
+        content = render_to_string("account/email/unknown_account_subject.txt")
+        assert "Past Lives" in content
+
+    def it_account_already_exists_txt_is_branded():
+        content = render_to_string(
+            "account/email/account_already_exists_message.txt",
+            {"email": "test@test.com", "password_reset_url": "#", "signup_url": "#"},
+        )
+        assert "Past Lives Makerspace" in content
+        assert "example.com" not in content
+
+    def it_account_already_exists_html_is_branded():
+        content = render_to_string(
+            "account/email/account_already_exists_message.html",
+            {"email": "test@test.com"},
+        )
+        assert "Past Lives" in content
+        assert "Account Already Exists" in content
+
+    def it_account_already_exists_subject_is_branded():
+        content = render_to_string("account/email/account_already_exists_subject.txt")
+        assert "Past Lives" in content

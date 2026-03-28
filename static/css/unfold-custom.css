@@ -536,6 +536,14 @@ body {
     color: #1D1E1E;
 }
 
+/* Force left-align on all admin tables (Unfold default can center) */
+#result_list th,
+#result_list td,
+.result-list th,
+.result-list td {
+    text-align: left !important;
+}
+
 /* Table — same as hub tables */
 .pl-admin-table {
     width: 100%;
