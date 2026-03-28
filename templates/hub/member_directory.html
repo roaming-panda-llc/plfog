@@ -54,22 +54,7 @@
             {% endif %}
         </div>
         {% endif %}
-        {% if can_manage_roles and member.pk != current_member.pk %}
-        <div class="directory-card__role-mgmt">
-            <span class="directory-card__contact-label">Role</span>
-            <form method="POST" action="{% url 'hub_set_member_role' member.pk %}" class="directory-card__role-form">
-                {% csrf_token %}
-                <select name="fog_role" class="directory-card__role-select">
-                    <option value="member" {% if member.fog_role == "member" %}selected{% endif %}>Member</option>
-                    <option value="guild_officer" {% if member.fog_role == "guild_officer" %}selected{% endif %}>Guild Officer</option>
-                    {% if current_member.is_fog_admin %}
-                    <option value="admin" {% if member.fog_role == "admin" %}selected{% endif %}>Admin</option>
-                    {% endif %}
-                </select>
-                <button type="submit" class="directory-card__role-btn">Update</button>
-            </form>
-        </div>
-        {% endif %}
+
     </div>
     {% endfor %}
 </div>
