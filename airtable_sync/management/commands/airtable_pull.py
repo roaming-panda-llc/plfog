@@ -102,6 +102,11 @@ class Command(BaseCommand):
             results["updated"] += 1
             return
 
+        if not email:
+            logger.info("Skipping Airtable record %s (no email): %s", record_id, django_kwargs.get("full_legal_name"))
+            results["skipped"] += 1
+            return
+
         if not dry_run and default_plan:
             django_kwargs["airtable_record_id"] = record_id
             django_kwargs["membership_plan"] = default_plan
