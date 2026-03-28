@@ -272,28 +272,30 @@
     {% if stats.top_guilds %}
     <div class="pl-card">
         <div class="pl-section-label">Current vote leaders</div>
-        <table class="pl-table">
-            <thead>
-                <tr>
-                    <th>Guild</th>
-                    <th class="text-right">1st</th>
-                    <th class="text-right">2nd</th>
-                    <th class="text-right">3rd</th>
-                    <th class="text-right">Points</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for guild in stats.top_guilds %}
-                <tr>
-                    <td>{{ guild.name }}</td>
-                    <td class="text-right">{{ guild.first }}</td>
-                    <td class="text-right">{{ guild.second }}</td>
-                    <td class="text-right">{{ guild.third }}</td>
-                    <td class="text-right font-semibold">{{ guild.points }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        {% for guild in stats.top_guilds %}
+        <div style="margin-bottom: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.3rem;">
+                <span style="font-weight: 500; font-size: 0.9375rem; color: #F4EFDD;">
+                    {% if forloop.first %}&#x1f947;{% elif forloop.counter == 2 %}&#x1f948;{% elif forloop.counter == 3 %}&#x1f949;{% endif %}
+                    {{ guild.name }}
+                </span>
+                <span style="font-size: 0.8125rem; color: #96ACBB;">
+                    {{ guild.points }} pts
+                    <span style="margin-left: 0.5rem; font-size: 0.75rem;">({{ guild.first }}/{{ guild.second }}/{{ guild.third }})</span>
+                </span>
+            </div>
+            <div style="background: rgba(255, 255, 255, 0.04); border-radius: 4px; height: 22px; overflow: hidden;">
+                <div style="
+                    width: {{ guild.bar_pct }}%;
+                    height: 100%;
+                    background: linear-gradient(90deg, #EEB44B, #d4a043);
+                    border-radius: 4px;
+                    transition: width 0.3s ease;
+                    min-width: {% if guild.points %}2px{% else %}0{% endif %};
+                "></div>
+            </div>
+        </div>
+        {% endfor %}
     </div>
     {% endif %}
 

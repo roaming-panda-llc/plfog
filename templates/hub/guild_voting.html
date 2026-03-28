@@ -106,6 +106,37 @@
 </div>
 {% endif %}
 
+{# --- Current Vote Standings --- #}
+{% if vote_standings %}
+<div class="hub-card" style="margin-bottom: 1.5rem;">
+    <h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem;">Current Vote Standings</h2>
+    <p class="hub-text-muted" style="margin-bottom: 1.25rem; font-size: 0.8rem;">
+        Live tally of all member votes this cycle.
+    </p>
+    {% for row in vote_standings %}
+    <div style="margin-bottom: 0.75rem;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.3rem;">
+            <span style="font-weight: 500; font-size: 0.9rem;">
+                {% if forloop.first %}&#x1f947;{% elif forloop.counter == 2 %}&#x1f948;{% elif forloop.counter == 3 %}&#x1f949;{% endif %}
+                {{ row.guild_name }}
+            </span>
+            <span class="hub-text-muted" style="font-size: 0.8rem;">{{ row.total_points }} pts</span>
+        </div>
+        <div style="background: var(--hub-input-bg, #0a1929); border-radius: 4px; height: 22px; overflow: hidden;">
+            <div style="
+                width: {{ row.bar_pct }}%;
+                height: 100%;
+                background: linear-gradient(90deg, var(--color-tuscan-yellow, #EEB44B), var(--color-yellow-hover, #d4a043));
+                border-radius: 4px;
+                transition: width 0.3s ease;
+                min-width: {% if row.total_points %}2px{% else %}0{% endif %};
+            "></div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
 {# --- Funding Results --- #}
 <div class="hub-card" style="margin-bottom: 1.5rem;">
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">

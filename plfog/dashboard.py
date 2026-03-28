@@ -45,6 +45,9 @@ def dashboard_callback(request: HttpRequest, context: dict) -> dict:
                 }
             )
     top_guilds.sort(key=lambda x: x["points"], reverse=True)
+    max_points = top_guilds[0]["points"] if top_guilds else 1
+    for entry in top_guilds:
+        entry["bar_pct"] = round(entry["points"] / max_points * 100, 1)
 
     last_snapshot = FundingSnapshot.objects.order_by("-snapshot_at").first()
 

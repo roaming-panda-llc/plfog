@@ -2,9 +2,19 @@
 
 from __future__ import annotations
 
-VERSION = "1.0.3"
+VERSION = "1.1.0"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.1.0",
+        "date": "2026-03-28",
+        "title": "Vote Standings & Discord Notifications",
+        "changes": [
+            "Live vote standings with bar charts on the guild voting page — see who's leading in real time",
+            "Admin voting dashboard now shows visual bar charts for vote leaders",
+            "Discord notifications — the team gets pinged when PRs are opened or code is merged to main",
+        ],
+    },
     {
         "version": "1.0.3",
         "date": "2026-03-28",

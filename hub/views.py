@@ -7,6 +7,7 @@ from typing import Any
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+from django.db.models import Count
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -51,6 +52,9 @@ def guild_voting(request: HttpRequest) -> HttpResponse:
 
     latest_snapshot = FundingSnapshot.objects.order_by("-snapshot_at").first()
 
+    # Live vote standings: tally points from all current VotePreference records
+    vote_standings = _compute_live_standings()
+
     if member is None:
         messages.info(request, "Your account is not linked to a membership.")
         return render(
@@ -63,6 +67,7 @@ def guild_voting(request: HttpRequest) -> HttpResponse:
                 "form": None,
                 "preference": None,
                 "latest_snapshot": latest_snapshot,
+                "vote_standings": vote_standings,
             },
         )
 
@@ -100,8 +105,37 @@ def guild_voting(request: HttpRequest) -> HttpResponse:
             "form": form,
             "preference": preference,
             "latest_snapshot": latest_snapshot,
+            "vote_standings": vote_standings,
         },
     )
+
+
+def _compute_live_standings() -> list[dict[str, Any]]:
+    """Tally live vote points from all current VotePreference records.
+
+    Returns a list of dicts sorted by total points descending:
+        [{"guild_name": str, "total_points": int, "bar_pct": float}, ...]
+    """
+    guilds = Guild.objects.filter(is_active=True).annotate(
+        first=Count("first_choice_votes"),
+        second=Count("second_choice_votes"),
+        third=Count("third_choice_votes"),
+    )
+
+    results = []
+    for g in guilds:
+        points = g.first * 5 + g.second * 3 + g.third * 2
+        if points > 0:
+            results.append({"guild_name": g.name, "total_points": points})
+
+    if not results:
+        return []
+
+    results.sort(key=lambda x: x["total_points"], reverse=True)
+    max_points = results[0]["total_points"]
+    for r in results:
+        r["bar_pct"] = round(r["total_points"] / max_points * 100, 1)
+    return results
 
 
 @login_required
