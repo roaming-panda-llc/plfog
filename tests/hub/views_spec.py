@@ -118,18 +118,47 @@ def describe_member_directory():
         assert len(members) == 2
 
 
-    def it_handles_invalid_role_value(client: Client):
-        user = User.objects.create_user(username="admin2", password="pass")
+    def it_shows_pronouns_in_directory(client: Client):
+        user = User.objects.create_user(username="viewer", password="pass")
+        MemberFactory(full_legal_name="Sam", show_in_directory=True, pronouns=Member.Pronouns.THEY_THEM)
+        client.login(username="viewer", password="pass")
+
+        response = client.get("/members/")
+
+        assert "they/them" in response.content.decode()
+
+    def it_hides_prefer_not_to_share_pronouns(client: Client):
+        user = User.objects.create_user(username="viewer2", password="pass")
+        MemberFactory(full_legal_name="Alex", show_in_directory=True, pronouns=Member.Pronouns.PREFER_NOT)
+        client.login(username="viewer2", password="pass")
+
+        response = client.get("/members/")
+
+        assert "prefer not to share" not in response.content.decode()
+
+
+@pytest.mark.django_db
+def describe_profile_settings():
+    def it_saves_pronouns(client: Client):
+        user = User.objects.create_user(username="member", password="pass")
         member = user.member
-        member.fog_role = Member.FogRole.ADMIN
-        member.save(update_fields=["fog_role"])
-        target = MemberFactory(fog_role=Member.FogRole.MEMBER)
-        client.login(username="admin2", password="pass")
+        client.login(username="member", password="pass")
 
-        client.post(f"/members/{target.pk}/set-role/", {"fog_role": "superadmin"}, follow=True)
+        client.post(
+            "/settings/profile/",
+            {
+                "preferred_name": "",
+                "pronouns": "she/her",
+                "phone": "",
+                "discord_handle": "",
+                "other_contact_info": "",
+                "about_me": "",
+                "show_in_directory": False,
+            },
+        )
 
-        target.refresh_from_db()
-        assert target.fog_role == Member.FogRole.MEMBER  # unchanged
+        member.refresh_from_db()
+        assert member.pronouns == "she/her"
 
 
 @pytest.mark.django_db
