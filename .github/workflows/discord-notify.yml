@@ -1,9 +1,6 @@
 name: Discord Notifications
 
 on:
-  pull_request:
-    types: [opened]
-    branches: [main]
   push:
     branches: [main]
 
@@ -11,28 +8,46 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Notify Discord — PR Opened
-        if: github.event_name == 'pull_request'
-        env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
-          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-        run: |
-          curl -H "Content-Type: application/json" \
-            -d "$(jq -n --arg title "New PR: $PR_TITLE" --arg url "$PR_URL" --arg desc "Opened by $PR_AUTHOR" \
-              '{embeds: [{title: $title, url: $url, description: $desc, color: 5814783}]}')" \
-            "$DISCORD_WEBHOOK_URL"
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Notify Discord — Merged to main
-        if: github.event_name == 'push'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Post release announcement to Discord
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          COMMIT_MSG: ${{ github.event.head_commit.message }}
-          COMMIT_URL: ${{ github.event.head_commit.url }}
         run: |
-          MSG=$(echo "$COMMIT_MSG" | head -1)
+          # Read the latest changelog entry from version.py
+          RELEASE_INFO=$(python3 -c "
+          import sys
+          sys.path.insert(0, '.')
+          from plfog.version import VERSION, CHANGELOG
+
+          entry = CHANGELOG[0]
+          title = entry['title']
+          changes = entry['changes']
+          bullets = '\n'.join(f'• {c}' for c in changes)
+          print(f'VERSION={VERSION}')
+          print(f'TITLE={title}')
+          print(f'BULLETS={bullets}')
+          ")
+
+          VERSION=$(echo "$RELEASE_INFO" | grep '^VERSION=' | cut -d= -f2-)
+          TITLE=$(echo "$RELEASE_INFO" | grep '^TITLE=' | cut -d= -f2-)
+          BULLETS=$(echo "$RELEASE_INFO" | sed -n '/^BULLETS=/,$ p' | cut -d= -f2-)
+
           curl -H "Content-Type: application/json" \
-            -d "$(jq -n --arg title "Merged to main" --arg url "$COMMIT_URL" --arg desc "$MSG" \
-              '{embeds: [{title: $title, url: $url, description: $desc, color: 3066993}]}')" \
+            -d "$(jq -n \
+              --arg title "New update: $TITLE" \
+              --arg changes "$BULLETS" \
+              --arg version "v$VERSION" \
+              '{embeds: [{
+                title: ("🚀 " + $title),
+                color: 3066993,
+                description: $changes,
+                footer: {text: ("Past Lives FOG " + $version)}
+              }]}')" \
             "$DISCORD_WEBHOOK_URL"
