@@ -117,7 +117,6 @@ def describe_member_directory():
         assert m2 in members
         assert len(members) == 2
 
-
     def it_shows_pronouns_in_directory(client: Client):
         User.objects.create_user(username="viewer", password="pass")
         MemberFactory(full_legal_name="Sam", show_in_directory=True, pronouns=Member.Pronouns.THEY_THEM)

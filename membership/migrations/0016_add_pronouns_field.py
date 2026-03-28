@@ -4,15 +4,30 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('membership', '0015_add_directory_profile_fields'),
+        ("membership", "0015_add_directory_profile_fields"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='member',
-            name='pronouns',
-            field=models.CharField(blank=True, choices=[('he/him', 'he/him'), ('she/her', 'she/her'), ('they/them', 'they/them'), ('he/they', 'he/they'), ('she/they', 'she/they'), ('he/she/they', 'he/she/they'), ('ze/hir', 'ze/hir'), ('xe/xem', 'xe/xem'), ('prefer not to share', 'Prefer not to share')], default='', help_text='Pronouns shown in the member directory.', max_length=30),
+            model_name="member",
+            name="pronouns",
+            field=models.CharField(
+                blank=True,
+                choices=[
+                    ("he/him", "he/him"),
+                    ("she/her", "she/her"),
+                    ("they/them", "they/them"),
+                    ("he/they", "he/they"),
+                    ("she/they", "she/they"),
+                    ("he/she/they", "he/she/they"),
+                    ("ze/hir", "ze/hir"),
+                    ("xe/xem", "xe/xem"),
+                    ("prefer not to share", "Prefer not to share"),
+                ],
+                default="",
+                help_text="Pronouns shown in the member directory.",
+                max_length=30,
+            ),
         ),
     ]

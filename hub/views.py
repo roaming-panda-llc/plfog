@@ -121,7 +121,6 @@ def member_directory(request: HttpRequest) -> HttpResponse:
     )
 
 
-
 @login_required
 def snapshot_history(request: HttpRequest) -> HttpResponse:
     """Funding snapshot history page — lists all past snapshots."""
