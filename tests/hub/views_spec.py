@@ -243,7 +243,7 @@ def describe_set_member_role():
         target = MemberFactory(fog_role=Member.FogRole.MEMBER)
         client.login(username="admin2", password="pass")
 
-        response = client.post(f"/members/{target.pk}/set-role/", {"fog_role": "superadmin"}, follow=True)
+        client.post(f"/members/{target.pk}/set-role/", {"fog_role": "superadmin"}, follow=True)
 
         target.refresh_from_db()
         assert target.fog_role == Member.FogRole.MEMBER  # unchanged
