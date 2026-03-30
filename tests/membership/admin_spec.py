@@ -105,6 +105,13 @@ def describe_MemberAdmin():
         assert "fog_role" not in membership_fields
 
 
+def describe_MemberEmailInline():
+    def it_is_attached_to_member_admin():
+        member_admin = admin.site._registry[Member]
+        inline_classes = [type(i) for i in member_admin.get_inline_instances(MagicMock())]
+        assert MemberEmailInline in inline_classes
+
+
 @pytest.mark.django_db
 def describe_admin_member_computed_fields():
     def it_displays_member_display_name():
