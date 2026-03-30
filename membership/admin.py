@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.utils.safestring import mark_safe
 from unfold.admin import ModelAdmin, TabularInline
 
+from .forms import MemberAdminForm
 from .models import FundingSnapshot, Guild, Member, MemberEmail, VotePreference
 
 
@@ -66,6 +67,7 @@ class HasUserFilter(admin.SimpleListFilter):
 @admin.register(Member)
 class MemberAdmin(ModelAdmin):
     change_list_template = "admin/membership/member/change_list.html"
+    form = MemberAdminForm
     inlines = [MemberEmailInline]
     list_display = [
         "display_name",
@@ -84,7 +86,7 @@ class MemberAdmin(ModelAdmin):
 
     def get_fieldsets(self, request: HttpRequest, obj: object = None) -> list[tuple[str, dict]]:
         """Build fieldsets dynamically — fog_role only visible to superusers."""
-        membership_fields = [
+        membership_fields: list[str] = [
             "membership_plan",
             "status",
             "member_type",
@@ -95,18 +97,25 @@ class MemberAdmin(ModelAdmin):
         if request.user.is_superuser:
             membership_fields.insert(3, "fog_role")
 
+        personal_fields: list[str] = [
+            "full_legal_name",
+            "preferred_name",
+            "email",
+            "phone",
+            "billing_name",
+        ]
+
+        # Show "user" link on edit, "create_user" checkbox on add
+        if obj is not None:
+            personal_fields.insert(0, "user")
+        else:
+            personal_fields.append("create_user")
+
         return [
             (
                 "Personal Info",
                 {
-                    "fields": [
-                        "user",
-                        "full_legal_name",
-                        "preferred_name",
-                        "email",
-                        "phone",
-                        "billing_name",
-                    ],
+                    "fields": personal_fields,
                 },
             ),
             (
@@ -132,6 +141,30 @@ class MemberAdmin(ModelAdmin):
                 },
             ),
         ]
+
+    def save_model(self, request: HttpRequest, obj: Member, form: MemberAdminForm, change: bool) -> None:
+        """Optionally create a User account when adding a new member with 'Create login' checked."""
+        create_user = form.cleaned_data.get("create_user", False)
+
+        if not change and create_user and obj.email:
+            from django.contrib.auth import get_user_model
+
+            UserModel = get_user_model()
+
+            # Save the member first (without a user)
+            super().save_model(request, obj, form, change)
+            # Create the user — the post_save signal will try to auto-link a member
+            user = UserModel.objects.create_user(username=obj.email, email=obj.email)
+            # Signal may have created a duplicate member or linked to wrong one.
+            # Delete any signal-created member and link ours.
+            from membership.models import Member as MemberModel
+
+            MemberModel.objects.filter(user=user).exclude(pk=obj.pk).delete()
+            obj.user = user
+            obj.save(update_fields=["user"])
+            obj.sync_user_permissions()
+        else:
+            super().save_model(request, obj, form, change)
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Member]:
         qs = super().get_queryset(request)
