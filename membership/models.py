@@ -323,7 +323,9 @@ class Member(models.Model):
 class MemberEmail(models.Model):
     """Additional email aliases for a member. The primary email stays on Member.email."""
 
-    member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name="emails")
+    member = models.ForeignKey(
+        Member, on_delete=models.CASCADE, related_name="emails", help_text="The member this email belongs to."
+    )
     email = models.EmailField(unique=True, help_text="An email address for this member.")
     is_primary = models.BooleanField(default=False, help_text="Primary email shown in lists.")
 

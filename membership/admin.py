@@ -144,7 +144,7 @@ class MemberAdmin(ModelAdmin):
 
     def save_model(self, request: HttpRequest, obj: Member, form: MemberAdminForm, change: bool) -> None:
         """Optionally create a User account when adding a new member with 'Create login' checked."""
-        create_user = form.cleaned_data.get("create_user", False)
+        create_user = form.cleaned_data["create_user"]
 
         if not change and create_user and obj.email:
             from django.contrib.auth import get_user_model
@@ -157,9 +157,7 @@ class MemberAdmin(ModelAdmin):
             user = UserModel.objects.create_user(username=obj.email, email=obj.email)
             # Signal may have created a duplicate member or linked to wrong one.
             # Delete any signal-created member and link ours.
-            from membership.models import Member as MemberModel
-
-            MemberModel.objects.filter(user=user).exclude(pk=obj.pk).delete()
+            Member.objects.filter(user=user).exclude(pk=obj.pk).delete()
             obj.user = user
             obj.save(update_fields=["user"])
             obj.sync_user_permissions()
