@@ -166,6 +166,18 @@ class MemberAdmin(ModelAdmin):
         else:
             super().save_model(request, obj, form, change)
 
+    def get_search_results(
+        self, request: HttpRequest, queryset: QuerySet[Member], search_term: str
+    ) -> tuple[QuerySet[Member], bool]:
+        queryset, use_distinct = super().get_search_results(request, queryset, search_term)
+        if search_term:
+            alias_member_ids = MemberEmail.objects.filter(email__icontains=search_term).values_list(
+                "member_id", flat=True
+            )
+            queryset = queryset | self.model.objects.filter(pk__in=alias_member_ids)
+            use_distinct = True
+        return queryset, use_distinct
+
     def get_queryset(self, request: HttpRequest) -> QuerySet[Member]:
         qs = super().get_queryset(request)
         return qs.select_related("membership_plan", "user")

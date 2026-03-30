@@ -410,6 +410,18 @@ def describe_admin_funding_snapshot_views():
 
 
 @pytest.mark.django_db
+def describe_admin_search_by_alias():
+    def it_finds_member_by_alias_email(admin_client):
+        from membership.models import MemberEmail
+
+        member = MemberFactory(full_legal_name="Alias Andy", email="primary@example.com")
+        MemberEmail.objects.create(member=member, email="secret@alias.com")
+        resp = admin_client.get("/admin/membership/member/?status=all&q=secret@alias.com")
+        content = resp.content.decode()
+        assert "Alias Andy" in content
+
+
+@pytest.mark.django_db
 def describe_admin_create_user_with_member():
     def it_creates_member_without_user_by_default(admin_client):
         plan = MembershipPlanFactory()
