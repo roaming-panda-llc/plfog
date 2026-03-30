@@ -316,6 +316,27 @@ class Member(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# MemberEmail
+# ---------------------------------------------------------------------------
+
+
+class MemberEmail(models.Model):
+    """Additional email aliases for a member. The primary email stays on Member.email."""
+
+    member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name="emails")
+    email = models.EmailField(unique=True, help_text="An email address for this member.")
+    is_primary = models.BooleanField(default=False, help_text="Primary email shown in lists.")
+
+    class Meta:
+        ordering = ["-is_primary", "email"]
+        verbose_name = "Email Alias"
+        verbose_name_plural = "Email Aliases"
+
+    def __str__(self) -> str:
+        return f"{self.email} ({self.member.display_name})"
+
+
+# ---------------------------------------------------------------------------
 # Guild
 # ---------------------------------------------------------------------------
 
