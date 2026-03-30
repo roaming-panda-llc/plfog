@@ -271,5 +271,5 @@ from allauth.account.models import EmailAddress  # noqa: E402
 for _model in (get_user_model(), EmailAddress):
     try:
         admin.site.unregister(_model)
-    except admin.sites.NotRegistered:
+    except admin.sites.NotRegistered:  # pragma: no cover
         pass
