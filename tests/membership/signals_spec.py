@@ -121,3 +121,26 @@ def describe_ensure_user_has_member():
         placeholder.refresh_from_db()
         assert placeholder.user == user
         assert placeholder.status == Member.Status.ACTIVE
+
+    def it_links_pre_created_member_by_alias_email():
+        from membership.models import MemberEmail
+
+        plan = MembershipPlanFactory()
+        member = MemberFactory(
+            user=None,
+            email="primary@example.com",
+            full_legal_name="Alias Person",
+            status=Member.Status.INVITED,
+            membership_plan=plan,
+        )
+        MemberEmail.objects.create(member=member, email="alias@example.com")
+
+        user = User.objects.create_user(
+            username="aliaslogin",
+            email="alias@example.com",
+            password="password",
+        )
+        member.refresh_from_db()
+        assert member.user == user
+        assert member.status == Member.Status.ACTIVE
+        assert Member.objects.filter(user=user).count() == 1

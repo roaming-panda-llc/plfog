@@ -18,7 +18,7 @@ User = get_user_model()
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def ensure_user_has_member(sender: type, instance: Any, **kwargs: Any) -> None:
     """Auto-create or link a Member record for any user who doesn't have one."""
-    from .models import Member, MembershipPlan
+    from .models import Member, MemberEmail, MembershipPlan
 
     try:
         instance.member
@@ -26,18 +26,31 @@ def ensure_user_has_member(sender: type, instance: Any, **kwargs: Any) -> None:
     except Member.DoesNotExist:
         pass
 
-    # Check for a pre-created Member from an invite (matched by email)
     email = getattr(instance, "email", "") or ""
     if email:
+        # Check primary email on Member
         try:
             member = Member.objects.get(email__iexact=email, user__isnull=True)
             member.user = instance
-            member.full_legal_name = instance.get_full_name() or instance.username
+            member.full_legal_name = instance.get_full_name() or member.full_legal_name or instance.username
             member.status = Member.Status.ACTIVE
             member.save(update_fields=["user", "full_legal_name", "status"])
-            logger.info("Linked existing Member (invite) to user %s.", instance.username)
+            logger.info("Linked existing Member (primary email) to user %s.", instance.username)
             return
         except Member.DoesNotExist:
+            pass
+
+        # Check email aliases
+        try:
+            alias = MemberEmail.objects.select_related("member").get(email__iexact=email, member__user__isnull=True)
+            member = alias.member
+            member.user = instance
+            member.full_legal_name = instance.get_full_name() or member.full_legal_name or instance.username
+            member.status = Member.Status.ACTIVE
+            member.save(update_fields=["user", "full_legal_name", "status"])
+            logger.info("Linked existing Member (alias email %s) to user %s.", email, instance.username)
+            return
+        except MemberEmail.DoesNotExist:
             pass
 
     # No pre-existing member found; create one

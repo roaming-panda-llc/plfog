@@ -132,12 +132,27 @@ class AutoCreateUserLoginCodeForm(RequestLoginCodeForm):
 
     def clean_email(self) -> str:
         """Auto-create User for known Members, then run normal allauth lookup."""
-        from membership.models import Member
+        from membership.models import Member, MemberEmail
 
         email: str = self.cleaned_data.get("email", "")
         if email and not User.objects.filter(email__iexact=email).exists():
+            # Check primary email on Member
             if Member.objects.filter(email__iexact=email, user__isnull=True).exists():
                 User.objects.create_user(username=email, email=email)
-                logger.info("Auto-created User for existing Member: %s", email)
+                logger.info("Auto-created User for existing Member (primary email): %s", email)
+            else:
+                # Check email aliases
+                try:
+                    alias = MemberEmail.objects.select_related("member").get(
+                        email__iexact=email, member__user__isnull=True
+                    )
+                    User.objects.create_user(username=email, email=email)
+                    logger.info(
+                        "Auto-created User for existing Member (alias email): %s -> %s",
+                        email,
+                        alias.member.display_name,
+                    )
+                except MemberEmail.DoesNotExist:
+                    pass
 
         return super().clean_email()
