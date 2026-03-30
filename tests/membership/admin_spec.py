@@ -31,6 +31,18 @@ from tests.membership.factories import (
 User = get_user_model()
 
 
+def describe_hidden_admin_pages():
+    def it_does_not_register_user_admin():
+        from django.contrib.auth import get_user_model
+
+        assert get_user_model() not in admin.site._registry
+
+    def it_does_not_register_emailaddress_admin():
+        from allauth.account.models import EmailAddress
+
+        assert EmailAddress not in admin.site._registry
+
+
 def describe_admin_registration():
     def it_registers_member():
         assert Member in admin.site._registry

@@ -245,3 +245,19 @@ class VotePreferenceAdmin(ModelAdmin):
 class FundingSnapshotAdmin(ModelAdmin):
     list_display = ["cycle_label", "snapshot_at", "contributor_count", "funding_pool"]
     readonly_fields = ["snapshot_at", "results"]
+
+
+# ---------------------------------------------------------------------------
+# Hide default User and EmailAddress admin pages
+# ---------------------------------------------------------------------------
+
+# Hide default User admin and allauth EmailAddress admin — members page is the
+# single interface for user management.
+from django.contrib.auth import get_user_model  # noqa: E402
+from allauth.account.models import EmailAddress  # noqa: E402
+
+for _model in (get_user_model(), EmailAddress):
+    try:
+        admin.site.unregister(_model)
+    except admin.sites.NotRegistered:
+        pass
