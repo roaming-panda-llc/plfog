@@ -5,9 +5,20 @@ from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.utils import timezone
 from django.utils.safestring import mark_safe
-from unfold.admin import ModelAdmin
+from unfold.admin import ModelAdmin, TabularInline
 
-from .models import FundingSnapshot, Guild, Member, VotePreference
+from .models import FundingSnapshot, Guild, Member, MemberEmail, VotePreference
+
+
+# ---------------------------------------------------------------------------
+# MemberEmail Inline
+# ---------------------------------------------------------------------------
+
+
+class MemberEmailInline(TabularInline):
+    model = MemberEmail
+    extra = 1
+    fields = ["email", "is_primary"]
 
 
 # ---------------------------------------------------------------------------
@@ -35,9 +46,27 @@ class ActiveStatusFilter(admin.SimpleListFilter):
         return queryset.filter(status=self.value())
 
 
+class HasUserFilter(admin.SimpleListFilter):
+    """Filter to show only members with linked User accounts (i.e., they've logged in)."""
+
+    title = "account type"
+    parameter_name = "has_user"
+
+    def lookups(self, request: HttpRequest, model_admin: ModelAdmin) -> list[tuple[str, str]]:  # type: ignore[override]
+        return [
+            ("yes", "Users — members who have logged into this web app"),
+        ]
+
+    def queryset(self, request: HttpRequest, queryset: QuerySet[Member]) -> QuerySet[Member]:
+        if self.value() == "yes":
+            return queryset.filter(user__isnull=False)
+        return queryset
+
+
 @admin.register(Member)
 class MemberAdmin(ModelAdmin):
     change_list_template = "admin/membership/member/change_list.html"
+    inlines = [MemberEmailInline]
     list_display = [
         "display_name",
         "email",
@@ -48,7 +77,7 @@ class MemberAdmin(ModelAdmin):
         "last_login_display",
     ]
     list_display_links = ["display_name"]
-    list_filter = [ActiveStatusFilter, "member_type"]
+    list_filter = [ActiveStatusFilter, HasUserFilter, "member_type"]
     search_fields = ["full_legal_name", "preferred_name", "email"]
     list_per_page = 100
     ordering = ["full_legal_name"]

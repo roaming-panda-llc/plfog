@@ -7,11 +7,15 @@ from django.test import Client
 
 from django.utils import timezone
 
+from unittest.mock import MagicMock
+
 from membership.admin import (
     ActiveStatusFilter,
     FundingSnapshotAdmin,
     GuildAdmin,
+    HasUserFilter,
     MemberAdmin,
+    MemberEmailInline,
     PayingMemberFilter,
     VotePreferenceAdmin,
 )
@@ -69,6 +73,7 @@ def describe_MemberAdmin():
     def it_has_expected_list_filter():
         member_admin = admin.site._registry[Member]
         assert member_admin.list_filter[0] is ActiveStatusFilter
+        assert HasUserFilter in member_admin.list_filter
         assert "member_type" in member_admin.list_filter
 
     def it_has_list_per_page_set():
@@ -179,6 +184,29 @@ def describe_active_status_filter():
         content = resp.content.decode()
         assert "Active Al" not in content
         assert "Former Fred" in content
+
+
+@pytest.mark.django_db
+def describe_has_user_filter():
+    def it_shows_all_members_by_default(admin_client):
+        MemberFactory(full_legal_name="No User Nancy", user=None)
+        user = User.objects.create_user(username="hasuser", email="hasuser@example.com")
+        user.member.full_legal_name = "Has User Helen"
+        user.member.save()
+        resp = admin_client.get("/admin/membership/member/?status=all")
+        content = resp.content.decode()
+        assert "No User Nancy" in content
+        assert "Has User Helen" in content
+
+    def it_shows_only_users_when_users_filter_selected(admin_client):
+        MemberFactory(full_legal_name="No User Nancy", user=None)
+        user = User.objects.create_user(username="hasuser2", email="hasuser2@example.com")
+        user.member.full_legal_name = "Has User Helen"
+        user.member.save()
+        resp = admin_client.get("/admin/membership/member/?status=all&has_user=yes")
+        content = resp.content.decode()
+        assert "No User Nancy" not in content
+        assert "Has User Helen" in content
 
 
 def describe_GuildAdmin():
