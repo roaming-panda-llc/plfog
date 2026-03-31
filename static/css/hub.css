@@ -835,7 +835,7 @@ a:hover { color: var(--color-yellow-hover); }
         transition: transform 0.25s ease;
     }
 
-    .hub-sidebar.open { transform: translateX(0); }
+    .hub-sidebar:not(.hub-sidebar--closed) { transform: translateX(0); }
 
     .hub-main-wrapper { margin-left: 0; }
 
