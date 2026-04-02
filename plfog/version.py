@@ -28,6 +28,14 @@ CHANGELOG: list[dict[str, str | list[str]]] = [
         ],
     },
     {
+        "version": "1.1.2",
+        "date": "2026-03-30",
+        "title": "Mobile Sidebar Fix",
+        "changes": [
+            "Fixed the sidebar menu button not working on Android phones — the side menu now opens and closes properly on mobile",
+        ],
+    },
+    {
         "version": "1.1.1",
         "date": "2026-03-28",
         "title": "Better Discord Announcements",
