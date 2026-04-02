@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, TypedDict
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -14,6 +14,12 @@ from django.shortcuts import get_object_or_404, redirect, render
 from hub.forms import BetaFeedbackForm, EmailPreferencesForm, ProfileSettingsForm, VotePreferenceForm
 from membership.cycle import get_cycle_context
 from membership.models import FundingSnapshot, Guild, Member, VotePreference
+
+
+class VoteStanding(TypedDict, total=False):
+    guild_name: str
+    total_points: int
+    bar_pct: float
 
 
 def _get_hub_context(request: HttpRequest) -> dict[str, Any]:
@@ -110,7 +116,7 @@ def guild_voting(request: HttpRequest) -> HttpResponse:
     )
 
 
-def _compute_live_standings() -> list[dict[str, Any]]:
+def _compute_live_standings() -> list[VoteStanding]:
     """Tally live vote points from all current VotePreference records.
 
     Returns a list of dicts sorted by total points descending:
@@ -122,19 +128,19 @@ def _compute_live_standings() -> list[dict[str, Any]]:
         third=Count("third_choice_votes"),
     )
 
-    results: list[dict[str, str | int | float]] = []
+    results: list[VoteStanding] = []
     for g in guilds:
         points = g.first * 5 + g.second * 3 + g.third * 2
         if points > 0:
-            results.append({"guild_name": g.name, "total_points": points})
+            results.append(VoteStanding(guild_name=g.name, total_points=points))
 
     if not results:
         return []
 
-    results.sort(key=lambda x: int(x["total_points"]), reverse=True)
-    max_points = int(results[0]["total_points"])
+    results.sort(key=lambda x: x["total_points"], reverse=True)
+    max_points = results[0]["total_points"]
     for r in results:
-        r["bar_pct"] = round(int(r["total_points"]) / max_points * 100, 1)
+        r["bar_pct"] = round(r["total_points"] / max_points * 100, 1)
     return results
 
 
