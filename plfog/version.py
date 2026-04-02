@@ -2,9 +2,19 @@
 
 from __future__ import annotations
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.2.1",
+        "date": "2026-04-01",
+        "title": "Mobile Sidebar Fix",
+        "changes": [
+            "Fixed the sidebar on mobile — it now slides open as a drawer with a dark backdrop you can tap to close",
+            "Sidebar starts closed on mobile so you get the full screen for content",
+            "Tapping a nav link on mobile automatically closes the sidebar",
+        ],
+    },
     {
         "version": "1.2.0",
         "date": "2026-03-30",
