@@ -2,9 +2,41 @@
 
 from __future__ import annotations
 
-VERSION = "1.2.1"
+VERSION = "1.4.0"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.4.0",
+        "date": "2026-04-02",
+        "title": "Multi-Stripe Connect",
+        "changes": [
+            "Guild Stripe accounts can now be connected via Stripe Connect — each guild receives their share of charges directly",
+            "New product catalog — admins create products tied to guilds, and charges route to the right Stripe account automatically",
+            "Members can pick products when adding to their tab — price and routing are automatic",
+            "Optional platform fee per guild — a percentage of each charge stays with the makerspace",
+            "Billing engine now creates separate charges per destination guild",
+            "New admin pages for managing Stripe accounts and products",
+        ],
+    },
+    {
+        "version": "1.3.0",
+        "date": "2026-04-02",
+        "title": "Tab Billing System",
+        "changes": [
+            "New tab system — charges accumulate on your tab and get billed on a schedule, just like a bar tab",
+            "See your tab balance at a glance with the new balance pill in the top bar",
+            "My Tab page shows your pending charges, tab limit, and remaining balance",
+            "Tab History page shows all past charges with itemized details you can expand",
+            "Add items to your own tab with the self-service form",
+            "Set up a payment method securely through Stripe — your card info never touches our server",
+            "Automated billing engine charges tabs on a configurable schedule (daily, weekly, or monthly)",
+            "Failed charges automatically retry up to 3 times before locking the tab",
+            "Email receipts after every successful charge with an itemized breakdown",
+            "Admins get a Payments Dashboard with outstanding balances, failed charges, and quick-add",
+            "Admins can configure billing schedule, tab limits, and retry settings",
+            "All financial records are preserved forever — entries are voided, never deleted",
+        ],
+    },
     {
         "version": "1.2.1",
         "date": "2026-04-01",

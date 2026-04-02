@@ -11,3 +11,4 @@ sentry-sdk>=2.0
 Pillow>=10.0
 Faker>=33.0
 pyairtable>=3.0
+stripe>=11.0

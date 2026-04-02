@@ -1,0 +1,87 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Payments Dashboard{% endblock %}
+{% block content_title %}<h1>Payments Dashboard</h1>{% endblock %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+    <div style="background: var(--body-bg, #fff); border: 1px solid var(--border-color, #ddd); border-radius: 8px; padding: 1.25rem;">
+        <div style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Total Outstanding</div>
+        <div style="font-size: 1.5rem; font-weight: 700;">${{ total_outstanding }}</div>
+    </div>
+    <div style="background: var(--body-bg, #fff); border: 1px solid var(--border-color, #ddd); border-radius: 8px; padding: 1.25rem;">
+        <div style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Collected This Month</div>
+        <div style="font-size: 1.5rem; font-weight: 700;">${{ collected_this_month }}</div>
+    </div>
+    <div style="background: var(--body-bg, #fff); border: 1px solid var(--border-color, #ddd); border-radius: 8px; padding: 1.25rem;">
+        <div style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Failed Charges</div>
+        <div style="font-size: 1.5rem; font-weight: 700;">{{ failed_count }}</div>
+    </div>
+    <div style="background: var(--body-bg, #fff); border: 1px solid var(--border-color, #ddd); border-radius: 8px; padding: 1.25rem;">
+        <div style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 0.25rem;">Locked Tabs</div>
+        <div style="font-size: 1.5rem; font-weight: 700;">{{ locked_count }}</div>
+    </div>
+</div>
+
+<div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+    <a href="{% url 'billing_admin_add_entry' %}" class="button" style="text-decoration: none;">+ Add Charge to Tab</a>
+    <a href="{% url 'admin:billing_billingsettings_changelist' %}" class="button" style="text-decoration: none;">Billing Settings</a>
+</div>
+
+{% if outstanding_tabs %}
+<h2>Outstanding Tabs</h2>
+<table style="width: 100%; border-collapse: collapse; margin-bottom: 2rem;">
+    <thead>
+        <tr>
+            <th style="text-align: left; padding: 0.5rem;">Member</th>
+            <th style="text-align: right; padding: 0.5rem;">Balance</th>
+            <th style="text-align: center; padding: 0.5rem;">Payment Method</th>
+            <th style="text-align: center; padding: 0.5rem;">Locked</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for tab in outstanding_tabs %}
+        <tr>
+            <td style="padding: 0.5rem;">
+                <a href="{% url 'admin:billing_tab_change' tab.pk %}">{{ tab.member.display_name }}</a>
+            </td>
+            <td style="padding: 0.5rem; text-align: right;">${{ tab.current_balance }}</td>
+            <td style="padding: 0.5rem; text-align: center;">
+                {% if tab.has_payment_method %}Yes{% else %}No{% endif %}
+            </td>
+            <td style="padding: 0.5rem; text-align: center;">
+                {% if tab.is_locked %}Locked{% else %}—{% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+{% if failed_charges %}
+<h2>Failed Charges</h2>
+<table style="width: 100%; border-collapse: collapse;">
+    <thead>
+        <tr>
+            <th style="text-align: left; padding: 0.5rem;">Member</th>
+            <th style="text-align: right; padding: 0.5rem;">Amount</th>
+            <th style="text-align: left; padding: 0.5rem;">Reason</th>
+            <th style="text-align: center; padding: 0.5rem;">Retries</th>
+            <th style="text-align: left; padding: 0.5rem;">Date</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for charge in failed_charges %}
+        <tr>
+            <td style="padding: 0.5rem;">{{ charge.tab.member.display_name }}</td>
+            <td style="padding: 0.5rem; text-align: right;">${{ charge.amount }}</td>
+            <td style="padding: 0.5rem;">{{ charge.failure_reason|truncatewords:10 }}</td>
+            <td style="padding: 0.5rem; text-align: center;">{{ charge.retry_count }}</td>
+            <td style="padding: 0.5rem;">{{ charge.created_at|date:"M j, Y" }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}

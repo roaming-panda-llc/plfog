@@ -1,0 +1,28 @@
+"""Template context processors for billing app."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from django.http import HttpRequest
+
+
+def tab_context(request: HttpRequest) -> dict[str, Any]:
+    """Add tab balance and status to template context for the balance pill."""
+    if not request.user.is_authenticated:
+        return {}
+
+    from membership.models import Member
+
+    member: Member | None = getattr(request.user, "member", None)
+    if member is None:
+        return {}
+
+    from billing.models import Tab
+
+    tab, _created = Tab.objects.get_or_create(member=member)
+    return {
+        "tab_balance": tab.current_balance,
+        "tab_is_locked": tab.is_locked,
+        "tab_has_payment_method": tab.has_payment_method,
+    }

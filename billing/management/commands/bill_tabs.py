@@ -169,7 +169,7 @@ class Command(BaseCommand):
         charges_to_process: list[tuple[TabCharge, str, int | None]] = []
 
         for guild_id, entries in groups.items():
-            group_total = sum(e.amount for e in entries)
+            group_total = sum((e.amount for e in entries), Decimal("0.00"))
             if group_total < Decimal("0.50"):
                 continue
 
@@ -251,23 +251,31 @@ class Command(BaseCommand):
     @staticmethod
     def _call_stripe(tab: Tab, charge: TabCharge, idempotency_key: str, fee_cents: int | None) -> dict[str, str]:
         """Dispatch to the appropriate Stripe payment intent creator."""
-        common = {
-            "customer_id": tab.stripe_customer_id,
-            "payment_method_id": tab.stripe_payment_method_id,
-            "amount_cents": int(charge.amount * 100),
-            "metadata": {"tab_id": str(tab.pk), "charge_id": str(charge.pk)},
-            "idempotency_key": f"tabcharge-{charge.pk}-{idempotency_key}",
-        }
+        customer_id = tab.stripe_customer_id
+        payment_method_id = tab.stripe_payment_method_id
+        amount_cents = int(charge.amount * 100)
+        description = f"Past Lives Makerspace tab — {charge.entry_count} items"
+        metadata = {"tab_id": str(tab.pk), "charge_id": str(charge.pk)}
+        idem_key = f"tabcharge-{charge.pk}-{idempotency_key}"
+
         if charge.stripe_account:
             return stripe_utils.create_destination_payment_intent(
-                **common,
-                description=f"Past Lives Makerspace tab — {charge.entry_count} items",
+                customer_id=customer_id,
+                payment_method_id=payment_method_id,
+                amount_cents=amount_cents,
+                description=description,
+                metadata=metadata,
+                idempotency_key=idem_key,
                 destination_account_id=charge.stripe_account.stripe_account_id,
                 application_fee_cents=fee_cents,
             )
         return stripe_utils.create_payment_intent(
-            **common,
-            description=f"Past Lives Makerspace tab — {charge.entry_count} items",
+            customer_id=customer_id,
+            payment_method_id=payment_method_id,
+            amount_cents=amount_cents,
+            description=description,
+            metadata=metadata,
+            idempotency_key=idem_key,
         )
 
     def _process_retries(self, settings: BillingSettings) -> int:

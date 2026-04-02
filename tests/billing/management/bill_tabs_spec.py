@@ -258,6 +258,29 @@ def describe_bill_tabs():
             charge = TabCharge.objects.get(tab=tab)
             assert charge.amount == Decimal("30.00")
 
+        @patch("billing.management.commands.bill_tabs.stripe_utils.create_payment_intent")
+        @patch("billing.management.commands.bill_tabs.send_receipt")
+        def it_skips_sub_minimum_guild_group_but_charges_platform(mock_receipt, mock_stripe):
+            mock_stripe.return_value = {
+                "id": "pi_plat",
+                "status": "succeeded",
+                "charge_id": "ch_plat",
+                "receipt_url": "",
+            }
+            BillingSettingsFactory()
+            guild = GuildFactory()
+            StripeAccountFactory(guild=guild, is_active=True)
+            product = ProductFactory(guild=guild, price=Decimal("0.25"))
+
+            member = MemberFactory(status="active")
+            tab = TabFactory(member=member, stripe_customer_id="cus_test", stripe_payment_method_id="pm_test")
+            TabEntryFactory(tab=tab, amount=Decimal("0.25"), product=product)  # Guild group: $0.25 (sub-minimum)
+            TabEntryFactory(tab=tab, amount=Decimal("5.00"))  # Platform group: $5.00
+
+            output = _call_bill_tabs(force=True)
+
+            assert "1 charged" in output  # Only platform group charged
+
         def describe_destination_routing():
             @patch("billing.management.commands.bill_tabs.stripe_utils.create_payment_intent")
             @patch("billing.management.commands.bill_tabs.stripe_utils.create_destination_payment_intent")

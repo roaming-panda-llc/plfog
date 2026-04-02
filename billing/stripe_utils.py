@@ -148,7 +148,7 @@ def create_destination_payment_intent(
         params["application_fee_amount"] = application_fee_cents
 
     intent = client.v1.payment_intents.create(
-        params=params,
+        params=params,  # type: ignore[arg-type]  # Dynamic params dict for Connect destination charges
         options={"idempotency_key": idempotency_key},
     )
     charge_id = ""
