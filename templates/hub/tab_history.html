@@ -1,0 +1,56 @@
+{% extends "hub/base.html" %}
+{% block title %}Tab History{% endblock %}
+
+{% block content %}
+<div class="tab-page-header">
+    <h1 class="hub-page-title">Tab History</h1>
+    <a href="{% url 'hub_tab_detail' %}" class="tab-history-link">Back to My Tab</a>
+</div>
+
+<div class="hub-card">
+    {% if charges %}
+    {% for charge in charges %}
+    <div class="tab-charge" x-data="{ expanded: false }">
+        <div class="tab-charge__header" @click="expanded = !expanded" style="cursor: pointer;">
+            <div class="tab-charge__info">
+                <span class="tab-charge__date">{{ charge.created_at|date:"M j, Y" }}</span>
+                <span class="tab-charge__status tab-charge__status--{{ charge.status }}">
+                    {{ charge.get_status_display }}
+                </span>
+                <span class="tab-charge__count">{{ charge.entry_count }} item{{ charge.entry_count|pluralize }}</span>
+                {% if charge.stripe_account %}
+                <span class="tab-charge__destination">→ {{ charge.stripe_account.display_name }}</span>
+                {% endif %}
+            </div>
+            <div class="tab-charge__amount">${{ charge.amount }}</div>
+        </div>
+        <div class="tab-charge__details" x-show="expanded" x-transition>
+            <table class="tab-table">
+                <thead>
+                    <tr>
+                        <th>Description</th>
+                        <th class="tab-table__right">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in charge.entries.all %}
+                    <tr>
+                        <td>{{ entry.description }}</td>
+                        <td class="tab-table__right">${{ entry.amount }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if charge.stripe_receipt_url %}
+            <a href="{{ charge.stripe_receipt_url }}" target="_blank" rel="noopener" class="tab-charge__receipt-link">
+                View Stripe Receipt
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <p class="hub-text-muted">No billing history yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

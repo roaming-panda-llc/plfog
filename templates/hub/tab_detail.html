@@ -1,0 +1,117 @@
+{% extends "hub/base.html" %}
+{% block title %}My Tab{% endblock %}
+
+{% block content %}
+<div class="tab-page-header">
+    <h1 class="hub-page-title">My Tab</h1>
+    <a href="{% url 'hub_tab_history' %}" class="tab-history-link">Tab History</a>
+</div>
+
+{% if tab is None %}
+<div class="hub-card">
+    <p class="hub-text-muted">Your account is not linked to a membership.</p>
+</div>
+{% else %}
+
+{# Status banners #}
+{% if tab.is_locked %}
+<div class="tab-banner tab-banner--error">
+    Your tab is locked: {{ tab.locked_reason|default:"Payment issue. Please contact an admin." }}
+</div>
+{% endif %}
+
+{% if not tab.has_payment_method %}
+<div class="tab-banner tab-banner--warning">
+    No payment method on file.
+    <a href="{% url 'billing_setup_payment_method' %}" style="color: inherit; text-decoration: underline;">Add a card</a>
+    before items can go on your tab.
+</div>
+{% endif %}
+
+{# Summary card #}
+<div class="hub-card tab-summary">
+    <div class="tab-summary__row">
+        <span class="tab-summary__label">Current Balance</span>
+        <span class="tab-summary__value tab-summary__value--balance">${{ tab.current_balance }}</span>
+    </div>
+    <div class="tab-summary__row">
+        <span class="tab-summary__label">Tab Limit</span>
+        <span class="tab-summary__value">${{ tab.effective_tab_limit }}</span>
+    </div>
+    <div class="tab-summary__row">
+        <span class="tab-summary__label">Remaining</span>
+        <span class="tab-summary__value">${{ tab.remaining_limit }}</span>
+    </div>
+    <div class="tab-summary__row">
+        <span class="tab-summary__label">Payment Method</span>
+        <span class="tab-summary__value">
+            {% if tab.has_payment_method %}
+            {{ tab.payment_method_brand|title }} ending in {{ tab.payment_method_last4 }}
+            (<a href="{% url 'billing_setup_payment_method' %}" class="tab-history-link">change</a>)
+            {% else %}
+            <a href="{% url 'billing_setup_payment_method' %}" class="tab-history-link">Add a card</a>
+            {% endif %}
+        </span>
+    </div>
+</div>
+
+{# Pending entries #}
+<div class="hub-card">
+    <h2 class="tab-section-title">Pending Charges</h2>
+    {% if entries %}
+    <table class="tab-table">
+        <thead>
+            <tr>
+                <th>Description</th>
+                <th class="tab-table__right">Amount</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in entries %}
+            <tr>
+                <td>{{ entry.description }}{% if entry.product %} <span class="tab-entry-guild">→ {{ entry.product.guild.name }}</span>{% endif %}</td>
+                <td class="tab-table__right">${{ entry.amount }}</td>
+                <td class="tab-table__date">{{ entry.created_at|date:"M j, Y" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="hub-text-muted">No pending charges.</p>
+    {% endif %}
+</div>
+
+{# Self-service add form #}
+{% if tab.can_add_entry %}
+<div class="hub-card">
+    <h2 class="tab-section-title">Add to Tab</h2>
+    <form method="post" class="tab-add-form">
+        {% csrf_token %}
+        <div class="tab-add-form__fields">
+            <div class="tab-add-form__field">
+                <label for="id_product">{{ form.product.label }}</label>
+                {{ form.product }}
+            </div>
+            <div class="tab-add-form__field">
+                <label for="id_description">{{ form.description.label }}</label>
+                {{ form.description }}
+                {% if form.description.errors %}
+                <span class="tab-form-error">{{ form.description.errors.0 }}</span>
+                {% endif %}
+            </div>
+            <div class="tab-add-form__field tab-add-form__field--amount">
+                <label for="id_amount">{{ form.amount.label }}</label>
+                {{ form.amount }}
+                {% if form.amount.errors %}
+                <span class="tab-form-error">{{ form.amount.errors.0 }}</span>
+                {% endif %}
+            </div>
+            <button type="submit" class="tab-add-form__btn">Add Item</button>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

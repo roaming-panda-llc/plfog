@@ -236,11 +236,13 @@ def admin_add_tab_entry(request: HttpRequest) -> HttpResponse:
         if form.is_valid():
             member = form.cleaned_data["member"]
             tab, _created = Tab.objects.get_or_create(member=member)
+            product = form.cleaned_data.get("product")
             TabEntry.objects.create(
                 tab=tab,
                 description=form.cleaned_data["description"],
                 amount=form.cleaned_data["amount"],
                 added_by=request.user,  # type: ignore[misc]  # @staff_member_required guarantees User
+                product=product,
             )
             django_messages.success(request, f"Added ${form.cleaned_data['amount']} to {member.display_name}'s tab.")
             return redirect("billing_admin_dashboard")

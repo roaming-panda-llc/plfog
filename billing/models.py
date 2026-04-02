@@ -315,6 +315,7 @@ class Tab(models.Model):
         amount: Decimal,
         added_by: User | None = None,
         is_self_service: bool = False,
+        product: Product | None = None,
     ) -> TabEntry:
         """Add a line item to this tab with race-condition protection.
 
@@ -350,6 +351,7 @@ class Tab(models.Model):
                 amount=amount,
                 added_by=added_by,
                 is_self_service=is_self_service,
+                product=product,
             )
 
     def lock(self, reason: str) -> None:

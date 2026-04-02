@@ -11,7 +11,9 @@ from django.db.models import Count
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
-from hub.forms import BetaFeedbackForm, EmailPreferencesForm, ProfileSettingsForm, VotePreferenceForm
+from billing.exceptions import NoPaymentMethodError, TabLimitExceededError, TabLockedError
+from billing.models import Product, Tab, TabCharge
+from hub.forms import AddTabEntryForm, BetaFeedbackForm, EmailPreferencesForm, ProfileSettingsForm, VotePreferenceForm
 from membership.cycle import get_cycle_context
 from membership.models import FundingSnapshot, Guild, Member, VotePreference
 
@@ -240,3 +242,62 @@ def beta_feedback(request: HttpRequest) -> HttpResponse:
         form = BetaFeedbackForm()
 
     return render(request, "hub/beta_feedback.html", {**ctx, "form": form})
+
+
+@login_required
+def tab_detail(request: HttpRequest) -> HttpResponse:
+    """My Tab page — shows current balance, pending entries, and self-service add form."""
+    member = _get_member(request)
+    ctx = _get_hub_context(request)
+
+    if member is None:
+        messages.info(request, "Your account is not linked to a membership.")
+        return render(request, "hub/tab_detail.html", {**ctx, "tab": None, "entries": [], "form": None})
+
+    tab, _created = Tab.objects.get_or_create(member=member)
+    entries = tab.entries.pending().select_related("product__guild").order_by("-created_at")
+    products = Product.objects.filter(is_active=True).select_related("guild").order_by("guild__name", "name")
+
+    if request.method == "POST":
+        form = AddTabEntryForm(request.POST)
+        if form.is_valid():
+            try:
+                tab.add_entry(
+                    description=form.cleaned_data["description"],
+                    amount=form.cleaned_data["amount"],
+                    added_by=request.user,
+                    is_self_service=True,
+                    product=form.cleaned_data.get("product"),
+                )
+                messages.success(request, "Item added to your tab.")
+                return redirect("hub_tab_detail")
+            except TabLockedError:
+                messages.error(request, "Your tab is locked. Please contact an admin.")
+            except NoPaymentMethodError:
+                messages.error(request, "Please add a payment method before adding items to your tab.")
+            except TabLimitExceededError:
+                messages.error(request, "This item would exceed your tab limit.")
+    else:
+        form = AddTabEntryForm()
+
+    return render(
+        request,
+        "hub/tab_detail.html",
+        {**ctx, "tab": tab, "entries": entries, "form": form, "products": products},
+    )
+
+
+@login_required
+def tab_history(request: HttpRequest) -> HttpResponse:
+    """Tab History page — shows past billing charges with expandable details."""
+    member = _get_member(request)
+    ctx = _get_hub_context(request)
+
+    if member is None:
+        messages.info(request, "Your account is not linked to a membership.")
+        return render(request, "hub/tab_history.html", {**ctx, "charges": []})
+
+    tab, _created = Tab.objects.get_or_create(member=member)
+    charges = tab.charges.exclude(status=TabCharge.Status.PENDING).order_by("-created_at").prefetch_related("entries")
+
+    return render(request, "hub/tab_history.html", {**ctx, "charges": charges})

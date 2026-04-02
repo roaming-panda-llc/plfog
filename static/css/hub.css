@@ -1151,3 +1151,245 @@ a:hover { color: var(--color-yellow-hover); }
     border-radius: 50%;
     background-color: var(--color-tuscan-yellow);
 }
+
+/* ========================================
+   Tab Balance Pill (topbar)
+   ======================================== */
+.pl-topbar__tab-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-family: var(--font-body);
+    color: var(--hub-text);
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    text-decoration: none;
+    margin-right: 0.5rem;
+    transition: background 150ms ease;
+}
+.pl-topbar__tab-pill:hover {
+    background: rgba(255,255,255,0.14);
+    color: var(--hub-text);
+}
+.pl-topbar__tab-pill--locked {
+    background: rgba(240, 100, 100, 0.2);
+    border-color: rgba(240, 100, 100, 0.4);
+    color: var(--color-error);
+}
+[data-theme="light"] .pl-topbar__tab-pill {
+    background: rgba(0,0,0,0.06);
+    border-color: rgba(0,0,0,0.12);
+    color: #333;
+}
+[data-theme="light"] .pl-topbar__tab-pill:hover {
+    background: rgba(0,0,0,0.1);
+    color: #333;
+}
+
+/* ========================================
+   Tab Pages
+   ======================================== */
+.tab-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+}
+.tab-page-header .hub-page-title { margin-bottom: 0; }
+
+.tab-history-link {
+    font-size: 0.85rem;
+    color: var(--color-tuscan-yellow);
+    text-decoration: none;
+}
+.tab-history-link:hover { text-decoration: underline; }
+
+/* Banners */
+.tab-banner {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+.tab-banner--error {
+    background: var(--color-error-bg);
+    color: var(--color-error);
+    border: 1px solid rgba(240, 160, 160, 0.25);
+}
+.tab-banner--warning {
+    background: rgba(238, 180, 75, 0.12);
+    color: var(--color-tuscan-yellow);
+    border: 1px solid rgba(238, 180, 75, 0.25);
+}
+
+/* Summary card */
+.tab-summary { margin-bottom: 1rem; }
+.tab-summary__row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+}
+.tab-summary__row + .tab-summary__row {
+    border-top: 1px solid var(--hub-topbar-border);
+}
+.tab-summary__label {
+    font-size: 0.9rem;
+    color: var(--hub-text-muted);
+}
+.tab-summary__value {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+.tab-summary__value--balance {
+    font-size: 1.1rem;
+    color: var(--color-tuscan-yellow);
+}
+
+/* Shared table */
+.tab-section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+.tab-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+.tab-table th {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--hub-topbar-border);
+    font-weight: 500;
+    color: var(--hub-text-muted);
+}
+.tab-table td {
+    padding: 0.5rem 0.75rem;
+}
+.tab-table__right { text-align: right; }
+.tab-table__date {
+    font-size: 0.8rem;
+    color: var(--hub-text-muted);
+}
+
+/* Add to Tab form */
+.tab-add-form__fields {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+.tab-add-form__field {
+    flex: 1;
+    min-width: 150px;
+}
+.tab-add-form__field--amount {
+    flex: 0 0 120px;
+    min-width: 100px;
+}
+.tab-add-form__field label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--hub-text-muted);
+    margin-bottom: 0.25rem;
+}
+.tab-add-form__field input {
+    width: 100%;
+    padding: 0.5rem 0.6rem;
+    background: var(--hub-input-bg);
+    border: 1px solid var(--hub-input-border);
+    border-radius: 6px;
+    color: var(--hub-text);
+    font-size: 0.85rem;
+}
+.tab-add-form__btn {
+    padding: 0.5rem 1rem;
+    background: var(--color-tuscan-yellow);
+    color: #1a1a2e;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.tab-add-form__btn:hover {
+    background: var(--color-yellow-hover);
+}
+.tab-form-error {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--color-error);
+    margin-top: 0.25rem;
+}
+
+/* Tab History — charge cards */
+.tab-charge {
+    border-bottom: 1px solid var(--hub-topbar-border);
+}
+.tab-charge:last-child { border-bottom: none; }
+.tab-charge__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+}
+.tab-charge__info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+.tab-charge__date {
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+.tab-charge__status {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    font-weight: 600;
+}
+.tab-charge__status--succeeded {
+    background: var(--color-success-bg);
+    color: var(--color-success);
+}
+.tab-charge__status--failed {
+    background: var(--color-error-bg);
+    color: var(--color-error);
+}
+.tab-charge__status--processing {
+    background: rgba(238, 180, 75, 0.12);
+    color: var(--color-tuscan-yellow);
+}
+.tab-charge__count {
+    font-size: 0.8rem;
+    color: var(--hub-text-muted);
+}
+.tab-charge__amount {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+.tab-charge__details {
+    padding: 0 0 0.75rem;
+}
+.tab-charge__receipt-link {
+    display: inline-block;
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--color-tuscan-yellow);
+    text-decoration: none;
+}
+.tab-charge__receipt-link:hover { text-decoration: underline; }
+.tab-entry-guild {
+    font-size: 0.75rem;
+    color: var(--hub-text-muted);
+    opacity: 0.8;
+}
+.tab-charge__destination {
+    font-size: 0.8rem;
+    color: var(--hub-text-muted);
+}
