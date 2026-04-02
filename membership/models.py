@@ -657,7 +657,7 @@ class Space(models.Model):
     def current_occupants(self) -> list[Member | Guild]:
         """Return all active tenants (Members and Guilds) for this space."""
         active = self.leases.filter(_active_lease_q()).select_related("content_type")
-        return [lease.tenant for lease in active]
+        return [t for lease in active if (t := lease.tenant) is not None]
 
     @property
     def vacancy_value(self) -> Decimal:

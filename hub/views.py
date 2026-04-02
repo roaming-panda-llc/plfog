@@ -122,7 +122,7 @@ def _compute_live_standings() -> list[dict[str, Any]]:
         third=Count("third_choice_votes"),
     )
 
-    results = []
+    results: list[dict[str, str | int | float]] = []
     for g in guilds:
         points = g.first * 5 + g.second * 3 + g.third * 2
         if points > 0:
@@ -131,10 +131,10 @@ def _compute_live_standings() -> list[dict[str, Any]]:
     if not results:
         return []
 
-    results.sort(key=lambda x: x["total_points"], reverse=True)
-    max_points = results[0]["total_points"]
+    results.sort(key=lambda x: int(x["total_points"]), reverse=True)
+    max_points = int(results[0]["total_points"])
     for r in results:
-        r["bar_pct"] = round(r["total_points"] / max_points * 100, 1)
+        r["bar_pct"] = round(int(r["total_points"]) / max_points * 100, 1)
     return results
 
 

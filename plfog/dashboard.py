@@ -31,7 +31,7 @@ def dashboard_callback(request: HttpRequest, context: dict) -> dict:
         .order_by("-first", "-second", "-third")
     )
 
-    top_guilds = []
+    top_guilds: list[dict[str, str | int | float]] = []
     for g in guilds:
         points = g.first * 5 + g.second * 3 + g.third * 2
         if points > 0:
@@ -44,10 +44,10 @@ def dashboard_callback(request: HttpRequest, context: dict) -> dict:
                     "points": points,
                 }
             )
-    top_guilds.sort(key=lambda x: x["points"], reverse=True)
-    max_points = top_guilds[0]["points"] if top_guilds else 1
+    top_guilds.sort(key=lambda x: int(x["points"]), reverse=True)
+    max_points = int(top_guilds[0]["points"]) if top_guilds else 1
     for entry in top_guilds:
-        entry["bar_pct"] = round(entry["points"] / max_points * 100, 1)
+        entry["bar_pct"] = round(int(entry["points"]) / max_points * 100, 1)
 
     last_snapshot = FundingSnapshot.objects.order_by("-snapshot_at").first()
 
