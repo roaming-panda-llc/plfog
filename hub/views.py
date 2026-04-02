@@ -265,7 +265,7 @@ def tab_detail(request: HttpRequest) -> HttpResponse:
                 tab.add_entry(
                     description=form.cleaned_data["description"],
                     amount=form.cleaned_data["amount"],
-                    added_by=request.user,
+                    added_by=request.user,  # type: ignore[arg-type]  # @login_required guarantees User
                     is_self_service=True,
                     product=form.cleaned_data.get("product"),
                 )
