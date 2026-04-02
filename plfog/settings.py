@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     "core",
     "hub",
     "membership",
+    "billing",
     "airtable_sync",
 ]
 
@@ -92,6 +93,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "core.context_processors.registration_mode",
                 "core.context_processors.app_version",
+                "billing.context_processors.tab_context",
             ],
         },
     },
@@ -218,6 +220,14 @@ BETA_FEEDBACK_EMAILS: list[str] = [
 AIRTABLE_API_TOKEN = os.environ.get("AIRTABLE_API_TOKEN", "")
 AIRTABLE_BASE_ID = os.environ.get("AIRTABLE_BASE_ID", "")
 AIRTABLE_SYNC_ENABLED = os.environ.get("AIRTABLE_SYNC_ENABLED", "false").lower() == "true"
+
+# Stripe — billing integration
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+
+if DEBUG and STRIPE_SECRET_KEY.startswith("sk_live"):
+    raise ValueError("DANGER: Live Stripe key detected in DEBUG mode. Use sk_test_ keys for development.")
 
 # Logging — ensure tracebacks reach stderr (captured by Render/Gunicorn)
 LOGGING = {
@@ -346,6 +356,53 @@ UNFOLD = {
                         "title": "Site Settings",
                         "icon": "settings",
                         "link": reverse_lazy("admin:core_siteconfiguration_changelist"),
+                        "permission": lambda request: request.user.is_superuser,
+                    },
+                ],
+            },
+            {
+                "title": "Billing",
+                "items": [
+                    {
+                        "title": "Payments Dashboard",
+                        "icon": "dashboard",
+                        "link": reverse_lazy("billing_admin_dashboard"),
+                        "permission": lambda request: request.user.is_superuser,
+                    },
+                    {
+                        "title": "Tabs",
+                        "icon": "receipt_long",
+                        "link": reverse_lazy("admin:billing_tab_changelist"),
+                        "permission": lambda request: request.user.is_superuser,
+                    },
+                    {
+                        "title": "Tab Entries",
+                        "icon": "list_alt",
+                        "link": reverse_lazy("admin:billing_tabentry_changelist"),
+                        "permission": lambda request: request.user.is_superuser,
+                    },
+                    {
+                        "title": "Tab Charges",
+                        "icon": "payments",
+                        "link": reverse_lazy("admin:billing_tabcharge_changelist"),
+                        "permission": lambda request: request.user.is_superuser,
+                    },
+                    {
+                        "title": "Billing Settings",
+                        "icon": "tune",
+                        "link": reverse_lazy("admin:billing_billingsettings_changelist"),
+                        "permission": lambda request: request.user.is_superuser,
+                    },
+                    {
+                        "title": "Stripe Accounts",
+                        "icon": "account_balance",
+                        "link": reverse_lazy("admin:billing_stripeaccount_changelist"),
+                        "permission": lambda request: request.user.is_superuser,
+                    },
+                    {
+                        "title": "Products",
+                        "icon": "inventory_2",
+                        "link": reverse_lazy("admin:billing_product_changelist"),
                         "permission": lambda request: request.user.is_superuser,
                     },
                 ],
