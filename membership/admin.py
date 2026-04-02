@@ -266,5 +266,6 @@ class FundingSnapshotAdmin(ModelAdmin):
 from django.contrib.auth import get_user_model  # noqa: E402
 from allauth.account.models import EmailAddress  # noqa: E402
 
-admin.site.unregister(get_user_model())
-admin.site.unregister(EmailAddress)
+for _model in (get_user_model(), EmailAddress):
+    if _model in admin.site._registry:
+        admin.site.unregister(_model)
