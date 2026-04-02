@@ -2,11 +2,22 @@
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 from django.db.models import Count
 from django.http import HttpRequest
 from django.utils import timezone
 
 from membership.models import FundingSnapshot, Guild, Member, VotePreference
+
+
+class GuildStanding(TypedDict, total=False):
+    name: str
+    first: int
+    second: int
+    third: int
+    points: int
+    bar_pct: float
 
 
 def dashboard_callback(request: HttpRequest, context: dict) -> dict:
@@ -31,18 +42,18 @@ def dashboard_callback(request: HttpRequest, context: dict) -> dict:
         .order_by("-first", "-second", "-third")
     )
 
-    top_guilds = []
+    top_guilds: list[GuildStanding] = []
     for g in guilds:
         points = g.first * 5 + g.second * 3 + g.third * 2
         if points > 0:
             top_guilds.append(
-                {
-                    "name": g.name,
-                    "first": g.first,
-                    "second": g.second,
-                    "third": g.third,
-                    "points": points,
-                }
+                GuildStanding(
+                    name=g.name,
+                    first=g.first,
+                    second=g.second,
+                    third=g.third,
+                    points=points,
+                )
             )
     top_guilds.sort(key=lambda x: x["points"], reverse=True)
     max_points = top_guilds[0]["points"] if top_guilds else 1

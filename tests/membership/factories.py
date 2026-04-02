@@ -12,6 +12,7 @@ from membership.models import (
     Guild,
     Lease,
     Member,
+    MemberEmail,
     MembershipPlan,
     Space,
     VotePreference,
@@ -35,6 +36,15 @@ class MemberFactory(factory.django.DjangoModelFactory):
     email = factory.Sequence(lambda n: f"member{n}@example.com")
     status = Member.Status.ACTIVE
     join_date = date(2024, 1, 1)
+
+
+class MemberEmailFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = MemberEmail
+
+    member = factory.SubFactory(MemberFactory)
+    email = factory.Sequence(lambda n: f"alias{n}@example.com")
+    is_primary = False
 
 
 class SpaceFactory(factory.django.DjangoModelFactory):

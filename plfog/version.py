@@ -2,9 +2,31 @@
 
 from __future__ import annotations
 
-VERSION = "1.1.2"
+VERSION = "1.2.1"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.2.1",
+        "date": "2026-04-01",
+        "title": "Mobile Sidebar Fix",
+        "changes": [
+            "Fixed the sidebar on mobile — it now slides open as a drawer with a dark backdrop you can tap to close",
+            "Sidebar starts closed on mobile so you get the full screen for content",
+            "Tapping a nav link on mobile automatically closes the sidebar",
+        ],
+    },
+    {
+        "version": "1.2.0",
+        "date": "2026-03-30",
+        "title": "Member Management Redesign",
+        "changes": [
+            "Admin Members page now lets you create users with a login right from the add form",
+            "Added email aliases — members can have multiple email addresses and log in with any of them",
+            "New 'Users' filter on the Members page to see who has logged into the app",
+            "Search now finds members by their alias emails too",
+            "Removed the separate User admin page — everything is managed through Members now",
+        ],
+    },
     {
         "version": "1.1.2",
         "date": "2026-03-30",

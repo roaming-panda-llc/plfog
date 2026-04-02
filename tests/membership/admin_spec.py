@@ -7,11 +7,15 @@ from django.test import Client
 
 from django.utils import timezone
 
+from unittest.mock import MagicMock
+
 from membership.admin import (
     ActiveStatusFilter,
     FundingSnapshotAdmin,
     GuildAdmin,
+    HasUserFilter,
     MemberAdmin,
+    MemberEmailInline,
     PayingMemberFilter,
     VotePreferenceAdmin,
 )
@@ -25,6 +29,18 @@ from tests.membership.factories import (
 )
 
 User = get_user_model()
+
+
+def describe_hidden_admin_pages():
+    def it_does_not_register_user_admin():
+        from django.contrib.auth import get_user_model
+
+        assert get_user_model() not in admin.site._registry
+
+    def it_does_not_register_emailaddress_admin():
+        from allauth.account.models import EmailAddress
+
+        assert EmailAddress not in admin.site._registry
 
 
 def describe_admin_registration():
@@ -69,6 +85,7 @@ def describe_MemberAdmin():
     def it_has_expected_list_filter():
         member_admin = admin.site._registry[Member]
         assert member_admin.list_filter[0] is ActiveStatusFilter
+        assert HasUserFilter in member_admin.list_filter
         assert "member_type" in member_admin.list_filter
 
     def it_has_list_per_page_set():
@@ -98,6 +115,40 @@ def describe_MemberAdmin():
         fieldsets = member_admin.get_fieldsets(request)
         membership_fields = fieldsets[1][1]["fields"]
         assert "fog_role" not in membership_fields
+
+    @pytest.mark.django_db
+    def it_shows_create_user_on_add_form():
+        from django.test import RequestFactory
+
+        rf = RequestFactory()
+        request = rf.get("/admin/membership/member/add/")
+        request.user = User(is_staff=True, is_superuser=True)
+        member_admin = admin.site._registry[Member]
+        fieldsets = member_admin.get_fieldsets(request)
+        personal_fields = fieldsets[0][1]["fields"]
+        assert "create_user" in personal_fields
+        assert "user" not in personal_fields
+
+    @pytest.mark.django_db
+    def it_shows_user_on_edit_form():
+        from django.test import RequestFactory
+
+        rf = RequestFactory()
+        request = rf.get("/admin/membership/member/1/change/")
+        request.user = User(is_staff=True, is_superuser=True)
+        member = MemberFactory()
+        member_admin = admin.site._registry[Member]
+        fieldsets = member_admin.get_fieldsets(request, obj=member)
+        personal_fields = fieldsets[0][1]["fields"]
+        assert "user" in personal_fields
+        assert "create_user" not in personal_fields
+
+
+def describe_MemberEmailInline():
+    def it_is_attached_to_member_admin():
+        member_admin = admin.site._registry[Member]
+        inline_classes = [type(i) for i in member_admin.get_inline_instances(MagicMock())]
+        assert MemberEmailInline in inline_classes
 
 
 @pytest.mark.django_db
@@ -179,6 +230,29 @@ def describe_active_status_filter():
         content = resp.content.decode()
         assert "Active Al" not in content
         assert "Former Fred" in content
+
+
+@pytest.mark.django_db
+def describe_has_user_filter():
+    def it_shows_all_members_by_default(admin_client):
+        MemberFactory(full_legal_name="No User Nancy", user=None)
+        user = User.objects.create_user(username="hasuser", email="hasuser@example.com")
+        user.member.full_legal_name = "Has User Helen"
+        user.member.save()
+        resp = admin_client.get("/admin/membership/member/?status=all")
+        content = resp.content.decode()
+        assert "No User Nancy" in content
+        assert "Has User Helen" in content
+
+    def it_shows_only_users_when_users_filter_selected(admin_client):
+        MemberFactory(full_legal_name="No User Nancy", user=None)
+        user = User.objects.create_user(username="hasuser2", email="hasuser2@example.com")
+        user.member.full_legal_name = "Has User Helen"
+        user.member.save()
+        resp = admin_client.get("/admin/membership/member/?status=all&has_user=yes")
+        content = resp.content.decode()
+        assert "No User Nancy" not in content
+        assert "Has User Helen" in content
 
 
 def describe_GuildAdmin():
@@ -333,3 +407,68 @@ def describe_admin_funding_snapshot_views():
         FundingSnapshotFactory()
         resp = admin_client.get("/admin/membership/fundingsnapshot/")
         assert resp.status_code == 200
+
+
+@pytest.mark.django_db
+def describe_admin_search_by_alias():
+    def it_finds_member_by_alias_email(admin_client):
+        from membership.models import MemberEmail
+
+        member = MemberFactory(full_legal_name="Alias Andy", email="primary@example.com")
+        MemberEmail.objects.create(member=member, email="secret@alias.com")
+        resp = admin_client.get("/admin/membership/member/?status=all&q=secret@alias.com")
+        content = resp.content.decode()
+        assert "Alias Andy" in content
+
+
+@pytest.mark.django_db
+def describe_admin_create_user_with_member():
+    def it_creates_member_without_user_by_default(admin_client):
+        plan = MembershipPlanFactory()
+        resp = admin_client.post(
+            "/admin/membership/member/add/",
+            {
+                "full_legal_name": "Test Person",
+                "email": "test@example.com",
+                "membership_plan": plan.pk,
+                "status": "active",
+                "member_type": "standard",
+                "fog_role": "member",
+                "create_user": "",
+                "emails-TOTAL_FORMS": "1",
+                "emails-INITIAL_FORMS": "0",
+                "emails-MIN_NUM_FORMS": "0",
+                "emails-MAX_NUM_FORMS": "1000",
+                "emails-0-email": "",
+                "emails-0-is_primary": "",
+            },
+        )
+        assert resp.status_code == 302
+        member = Member.objects.get(email="test@example.com")
+        assert member.user is None
+
+    def it_creates_member_with_user_when_checked(admin_client):
+        plan = MembershipPlanFactory()
+        resp = admin_client.post(
+            "/admin/membership/member/add/",
+            {
+                "full_legal_name": "Login Person",
+                "email": "login@example.com",
+                "membership_plan": plan.pk,
+                "status": "active",
+                "member_type": "employee",
+                "fog_role": "admin",
+                "create_user": "on",
+                "emails-TOTAL_FORMS": "1",
+                "emails-INITIAL_FORMS": "0",
+                "emails-MIN_NUM_FORMS": "0",
+                "emails-MAX_NUM_FORMS": "1000",
+                "emails-0-email": "",
+                "emails-0-is_primary": "",
+            },
+        )
+        assert resp.status_code == 302
+        member = Member.objects.get(email="login@example.com")
+        assert member.user is not None
+        assert member.user.email == "login@example.com"
+        assert member.user.username == "login@example.com"

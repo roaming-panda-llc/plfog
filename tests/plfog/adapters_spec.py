@@ -652,3 +652,25 @@ def describe_AdminRedirectAccountAdapter():
                 return_value=None,
             ):
                 adapter.pre_login(request, user, signup=True)  # Should not raise
+
+
+def describe_AutoCreateUserLoginCodeForm():
+    def describe_clean_email():
+        def it_auto_creates_user_for_member_with_alias_email():
+            from unittest.mock import patch
+
+            from membership.models import MemberEmail
+            from plfog.adapters import AutoCreateUserLoginCodeForm
+            from tests.membership.factories import MemberFactory
+
+            member = MemberFactory(user=None, email="primary@example.com")
+            MemberEmail.objects.create(member=member, email="alias@example.com")
+
+            form = AutoCreateUserLoginCodeForm(data={"email": "alias@example.com"})
+            form.cleaned_data = {"email": "alias@example.com"}
+            with patch.object(
+                AutoCreateUserLoginCodeForm.__bases__[0], "clean_email", return_value="alias@example.com"
+            ):
+                form.clean_email()
+
+            assert User.objects.filter(email__iexact="alias@example.com").exists()

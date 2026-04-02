@@ -316,6 +316,29 @@ class Member(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# MemberEmail
+# ---------------------------------------------------------------------------
+
+
+class MemberEmail(models.Model):
+    """Additional email aliases for a member. The primary email stays on Member.email."""
+
+    member = models.ForeignKey(
+        Member, on_delete=models.CASCADE, related_name="emails", help_text="The member this email belongs to."
+    )
+    email = models.EmailField(unique=True, help_text="An email address for this member.")
+    is_primary = models.BooleanField(default=False, help_text="Primary email shown in lists.")
+
+    class Meta:
+        ordering = ["-is_primary", "email"]
+        verbose_name = "Email Alias"
+        verbose_name_plural = "Email Aliases"
+
+    def __str__(self) -> str:
+        return f"{self.email} ({self.member.display_name})"
+
+
+# ---------------------------------------------------------------------------
 # Guild
 # ---------------------------------------------------------------------------
 
@@ -634,7 +657,7 @@ class Space(models.Model):
     def current_occupants(self) -> list[Member | Guild]:
         """Return all active tenants (Members and Guilds) for this space."""
         active = self.leases.filter(_active_lease_q()).select_related("content_type")
-        return [lease.tenant for lease in active]
+        return [t for lease in active if (t := lease.tenant) is not None]
 
     @property
     def vacancy_value(self) -> Decimal:
