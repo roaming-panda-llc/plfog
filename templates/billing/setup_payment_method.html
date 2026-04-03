@@ -41,6 +41,7 @@
         mode: 'setup',
         currency: 'usd',
         setupFutureUsage: 'off_session',
+        paymentMethodTypes: ['card'],
         appearance: {
             theme: 'night',
             variables: {
@@ -71,17 +72,24 @@
         }
 
         // 2. Create SetupIntent via our API (lazy — only on submit)
-        const intentResp = await fetch('{% url "billing_create_setup_intent" %}', {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': '{{ csrf_token }}',
-                'Content-Type': 'application/json'
+        let intentData;
+        try {
+            const intentResp = await fetch('{% url "billing_create_setup_intent" %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json'
+                }
+            });
+            intentData = await intentResp.json();
+            if (!intentResp.ok || intentData.error) {
+                errorEl.textContent = intentData.error || 'Unable to initialize payment setup. Please try again.';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save Card';
+                return;
             }
-        });
-        const intentData = await intentResp.json();
-
-        if (intentData.error) {
-            errorEl.textContent = intentData.error;
+        } catch (networkError) {
+            errorEl.textContent = 'Network error — please check your connection and try again.';
             submitBtn.disabled = false;
             submitBtn.textContent = 'Save Card';
             return;
