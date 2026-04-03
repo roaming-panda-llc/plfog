@@ -8,12 +8,20 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.db.models import Count
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseForbidden, HttpResponseNotAllowed
 from django.shortcuts import get_object_or_404, redirect, render
 
 from billing.exceptions import NoPaymentMethodError, TabLimitExceededError, TabLockedError
 from billing.models import Product, Tab, TabCharge
-from hub.forms import AddTabEntryForm, BetaFeedbackForm, EmailPreferencesForm, ProfileSettingsForm, VotePreferenceForm
+from hub.forms import (
+    AddTabEntryForm,
+    BetaFeedbackForm,
+    EmailPreferencesForm,
+    GuildPageForm,
+    GuildProductForm,
+    ProfileSettingsForm,
+    VotePreferenceForm,
+)
 from membership.cycle import get_cycle_context
 from membership.models import FundingSnapshot, Guild, Member, VotePreference
 
@@ -181,10 +189,102 @@ def snapshot_detail(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
-    """Guild detail page."""
+    """Guild detail page — shows about text, products, and guild lead info."""
     guild = get_object_or_404(Guild, pk=pk)
     ctx = _get_hub_context(request)
-    return render(request, "hub/guild_detail.html", {**ctx, "guild": guild})
+    products = guild.products.filter(is_active=True).order_by("name")
+    member = _get_member(request)
+    is_lead = (
+        member is not None
+        and guild.guild_lead is not None
+        and guild.guild_lead == member
+    )
+    return render(
+        request,
+        "hub/guild_detail.html",
+        {**ctx, "guild": guild, "products": products, "is_lead": is_lead},
+    )
+
+
+@login_required
+def guild_edit(request: HttpRequest, pk: int) -> HttpResponse:
+    """Guild edit page — guild lead edits about text and manages products."""
+    guild = get_object_or_404(Guild, pk=pk)
+    member = _get_member(request)
+
+    if member is None or guild.guild_lead is None or guild.guild_lead != member:
+        return HttpResponseForbidden()
+
+    ctx = _get_hub_context(request)
+    products = guild.products.filter(is_active=True).order_by("name")
+    page_form = GuildPageForm(instance=guild)
+    product_form = GuildProductForm()
+
+    if request.method == "POST":
+        if "add_product" in request.POST:
+            product_form = GuildProductForm(request.POST)
+            if product_form.is_valid():
+                p = product_form.save(commit=False)
+                p.guild = guild
+                p.created_by = request.user  # type: ignore[assignment]
+                p.save()
+                return redirect("hub_guild_edit", pk=guild.pk)
+        else:
+            page_form = GuildPageForm(request.POST, instance=guild)
+            if page_form.is_valid():
+                page_form.save()
+                return redirect("hub_guild_edit", pk=guild.pk)
+
+    return render(
+        request,
+        "hub/guild_edit.html",
+        {**ctx, "guild": guild, "products": products, "page_form": page_form, "product_form": product_form},
+    )
+
+
+@login_required
+def guild_product_edit(request: HttpRequest, pk: int, product_pk: int) -> HttpResponse:
+    """Edit a single product belonging to this guild."""
+    guild = get_object_or_404(Guild, pk=pk)
+    member = _get_member(request)
+
+    if member is None or guild.guild_lead is None or guild.guild_lead != member:
+        return HttpResponseForbidden()
+
+    product = get_object_or_404(Product, pk=product_pk, guild=guild)
+    ctx = _get_hub_context(request)
+
+    if request.method == "POST":
+        form = GuildProductForm(request.POST, instance=product)
+        if form.is_valid():
+            form.save()
+            return redirect("hub_guild_edit", pk=guild.pk)
+    else:
+        form = GuildProductForm(instance=product)
+
+    return render(
+        request,
+        "hub/guild_product_edit.html",
+        {**ctx, "guild": guild, "product": product, "form": form},
+    )
+
+
+@login_required
+def guild_product_remove(request: HttpRequest, pk: int, product_pk: int) -> HttpResponse:
+    """Soft-delete a product (sets is_active=False)."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+
+    guild = get_object_or_404(Guild, pk=pk)
+    member = _get_member(request)
+
+    if member is None or guild.guild_lead is None or guild.guild_lead != member:
+        return HttpResponseForbidden()
+
+    product = get_object_or_404(Product, pk=product_pk, guild=guild)
+    product.is_active = False
+    product.save(update_fields=["is_active"])
+    return redirect("hub_guild_edit", pk=guild.pk)
 
 
 @login_required

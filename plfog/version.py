@@ -2,36 +2,9 @@
 
 from __future__ import annotations
 
-VERSION = "1.5.0"
+VERSION = "1.3.0"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
-    {
-        "version": "1.5.0",
-        "date": "2026-04-02",
-        "title": "Payments Dashboard Redesign",
-        "changes": [
-            "Payments Dashboard is now a unified five-tab page — Overview, Open Tabs, History, Settings, and Stripe all in one place",
-            "Dark card design matches the rest of the admin — no more white-on-white cards",
-            "Click any member row to see their full tab detail — pending entries, charge history, and quick actions in a slide-up modal",
-            "Retry failed charges with a single click — no need to navigate away",
-            "History tab shows all charge records with filter chips (All, Succeeded, Failed, Needs Retry) and inline receipt links",
-            "Settings tab lets you edit billing schedule, tab limits, and retry settings without leaving the dashboard",
-            "Stripe tab manages connected accounts and the product catalog in one view",
-        ],
-    },
-    {
-        "version": "1.4.0",
-        "date": "2026-04-02",
-        "title": "Multi-Stripe Connect",
-        "changes": [
-            "Guild Stripe accounts can now be connected via Stripe Connect — each guild receives their share of charges directly",
-            "New product catalog — admins create products tied to guilds, and charges route to the right Stripe account automatically",
-            "Members can pick products when adding to their tab — price and routing are automatic",
-            "Optional platform fee per guild — a percentage of each charge stays with the makerspace",
-            "Billing engine now creates separate charges per destination guild",
-            "New admin pages for managing Stripe accounts and products",
-        ],
-    },
     {
         "version": "1.3.0",
         "date": "2026-04-02",
@@ -46,9 +19,12 @@ CHANGELOG: list[dict[str, str | list[str]]] = [
             "Automated billing engine charges tabs on a configurable schedule (daily, weekly, or monthly)",
             "Failed charges automatically retry up to 3 times before locking the tab",
             "Email receipts after every successful charge with an itemized breakdown",
-            "Admins get a Payments Dashboard with outstanding balances, failed charges, and quick-add",
-            "Admins can configure billing schedule, tab limits, and retry settings",
+            "Guild Stripe accounts can be connected via Stripe Connect — each guild receives their share of charges directly",
+            "Members can pick products when adding to their tab — price and description are filled in automatically",
+            "Unified Payments admin — one page for outstanding tabs, charge history, billing settings, and Stripe accounts",
             "All financial records are preserved forever — entries are voided, never deleted",
+            "Guild pages — each guild now has its own page with an about section and a list of products",
+            "Guild leads can edit their guild's about text and manage their product listings directly from the guild page",
         ],
     },
     {

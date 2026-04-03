@@ -1,0 +1,38 @@
+{% extends "hub/base.html" %}
+{% block title %}Edit Product — {{ guild.name }}{% endblock %}
+
+{% block content %}
+<div class="hub-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;">
+        <h1 class="hub-page-title" style="margin-bottom:0;">Edit Product</h1>
+        <a href="{% url 'hub_guild_edit' guild.pk %}" class="hub-btn">Back to Edit Page</a>
+    </div>
+
+    <form method="post" class="hub-form">
+        {% csrf_token %}
+        {% for field in form %}
+        <div class="hub-form-group">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}
+            <ul class="hub-field-errors">
+                {% for error in field.errors %}
+                <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% if form.non_field_errors %}
+        <ul class="hub-field-errors">
+            {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        <div style="margin-top:1.5rem;">
+            <button type="submit" class="hub-btn hub-btn--primary">Save Changes</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
