@@ -118,37 +118,6 @@ class VotePreferenceForm(forms.Form):
         return cleaned
 
 
-class GuildPageForm(forms.ModelForm):
-    """Form for guild leads to edit their guild's member-facing about/announcement text."""
-
-    class Meta:
-        model = Guild
-        fields = ["about"]
-        widgets = {
-            "about": forms.Textarea(attrs={"rows": 6, "placeholder": "Tell members what your guild is about..."}),
-        }
-        labels = {"about": "About / Announcements"}
-
-
-class GuildProductForm(forms.ModelForm):
-    """Form for guild leads to add or edit a product offered by their guild."""
-
-    class Meta:
-        model = Product
-        fields = ["name", "price"]
-        widgets = {
-            "name": forms.TextInput(attrs={"placeholder": "e.g. Laser Cutter — 30 min"}),
-            "price": forms.NumberInput(attrs={"placeholder": "0.00", "step": "0.01", "min": "0.01"}),
-        }
-        labels = {"name": "Product name", "price": "Price ($)"}
-
-    def clean_price(self) -> Decimal:
-        price: Decimal = self.cleaned_data["price"]
-        if price <= Decimal("0"):
-            raise forms.ValidationError("Price must be greater than zero.")
-        return price
-
-
 class AddTabEntryForm(forms.Form):
     """Self-service form for members to add items to their own tab."""
 

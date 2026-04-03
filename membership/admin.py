@@ -5,8 +5,11 @@ from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.utils import timezone
 from django.utils.safestring import mark_safe
+from django.http import HttpResponseRedirect
 from unfold.admin import ModelAdmin, TabularInline
+from unfold.decorators import action
 
+from billing.models import Product
 from .forms import MemberAdminForm
 from .models import FundingSnapshot, Guild, Member, MemberEmail, VotePreference
 
@@ -202,10 +205,43 @@ class MemberAdmin(ModelAdmin):
 # ---------------------------------------------------------------------------
 
 
+class GuildProductInline(TabularInline):
+    model = Product
+    fields = ["name", "price"]
+    extra = 1
+    show_change_link = False
+    template = "admin/membership/guild_product_inline.html"
+
+
 @admin.register(Guild)
 class GuildAdmin(ModelAdmin):
+    inlines = [GuildProductInline]
     list_display = ["name", "guild_lead", "notes_preview"]
     search_fields = ["name"]
+    autocomplete_fields = ["guild_lead"]
+    actions_detail = ["view_guild_page"]
+
+    @action(description="View Guild Page", icon="open_in_new")
+    def view_guild_page(self, request: HttpRequest, object_id: int) -> HttpResponseRedirect:
+        return HttpResponseRedirect(f"/guilds/{object_id}/")
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "guild_lead":
+            kwargs["empty_label"] = "Unassigned"
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
+        if db_field.name == "guild_lead" and hasattr(formfield, "widget"):
+            formfield.widget.can_add_related = False
+            formfield.widget.can_change_related = False
+            formfield.widget.can_delete_related = False
+            formfield.widget.can_view_related = False
+        return formfield
+
+    def response_change(self, request, obj):
+        from django.http import HttpResponseRedirect
+        return HttpResponseRedirect(request.path + "#pl-products-section")
 
     @admin.display(description="Notes")
     def notes_preview(self, obj: Guild) -> str:

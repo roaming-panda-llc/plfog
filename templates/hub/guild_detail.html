@@ -3,12 +3,7 @@
 
 {% block content %}
 <div class="hub-card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;">
-        <h1 class="hub-page-title" style="margin-bottom:0;">{{ guild.name }}</h1>
-        {% if is_lead %}
-        <a href="{% url 'hub_guild_edit' guild.pk %}" class="hub-btn hub-btn--primary">Edit Guild Page</a>
-        {% endif %}
-    </div>
+    <h1 class="hub-page-title">{{ guild.name }}</h1>
 
     <div class="hub-detail-section">
         <h3 class="hub-detail-label">About</h3>

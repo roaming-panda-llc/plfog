@@ -536,12 +536,24 @@ body {
     color: #1D1E1E;
 }
 
-/* Force left-align on all admin tables (Unfold default can center) */
+/* Force left-align on all admin tables */
 #result_list th,
 #result_list td,
 .result-list th,
 .result-list td {
     text-align: left !important;
+}
+
+/* Unfold wraps cell content in divs — override any Tailwind text-center inside */
+#result_list td > *,
+#result_list th > * {
+    text-align: left !important;
+}
+
+/* First-column link cells render as <th scope="row"> — override browser th default */
+.field-display_name,
+.field-name {
+    text-align: left;
 }
 
 /* Table — same as hub tables */
@@ -982,11 +994,27 @@ textarea:focus {
     font-size: 0.875rem;
     color: #e05555;
     text-decoration: none;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
     transition: color 0.15s ease;
 }
 
 .pl-admin-submit__delete:hover {
     color: #ff6b6b;
+}
+
+.hub-btn--danger {
+    background: #c0392b;
+    color: #fff;
+    border-color: #c0392b;
+}
+
+.hub-btn--danger:hover {
+    background: #e05555;
+    border-color: #e05555;
+    color: #fff;
 }
 
 /* Delete confirmation page */
@@ -1636,4 +1664,203 @@ textarea:focus {
     height: 5px;
     border-radius: 50%;
     background-color: #EEB44B;
+}
+
+/* ========================================
+   Guild Products Inline
+   ======================================== */
+
+.pl-products-section {
+    padding: 1.5rem;
+}
+
+.pl-products-title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #F4EFDD;
+    margin: 0 0 1rem;
+    letter-spacing: 0.01em;
+}
+
+.pl-products-table-wrap {
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+}
+
+.pl-products-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.pl-products-table thead th {
+    padding: 0.625rem 1rem;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #96ACBB;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.02);
+}
+
+.pl-products-table tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.pl-products-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.pl-products-table tbody tr:hover {
+    background: rgba(255,255,255,0.02);
+}
+
+.pl-products-table td {
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    color: #F4EFDD;
+    vertical-align: middle;
+}
+
+.pl-product-price {
+    color: #96ACBB;
+}
+
+.pl-product-actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.pl-product-badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.pl-product-badge--active {
+    background: rgba(52, 199, 89, 0.15);
+    color: #34c759;
+}
+
+.pl-product-badge--inactive {
+    background: rgba(150, 172, 187, 0.12);
+    color: #96ACBB;
+}
+
+.pl-product-btn {
+    display: inline-block;
+    padding: 0.3rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s ease, color 0.15s ease;
+    margin-left: 0.375rem;
+    border: none;
+}
+
+.pl-product-btn--edit {
+    background: rgba(238, 180, 75, 0.12);
+    color: #EEB44B;
+}
+
+.pl-product-btn--edit:hover {
+    background: rgba(238, 180, 75, 0.22);
+    color: #EEB44B;
+}
+
+.pl-product-btn--delete {
+    background: rgba(192, 57, 43, 0.12);
+    color: #e05555;
+}
+
+.pl-product-btn--delete:hover {
+    background: rgba(192, 57, 43, 0.22);
+    color: #ff6b6b;
+}
+
+.pl-products-empty {
+    padding: 1.5rem;
+    color: #96ACBB;
+    font-size: 0.875rem;
+    text-align: center;
+}
+
+/* Add Product form */
+.pl-add-product {
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 1.25rem;
+    background: rgba(255,255,255,0.015);
+}
+
+.pl-add-product__title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #96ACBB;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 0 0 1rem;
+}
+
+.pl-add-product__fields {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.pl-add-product__field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    flex: 1;
+    min-width: 140px;
+}
+
+.pl-add-product__field label {
+    font-size: 0.8125rem;
+    color: #96ACBB;
+    font-weight: 500;
+}
+
+.pl-add-product__field input {
+    background: #0A2035 !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    border-radius: 6px !important;
+    color: #F4EFDD !important;
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.875rem !important;
+    width: 100% !important;
+    transition: border-color 0.15s ease !important;
+}
+
+.pl-add-product__field input:focus {
+    border-color: #EEB44B !important;
+    outline: none !important;
+    box-shadow: 0 0 0 3px rgba(238,180,75,0.15) !important;
+}
+
+.pl-add-product__btn {
+    background: #EEB44B;
+    color: #092E4C;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    white-space: nowrap;
+}
+
+.pl-add-product__btn:hover {
+    background: #f5c86a;
 }
