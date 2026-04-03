@@ -685,7 +685,15 @@ class TabCharge(models.Model):
             self.stripe_receipt_url = result["receipt_url"]
             self.status = self.Status.SUCCEEDED
             self.charged_at = timezone.now()
-            self.save(update_fields=["stripe_payment_intent_id", "stripe_charge_id", "stripe_receipt_url", "status", "charged_at"])
+            self.save(
+                update_fields=[
+                    "stripe_payment_intent_id",
+                    "stripe_charge_id",
+                    "stripe_receipt_url",
+                    "status",
+                    "charged_at",
+                ]
+            )
             return True
         except Exception:
             self.status = self.Status.FAILED
