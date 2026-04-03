@@ -28,41 +28,49 @@
         By adding a payment method, you authorize Past Lives Makerspace to charge your card
         for accumulated tab balances on the billing schedule set by the organization.
     </p>
-    <div id="card-element" style="padding: 0.75rem; background: var(--hub-input-bg); border: 1px solid var(--hub-input-border); border-radius: 6px; margin-bottom: 1rem;"></div>
-    <div id="card-errors" class="tab-form-error" style="margin-bottom: 0.75rem;"></div>
-    <button id="submit-btn" class="tab-add-form__btn" disabled>Save Card</button>
+    <div id="payment-element" style="margin-bottom: 1rem;"></div>
+    <div id="payment-errors" class="tab-form-error" style="margin-bottom: 0.75rem;"></div>
+    <button id="submit-btn" class="tab-add-form__btn">Save Card</button>
 </div>
 
 <script src="https://js.stripe.com/v3/"></script>
 <script>
 (function() {
     const stripe = Stripe('{{ stripe_publishable_key }}');
-    const elements = stripe.elements();
-    const cardElement = elements.create('card', {
-        style: {
-            base: {
-                color: getComputedStyle(document.documentElement).getPropertyValue('--hub-text').trim() || '#F4EFDD',
+    const elements = stripe.elements({
+        mode: 'setup',
+        currency: 'usd',
+        setupFutureUsage: 'off_session',
+        appearance: {
+            theme: 'night',
+            variables: {
+                colorPrimary: '#3b82f6',
                 fontFamily: 'Inter, system-ui, sans-serif',
-                fontSize: '14px',
-                '::placeholder': { color: '#96ACBB' }
+                borderRadius: '6px',
             }
         }
     });
-    cardElement.mount('#card-element');
+    const paymentElement = elements.create('payment');
+    paymentElement.mount('#payment-element');
 
-    const errorEl = document.getElementById('card-errors');
+    const errorEl = document.getElementById('payment-errors');
     const submitBtn = document.getElementById('submit-btn');
-
-    cardElement.on('change', function(event) {
-        errorEl.textContent = event.error ? event.error.message : '';
-        submitBtn.disabled = !event.complete;
-    });
 
     submitBtn.addEventListener('click', async function() {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Saving...';
+        errorEl.textContent = '';
 
-        // 1. Create SetupIntent via our API
+        // 1. Validate fields and activate wallet if selected
+        const { error: submitError } = await elements.submit();
+        if (submitError) {
+            errorEl.textContent = submitError.message;
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Card';
+            return;
+        }
+
+        // 2. Create SetupIntent via our API (lazy — only on submit)
         const intentResp = await fetch('{% url "billing_create_setup_intent" %}', {
             method: 'POST',
             headers: {
@@ -79,9 +87,15 @@
             return;
         }
 
-        // 2. Confirm the SetupIntent with the card element
-        const { setupIntent, error } = await stripe.confirmCardSetup(intentData.client_secret, {
-            payment_method: { card: cardElement }
+        // 3. Confirm the SetupIntent with the payment element
+        // return_url is required by Stripe but only used for redirect-based payment
+        // methods (e.g. bank redirects) — cards and wallets stay in-page.
+        const returnUrl = window.location.origin + '{% url "billing_confirm_setup" %}';
+        const { setupIntent, error } = await stripe.confirmSetup({
+            elements,
+            clientSecret: intentData.client_secret,
+            confirmParams: { return_url: returnUrl },
+            redirect: 'if_required'
         });
 
         if (error) {
@@ -91,7 +105,7 @@
             return;
         }
 
-        // 3. POST the payment method ID to our confirm endpoint
+        // 4. POST the payment method ID to our confirm endpoint (same as before)
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = '{% url "billing_confirm_setup" %}';
