@@ -225,23 +225,21 @@ class GuildAdmin(ModelAdmin):
     def view_guild_page(self, request: HttpRequest, object_id: int) -> HttpResponseRedirect:
         return HttpResponseRedirect(f"/guilds/{object_id}/")
 
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "guild_lead":
+    def formfield_for_foreignkey(self, db_field: object, request: HttpRequest, **kwargs: object) -> object:  # type: ignore[override]
+        if db_field.name == "guild_lead":  # type: ignore[attr-defined]
             kwargs["empty_label"] = "Unassigned"
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)  # type: ignore[arg-type]
 
-    def formfield_for_dbfield(self, db_field, request, **kwargs):
-        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
-        if db_field.name == "guild_lead" and hasattr(formfield, "widget"):
+    def formfield_for_dbfield(self, db_field: object, request: HttpRequest, **kwargs: object) -> object:  # type: ignore[override]
+        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)  # type: ignore[arg-type]
+        if db_field.name == "guild_lead" and hasattr(formfield, "widget"):  # type: ignore[attr-defined]
             formfield.widget.can_add_related = False
             formfield.widget.can_change_related = False
             formfield.widget.can_delete_related = False
             formfield.widget.can_view_related = False
         return formfield
 
-    def response_change(self, request, obj):
-        from django.http import HttpResponseRedirect
-
+    def response_change(self, request: HttpRequest, obj: Guild) -> HttpResponseRedirect:  # type: ignore[override]
         return HttpResponseRedirect(request.path + "#pl-products-section")
 
     @admin.display(description="Notes")
