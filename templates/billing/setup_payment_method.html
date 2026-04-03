@@ -33,106 +33,124 @@
     <button id="submit-btn" class="tab-add-form__btn">Save Card</button>
 </div>
 
-<script src="https://js.stripe.com/v3/"></script>
 <script>
 (function() {
-    const stripe = Stripe('{{ stripe_publishable_key }}');
-    const elements = stripe.elements({
-        mode: 'setup',
-        currency: 'usd',
-        setupFutureUsage: 'off_session',
-        paymentMethodTypes: ['card'],
-        appearance: {
-            theme: 'night',
-            variables: {
-                colorPrimary: '#3b82f6',
-                fontFamily: 'Inter, system-ui, sans-serif',
-                borderRadius: '6px',
-            }
-        }
-    });
-    const paymentElement = elements.create('payment');
-    paymentElement.mount('#payment-element');
-
-    const errorEl = document.getElementById('payment-errors');
-    const submitBtn = document.getElementById('submit-btn');
-
-    submitBtn.addEventListener('click', async function() {
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Saving...';
-        errorEl.textContent = '';
-
-        // 1. Validate fields and activate wallet if selected
-        const { error: submitError } = await elements.submit();
-        if (submitError) {
-            errorEl.textContent = submitError.message;
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Save Card';
+    function init() {
+        const publishableKey = '{{ stripe_publishable_key }}';
+        if (!publishableKey) {
+            document.getElementById('payment-element').innerHTML =
+                '<p class="hub-text-muted">Payment setup is temporarily unavailable. Please try again later.</p>';
+            document.getElementById('submit-btn').style.display = 'none';
             return;
         }
 
-        // 2. Create SetupIntent via our API (lazy — only on submit)
-        let intentData;
-        try {
-            const intentResp = await fetch('{% url "billing_create_setup_intent" %}', {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': '{{ csrf_token }}',
-                    'Content-Type': 'application/json'
+        const stripe = Stripe(publishableKey);
+        const elements = stripe.elements({
+            mode: 'setup',
+            currency: 'usd',
+            setupFutureUsage: 'off_session',
+            paymentMethodTypes: ['card'],
+            appearance: {
+                theme: 'night',
+                variables: {
+                    colorPrimary: '#3b82f6',
+                    fontFamily: 'Inter, system-ui, sans-serif',
+                    borderRadius: '6px',
                 }
-            });
-            intentData = await intentResp.json();
-            if (!intentResp.ok || intentData.error) {
-                errorEl.textContent = intentData.error || 'Unable to initialize payment setup. Please try again.';
+            }
+        });
+        const paymentElement = elements.create('payment');
+        paymentElement.mount('#payment-element');
+
+        const errorEl = document.getElementById('payment-errors');
+        const submitBtn = document.getElementById('submit-btn');
+
+        submitBtn.addEventListener('click', async function() {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
+            errorEl.textContent = '';
+
+            // 1. Validate fields and activate wallet if selected
+            const { error: submitError } = await elements.submit();
+            if (submitError) {
+                errorEl.textContent = submitError.message;
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Save Card';
                 return;
             }
-        } catch (networkError) {
-            errorEl.textContent = 'Network error — please check your connection and try again.';
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Save Card';
-            return;
-        }
 
-        // 3. Confirm the SetupIntent with the payment element
-        // return_url is required by Stripe but only used for redirect-based payment
-        // methods (e.g. bank redirects) — cards and wallets stay in-page.
-        const returnUrl = window.location.origin + '{% url "billing_confirm_setup" %}';
-        const { setupIntent, error } = await stripe.confirmSetup({
-            elements,
-            clientSecret: intentData.client_secret,
-            confirmParams: { return_url: returnUrl },
-            redirect: 'if_required'
+            // 2. Create SetupIntent via our API (lazy — only on submit)
+            let intentData;
+            try {
+                const intentResp = await fetch('{% url "billing_create_setup_intent" %}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                intentData = await intentResp.json();
+                if (!intentResp.ok || intentData.error) {
+                    errorEl.textContent = intentData.error || 'Unable to initialize payment setup. Please try again.';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Save Card';
+                    return;
+                }
+            } catch (networkError) {
+                errorEl.textContent = 'Network error — please check your connection and try again.';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save Card';
+                return;
+            }
+
+            // 3. Confirm the SetupIntent with the payment element
+            // return_url is required by Stripe but only used for redirect-based payment
+            // methods (e.g. bank redirects) — cards and wallets stay in-page.
+            const returnUrl = window.location.origin + '{% url "billing_confirm_setup" %}';
+            const { setupIntent, error } = await stripe.confirmSetup({
+                elements,
+                clientSecret: intentData.client_secret,
+                confirmParams: { return_url: returnUrl },
+                redirect: 'if_required'
+            });
+
+            if (error) {
+                errorEl.textContent = error.message;
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save Card';
+                return;
+            }
+
+            // 4. POST the payment method ID to our confirm endpoint (same as before)
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{% url "billing_confirm_setup" %}';
+
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = '{{ csrf_token }}';
+            form.appendChild(csrfInput);
+
+            const pmInput = document.createElement('input');
+            pmInput.type = 'hidden';
+            pmInput.name = 'payment_method_id';
+            pmInput.value = setupIntent.payment_method;
+            form.appendChild(pmInput);
+
+            document.body.appendChild(form);
+            form.submit();
         });
+    }
 
-        if (error) {
-            errorEl.textContent = error.message;
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Save Card';
-            return;
-        }
-
-        // 4. POST the payment method ID to our confirm endpoint (same as before)
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '{% url "billing_confirm_setup" %}';
-
-        const csrfInput = document.createElement('input');
-        csrfInput.type = 'hidden';
-        csrfInput.name = 'csrfmiddlewaretoken';
-        csrfInput.value = '{{ csrf_token }}';
-        form.appendChild(csrfInput);
-
-        const pmInput = document.createElement('input');
-        pmInput.type = 'hidden';
-        pmInput.name = 'payment_method_id';
-        pmInput.value = setupIntent.payment_method;
-        form.appendChild(pmInput);
-
-        document.body.appendChild(form);
-        form.submit();
-    });
+    if (typeof Stripe !== 'undefined') {
+        init();
+    } else {
+        const script = document.createElement('script');
+        script.src = 'https://js.stripe.com/v3/';
+        script.onload = init;
+        document.head.appendChild(script);
+    }
 })();
 </script>
 {% endblock %}
