@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Any
 
 from django import forms
 
@@ -38,7 +39,7 @@ class AdminAddTabEntryForm(forms.Form):
         label="Amount ($)",
     )
 
-    def clean(self) -> dict:
+    def clean(self) -> dict[str, Any]:
         cleaned = super().clean() or {}
         product = cleaned.get("product")
         if product:

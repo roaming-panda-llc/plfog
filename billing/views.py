@@ -67,18 +67,8 @@ def create_setup_intent_api(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"error": "No membership found."}, status=400)
 
     tab, _created = Tab.objects.get_or_create(member=member)
-
-    # Ensure Stripe customer exists
-    if not tab.stripe_customer_id:
-        customer_id = stripe_utils.create_customer(
-            email=member.email,
-            name=member.display_name,
-            member_pk=member.pk,
-        )
-        tab.stripe_customer_id = customer_id
-        tab.save(update_fields=["stripe_customer_id"])
-
-    result = stripe_utils.create_setup_intent(customer_id=tab.stripe_customer_id)
+    customer_id = tab.get_or_create_stripe_customer()
+    result = stripe_utils.create_setup_intent(customer_id=customer_id)
     return JsonResponse(result)
 
 
@@ -98,26 +88,7 @@ def confirm_setup(request: HttpRequest) -> HttpResponse:
     if not payment_method_id:
         return redirect("billing_setup_payment_method")
 
-    # Attach to customer and retrieve details
-    if tab.stripe_customer_id:
-        stripe_utils.attach_payment_method(
-            customer_id=tab.stripe_customer_id,
-            payment_method_id=payment_method_id,
-        )
-
-    pm_details = stripe_utils.retrieve_payment_method(payment_method_id=payment_method_id)
-    tab.stripe_payment_method_id = pm_details["id"]
-    tab.payment_method_last4 = pm_details["last4"]
-    tab.payment_method_brand = pm_details["brand"]
-    tab.save(
-        update_fields=[
-            "stripe_payment_method_id",
-            "payment_method_last4",
-            "payment_method_brand",
-            "updated_at",
-        ]
-    )
-
+    tab.set_payment_method(payment_method_id)
     return redirect("hub_tab_detail")
 
 
@@ -132,21 +103,7 @@ def remove_payment_method(request: HttpRequest) -> HttpResponse:
         return redirect("hub_tab_detail")
 
     tab, _created = Tab.objects.get_or_create(member=member)
-
-    if tab.stripe_payment_method_id:
-        stripe_utils.detach_payment_method(payment_method_id=tab.stripe_payment_method_id)
-        tab.stripe_payment_method_id = ""
-        tab.payment_method_last4 = ""
-        tab.payment_method_brand = ""
-        tab.save(
-            update_fields=[
-                "stripe_payment_method_id",
-                "payment_method_last4",
-                "payment_method_brand",
-                "updated_at",
-            ]
-        )
-
+    tab.clear_payment_method()
     return redirect("hub_tab_detail")
 
 

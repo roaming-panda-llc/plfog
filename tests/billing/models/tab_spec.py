@@ -156,3 +156,80 @@ def describe_Tab():
             tab.refresh_from_db()
             assert tab.is_locked is False
             assert tab.locked_reason == ""
+
+    def describe_get_or_create_stripe_customer():
+        def it_returns_existing_customer_id_without_calling_stripe():
+            from unittest.mock import patch
+
+            tab = TabFactory(stripe_customer_id="cus_existing")
+            with patch("billing.stripe_utils.create_customer") as mock_create:
+                result = tab.get_or_create_stripe_customer()
+            assert result == "cus_existing"
+            mock_create.assert_not_called()
+
+        def it_creates_customer_when_none_exists():
+            from unittest.mock import patch
+
+            tab = TabFactory(stripe_customer_id="")
+            with patch("billing.stripe_utils.create_customer", return_value="cus_new") as mock_create:
+                result = tab.get_or_create_stripe_customer()
+            assert result == "cus_new"
+            mock_create.assert_called_once()
+            tab.refresh_from_db()
+            assert tab.stripe_customer_id == "cus_new"
+
+    def describe_set_payment_method():
+        def it_attaches_and_persists_payment_method_when_customer_exists():
+            from unittest.mock import patch
+
+            tab = TabFactory(stripe_customer_id="cus_123", stripe_payment_method_id="")
+            pm_details = {"id": "pm_new", "last4": "4242", "brand": "visa"}
+            with (
+                patch("billing.stripe_utils.attach_payment_method") as mock_attach,
+                patch("billing.stripe_utils.retrieve_payment_method", return_value=pm_details),
+            ):
+                tab.set_payment_method("pm_new")
+            mock_attach.assert_called_once_with(customer_id="cus_123", payment_method_id="pm_new")
+            tab.refresh_from_db()
+            assert tab.stripe_payment_method_id == "pm_new"
+            assert tab.payment_method_last4 == "4242"
+            assert tab.payment_method_brand == "visa"
+
+        def it_skips_attach_when_no_stripe_customer():
+            from unittest.mock import patch
+
+            tab = TabFactory(stripe_customer_id="", stripe_payment_method_id="")
+            pm_details = {"id": "pm_noattach", "last4": "9999", "brand": "mastercard"}
+            with (
+                patch("billing.stripe_utils.attach_payment_method") as mock_attach,
+                patch("billing.stripe_utils.retrieve_payment_method", return_value=pm_details),
+            ):
+                tab.set_payment_method("pm_noattach")
+            mock_attach.assert_not_called()
+            tab.refresh_from_db()
+            assert tab.stripe_payment_method_id == "pm_noattach"
+
+    def describe_clear_payment_method():
+        def it_detaches_and_clears_payment_fields():
+            from unittest.mock import patch
+
+            tab = TabFactory(
+                stripe_payment_method_id="pm_old",
+                payment_method_last4="1234",
+                payment_method_brand="visa",
+            )
+            with patch("billing.stripe_utils.detach_payment_method") as mock_detach:
+                tab.clear_payment_method()
+            mock_detach.assert_called_once_with(payment_method_id="pm_old")
+            tab.refresh_from_db()
+            assert tab.stripe_payment_method_id == ""
+            assert tab.payment_method_last4 == ""
+            assert tab.payment_method_brand == ""
+
+        def it_does_nothing_when_no_payment_method():
+            from unittest.mock import patch
+
+            tab = TabFactory(stripe_payment_method_id="")
+            with patch("billing.stripe_utils.detach_payment_method") as mock_detach:
+                tab.clear_payment_method()
+            mock_detach.assert_not_called()

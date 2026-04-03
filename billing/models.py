@@ -388,6 +388,59 @@ class Tab(models.Model):
         self.locked_reason = ""
         self.save(update_fields=["is_locked", "locked_reason", "updated_at"])
 
+    def get_or_create_stripe_customer(self) -> str:
+        """Return the Stripe Customer ID, creating one if it does not exist yet."""
+        from billing import stripe_utils as _stripe_utils
+
+        if not self.stripe_customer_id:
+            self.stripe_customer_id = _stripe_utils.create_customer(
+                email=self.member.email,
+                name=self.member.display_name,
+                member_pk=self.member.pk,
+            )
+            self.save(update_fields=["stripe_customer_id"])
+        return self.stripe_customer_id
+
+    def set_payment_method(self, payment_method_id: str) -> None:
+        """Attach a payment method to this tab's Stripe customer and persist the details."""
+        from billing import stripe_utils as _stripe_utils
+
+        if self.stripe_customer_id:
+            _stripe_utils.attach_payment_method(
+                customer_id=self.stripe_customer_id,
+                payment_method_id=payment_method_id,
+            )
+        pm_details = _stripe_utils.retrieve_payment_method(payment_method_id=payment_method_id)
+        self.stripe_payment_method_id = pm_details["id"]
+        self.payment_method_last4 = pm_details["last4"]
+        self.payment_method_brand = pm_details["brand"]
+        self.save(
+            update_fields=[
+                "stripe_payment_method_id",
+                "payment_method_last4",
+                "payment_method_brand",
+                "updated_at",
+            ]
+        )
+
+    def clear_payment_method(self) -> None:
+        """Detach the current payment method from Stripe and clear all payment fields."""
+        from billing import stripe_utils as _stripe_utils
+
+        if self.stripe_payment_method_id:
+            _stripe_utils.detach_payment_method(payment_method_id=self.stripe_payment_method_id)
+            self.stripe_payment_method_id = ""
+            self.payment_method_last4 = ""
+            self.payment_method_brand = ""
+            self.save(
+                update_fields=[
+                    "stripe_payment_method_id",
+                    "payment_method_last4",
+                    "payment_method_brand",
+                    "updated_at",
+                ]
+            )
+
 
 # ---------------------------------------------------------------------------
 # TabEntry
