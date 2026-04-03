@@ -357,6 +357,11 @@ class Guild(models.Model):
         related_name="led_guilds",
     )
     notes = models.TextField(blank=True)
+    about = models.TextField(
+        blank=True,
+        default="",
+        help_text="Member-facing description or announcement shown on the guild page.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     leases = GenericRelation(
         "Lease",
