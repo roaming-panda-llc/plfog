@@ -19,7 +19,7 @@ from django.views.decorators.http import require_POST
 
 from billing import stripe_utils, webhook_handlers
 from billing.forms import AdminAddTabEntryForm
-from billing.models import StripeAccount, Tab, TabCharge, TabEntry
+from billing.models import BillingSettings, StripeAccount, Tab, TabCharge, TabEntry
 
 logger = logging.getLogger(__name__)
 
@@ -251,6 +251,22 @@ def admin_add_tab_entry(request: HttpRequest) -> HttpResponse:
 
     context = {**admin.site.each_context(request), "form": form}
     return render(request, "billing/admin_add_entry.html", context)
+
+
+@staff_member_required
+@require_POST
+def billing_admin_save_settings(request: HttpRequest) -> HttpResponse:
+    """Save BillingSettings singleton from the Settings tab form."""
+    from billing.forms import BillingSettingsForm
+
+    settings_obj = BillingSettings.load()
+    form = BillingSettingsForm(request.POST, instance=settings_obj)
+    if form.is_valid():
+        form.save()
+        django_messages.success(request, "Billing settings saved.")
+    else:
+        django_messages.error(request, "Invalid settings — please check the form.")
+    return redirect("/billing/admin/dashboard/?tab=settings")
 
 
 @staff_member_required

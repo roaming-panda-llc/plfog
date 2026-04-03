@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth.models import User
 from django.test import Client
 
-from billing.models import Tab, TabCharge
-from tests.billing.factories import TabChargeFactory, TabEntryFactory, TabFactory
+from billing.models import BillingSettings, Tab, TabCharge
+from tests.billing.factories import BillingSettingsFactory, TabChargeFactory, TabEntryFactory, TabFactory
 from tests.membership.factories import MemberFactory
 
 pytestmark = pytest.mark.django_db
@@ -64,6 +66,57 @@ def describe_admin_tab_dashboard():
         response = client.get("/billing/admin/dashboard/")
 
         assert response.context["locked_count"] == 1
+
+
+def describe_billing_admin_save_settings():
+    def it_requires_staff(client: Client):
+        response = client.post("/billing/admin/save-settings/", {})
+        assert response.status_code == 302
+        assert "/accounts/login/" in response.url or "/admin/login/" in response.url
+
+    def it_saves_valid_settings_and_redirects(client: Client):
+        _create_superuser(client)
+        BillingSettingsFactory()
+
+        response = client.post("/billing/admin/save-settings/", {
+            "charge_frequency": "weekly",
+            "charge_time": "22:00",
+            "charge_day_of_week": "1",
+            "charge_day_of_month": "",
+            "default_tab_limit": "150.00",
+            "max_retry_attempts": "5",
+            "retry_interval_hours": "12",
+        })
+
+        assert response.status_code == 302
+        assert response.url == "/billing/admin/dashboard/?tab=settings"
+        settings = BillingSettings.load()
+        assert settings.charge_frequency == "weekly"
+        assert settings.max_retry_attempts == 5
+
+    def it_redirects_with_error_on_invalid_data(client: Client):
+        _create_superuser(client)
+        BillingSettingsFactory()
+
+        response = client.post("/billing/admin/save-settings/", {
+            "charge_frequency": "daily",
+            "charge_time": "23:00",
+            "charge_day_of_week": "",
+            "charge_day_of_month": "",
+            "default_tab_limit": "-50.00",
+            "max_retry_attempts": "3",
+            "retry_interval_hours": "24",
+        })
+
+        assert response.status_code == 302
+        assert "tab=settings" in response.url
+        settings = BillingSettings.load()
+        assert settings.default_tab_limit != Decimal("-50.00")
+
+    def it_only_accepts_post(client: Client):
+        _create_superuser(client)
+        response = client.get("/billing/admin/save-settings/")
+        assert response.status_code == 405
 
 
 def describe_admin_add_tab_entry():
