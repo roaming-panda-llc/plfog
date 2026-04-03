@@ -18,6 +18,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from billing import stripe_utils, webhook_handlers
+from billing.exceptions import NoPaymentMethodError, TabLimitExceededError, TabLockedError
 from billing.forms import AdminAddTabEntryForm
 from billing.models import BillingSettings, StripeAccount, Tab, TabCharge, TabEntry
 
@@ -330,13 +331,17 @@ def admin_add_tab_entry(request: HttpRequest) -> HttpResponse:
             member = form.cleaned_data["member"]
             tab, _created = Tab.objects.get_or_create(member=member)
             product = form.cleaned_data.get("product")
-            TabEntry.objects.create(
-                tab=tab,
-                description=form.cleaned_data["description"],
-                amount=form.cleaned_data["amount"],
-                added_by=request.user,  # type: ignore[misc]  # @staff_member_required guarantees User
-                product=product,
-            )
+            try:
+                tab.add_entry(
+                    description=form.cleaned_data["description"],
+                    amount=form.cleaned_data["amount"],
+                    added_by=request.user,  # type: ignore[misc]
+                    product=product,
+                )
+            except (TabLockedError, NoPaymentMethodError, TabLimitExceededError) as exc:
+                django_messages.error(request, str(exc))
+                context = {**admin.site.each_context(request), "form": form}
+                return render(request, "billing/admin_add_entry.html", context)
             django_messages.success(request, f"Added ${form.cleaned_data['amount']} to {member.display_name}'s tab.")
             return redirect("billing_admin_dashboard")
     else:
@@ -432,41 +437,12 @@ def billing_admin_retry_charge(request: HttpRequest, charge_pk: int) -> JsonResp
 
         raise Http404
 
-    tab = charge.tab
     idempotency_key = f"admin-retry-{charge.pk}-{_uuid.uuid4()}"
-
-    try:
-        if charge.stripe_account:
-            fee_cents = int(charge.application_fee * 100) if charge.application_fee else None
-            result = stripe_utils.create_destination_payment_intent(
-                customer_id=tab.stripe_customer_id,
-                payment_method_id=tab.stripe_payment_method_id,
-                amount_cents=int(charge.amount * 100),
-                description=f"Past Lives Makerspace tab retry — {charge.entry_count} items",
-                metadata={"tab_id": str(tab.pk), "charge_id": str(charge.pk)},
-                idempotency_key=idempotency_key,
-                destination_account_id=charge.stripe_account.stripe_account_id,
-                application_fee_cents=fee_cents,
-            )
-        else:
-            result = stripe_utils.create_payment_intent(
-                customer_id=tab.stripe_customer_id,
-                payment_method_id=tab.stripe_payment_method_id,
-                amount_cents=int(charge.amount * 100),
-                description=f"Past Lives Makerspace tab retry — {charge.entry_count} items",
-                metadata={"tab_id": str(tab.pk), "charge_id": str(charge.pk)},
-                idempotency_key=idempotency_key,
-            )
-        charge.stripe_payment_intent_id = result["id"]
-        charge.stripe_charge_id = result["charge_id"]
-        charge.stripe_receipt_url = result["receipt_url"]
-        charge.status = TabCharge.Status.SUCCEEDED
-        charge.charged_at = timezone.now()
-        charge.save()
+    success = charge.execute_stripe_charge(idempotency_key)
+    if success:
         return JsonResponse({"status": "succeeded"})
-    except Exception:
-        logger.exception("Admin retry failed for charge %s.", charge.pk)
-        return JsonResponse({"status": "failed"})
+    logger.exception("Admin retry failed for charge %s.", charge.pk)
+    return JsonResponse({"status": "failed"})
 
 
 @staff_member_required
@@ -491,14 +467,6 @@ def connect_callback(request: HttpRequest) -> HttpResponse:
     account_id = stripe_utils.complete_connect_oauth(code=code)
     guild = Guild.objects.get(pk=int(guild_id))
 
-    StripeAccount.objects.update_or_create(
-        guild=guild,
-        defaults={
-            "stripe_account_id": account_id,
-            "display_name": guild.name,
-            "is_active": True,
-            "connected_at": timezone.now(),
-        },
-    )
+    StripeAccount.upsert_for_guild(guild, account_id)
     django_messages.success(request, f"Connected Stripe account for {guild.name}.")
     return redirect("billing_admin_dashboard")

@@ -169,6 +169,28 @@ class StripeAccount(models.Model):
             return Decimal("0.00")
         return (amount * self.platform_fee_percent / Decimal("100")).quantize(Decimal("0.01"))
 
+    @classmethod
+    def upsert_for_guild(cls, guild: object, account_id: str) -> StripeAccount:
+        """Create or update the Stripe account linked to a guild.
+
+        Args:
+            guild: The Guild instance to link.
+            account_id: The Stripe Connect account ID (acct_xxx).
+
+        Returns:
+            The created or updated StripeAccount.
+        """
+        obj, _ = cls.objects.update_or_create(
+            guild=guild,
+            defaults={
+                "stripe_account_id": account_id,
+                "display_name": guild.name,  # type: ignore[attr-defined]
+                "is_active": True,
+                "connected_at": timezone.now(),
+            },
+        )
+        return obj
+
 
 # ---------------------------------------------------------------------------
 # Product
@@ -621,3 +643,52 @@ class TabCharge(models.Model):
     @property
     def entry_count(self) -> int:
         return self.entries.count()
+
+    def execute_stripe_charge(self, idempotency_key: str) -> bool:
+        """Call Stripe for this charge, updating fields in place. Returns True on success.
+
+        On success: sets status=SUCCEEDED, stripe_payment_intent_id, stripe_charge_id,
+        stripe_receipt_url, charged_at, and saves.
+        On failure: sets status=FAILED, failure_reason, and saves.
+        """
+        from billing import stripe_utils as _stripe_utils
+
+        tab = self.tab
+        fee_cents: int | None = int(self.application_fee * 100) if self.application_fee else None
+        amount_cents = int(self.amount * 100)
+        description = f"Past Lives Makerspace tab — {self.entry_count} items"
+        metadata = {"tab_id": str(tab.pk), "charge_id": str(self.pk)}
+
+        try:
+            if self.stripe_account:
+                result = _stripe_utils.create_destination_payment_intent(
+                    customer_id=tab.stripe_customer_id,
+                    payment_method_id=tab.stripe_payment_method_id,
+                    amount_cents=amount_cents,
+                    description=description,
+                    metadata=metadata,
+                    idempotency_key=idempotency_key,
+                    destination_account_id=self.stripe_account.stripe_account_id,
+                    application_fee_cents=fee_cents,
+                )
+            else:
+                result = _stripe_utils.create_payment_intent(
+                    customer_id=tab.stripe_customer_id,
+                    payment_method_id=tab.stripe_payment_method_id,
+                    amount_cents=amount_cents,
+                    description=description,
+                    metadata=metadata,
+                    idempotency_key=idempotency_key,
+                )
+            self.stripe_payment_intent_id = result["id"]
+            self.stripe_charge_id = result["charge_id"]
+            self.stripe_receipt_url = result["receipt_url"]
+            self.status = self.Status.SUCCEEDED
+            self.charged_at = timezone.now()
+            self.save()
+            return True
+        except Exception:
+            self.status = self.Status.FAILED
+            self.failure_reason = "Stripe charge failed"
+            self.save(update_fields=["status", "failure_reason"])
+            return False

@@ -13,7 +13,6 @@ from django.db.models import DecimalField, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from billing import stripe_utils
 from billing.models import BillingSettings, StripeAccount, Tab, TabCharge, TabEntry
 from billing.notifications import notify_admin_charge_failed, send_receipt
 
@@ -43,7 +42,7 @@ class Command(BaseCommand):
             return
 
         try:
-            self._run_billing(force=bool(options.get("force", False)))
+            self._run_billing(force=bool(options["force"]))
         finally:
             self._release_lock()
 
@@ -51,7 +50,7 @@ class Command(BaseCommand):
         """Acquire a PostgreSQL advisory lock. Returns True if acquired, False if already held."""
         if connection.vendor == "sqlite":
             return True  # SQLite doesn't support advisory locks
-        with connection.cursor() as cursor:  # pragma: no cover
+        with connection.cursor() as cursor:
             cursor.execute("SELECT pg_try_advisory_lock(%s)", [ADVISORY_LOCK_ID])
             row = cursor.fetchone()
             return bool(row and row[0])
@@ -60,7 +59,7 @@ class Command(BaseCommand):
         """Release the advisory lock."""
         if connection.vendor == "sqlite":
             return
-        with connection.cursor() as cursor:  # pragma: no cover
+        with connection.cursor() as cursor:
             cursor.execute("SELECT pg_advisory_unlock(%s)", [ADVISORY_LOCK_ID])
 
     def _run_billing(self, *, force: bool) -> None:
@@ -228,55 +227,16 @@ class Command(BaseCommand):
         settings: BillingSettings,
     ) -> bool:
         """Call Stripe for a single charge. Returns True on success."""
-        try:
-            result = self._call_stripe(tab, charge, idempotency_key, fee_cents)
-            charge.stripe_payment_intent_id = result["id"]
-            charge.stripe_charge_id = result["charge_id"]
-            charge.stripe_receipt_url = result["receipt_url"]
-            charge.status = TabCharge.Status.SUCCEEDED
-            charge.charged_at = timezone.now()
-            charge.save()
+        success = charge.execute_stripe_charge(idempotency_key)
+        if success:
             send_receipt(charge)
             return True
-        except Exception:
-            logger.exception("Tab %s: Stripe charge failed.", tab.pk)
-            charge.status = TabCharge.Status.FAILED
-            charge.failure_reason = "Stripe charge failed"
-            charge.retry_count = 1
-            charge.next_retry_at = timezone.now() + timedelta(hours=settings.retry_interval_hours)
-            charge.save()
-            notify_admin_charge_failed(charge)
-            return False
-
-    @staticmethod
-    def _call_stripe(tab: Tab, charge: TabCharge, idempotency_key: str, fee_cents: int | None) -> dict[str, str]:
-        """Dispatch to the appropriate Stripe payment intent creator."""
-        customer_id = tab.stripe_customer_id
-        payment_method_id = tab.stripe_payment_method_id
-        amount_cents = int(charge.amount * 100)
-        description = f"Past Lives Makerspace tab — {charge.entry_count} items"
-        metadata = {"tab_id": str(tab.pk), "charge_id": str(charge.pk)}
-        idem_key = f"tabcharge-{charge.pk}-{idempotency_key}"
-
-        if charge.stripe_account:
-            return stripe_utils.create_destination_payment_intent(
-                customer_id=customer_id,
-                payment_method_id=payment_method_id,
-                amount_cents=amount_cents,
-                description=description,
-                metadata=metadata,
-                idempotency_key=idem_key,
-                destination_account_id=charge.stripe_account.stripe_account_id,
-                application_fee_cents=fee_cents,
-            )
-        return stripe_utils.create_payment_intent(
-            customer_id=customer_id,
-            payment_method_id=payment_method_id,
-            amount_cents=amount_cents,
-            description=description,
-            metadata=metadata,
-            idempotency_key=idem_key,
-        )
+        logger.exception("Tab %s: Stripe charge failed.", tab.pk)
+        charge.retry_count = 1
+        charge.next_retry_at = timezone.now() + timedelta(hours=settings.retry_interval_hours)
+        charge.save(update_fields=["retry_count", "next_retry_at"])
+        notify_admin_charge_failed(charge)
+        return False
 
     def _process_retries(self, settings: BillingSettings) -> int:
         """Retry failed charges that are due for retry. Returns count of retries attempted."""
@@ -289,19 +249,11 @@ class Command(BaseCommand):
             if not tab.has_payment_method or not tab.stripe_customer_id:
                 continue
 
-            try:
-                fee_cents = int(charge.application_fee * 100) if charge.application_fee else None
-                result = self._call_stripe(tab, charge, f"retry-{charge.retry_count}", fee_cents)
-
-                charge.stripe_payment_intent_id = result["id"]
-                charge.stripe_charge_id = result["charge_id"]
-                charge.stripe_receipt_url = result["receipt_url"]
-                charge.status = TabCharge.Status.SUCCEEDED
-                charge.charged_at = timezone.now()
-                charge.save()
+            idempotency_key = f"retry-{charge.pk}-{charge.retry_count}"
+            success = charge.execute_stripe_charge(idempotency_key)
+            if success:
                 send_receipt(charge)
-
-            except Exception:
+            else:
                 logger.exception("Tab %s: retry %d failed.", tab.pk, charge.retry_count)
                 charge.retry_count += 1
                 if charge.retry_count >= settings.max_retry_attempts:

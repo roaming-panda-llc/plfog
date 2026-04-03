@@ -64,9 +64,9 @@ def handle_payment_intent_succeeded(event: dict[str, Any]) -> None:
     charge.charged_at = timezone.now()
 
     # Extract receipt URL from charges
-    charges_data = payment_intent.get("charges", {}).get("data", [])
+    charges_data = payment_intent["charges"]["data"]
     if charges_data:
-        charge.stripe_charge_id = charges_data[0].get("id", "")
+        charge.stripe_charge_id = charges_data[0]["id"]
         charge.stripe_receipt_url = charges_data[0].get("receipt_url", "")
 
     charge.save()
@@ -88,9 +88,9 @@ def handle_payment_intent_failed(event: dict[str, Any]) -> None:
     if charge.status == TabCharge.Status.FAILED:
         return
 
-    last_error = payment_intent.get("last_payment_error", {})
+    last_error = payment_intent["last_payment_error"]
     charge.status = TabCharge.Status.FAILED
-    charge.failure_reason = last_error.get("message", "Payment failed")
+    charge.failure_reason = last_error["message"]
     charge.save(update_fields=["status", "failure_reason"])
     notify_admin_charge_failed(charge)
 
@@ -128,14 +128,15 @@ def handle_payment_method_updated(event: dict[str, Any]) -> None:
     except Tab.DoesNotExist:
         return
 
-    card = pm.get("card", {})
-    tab.payment_method_last4 = card.get("last4", tab.payment_method_last4)
-    tab.payment_method_brand = card.get("brand", tab.payment_method_brand)
-    tab.save(update_fields=["payment_method_last4", "payment_method_brand", "updated_at"])
+    card = pm.get("card")
+    if card:
+        tab.payment_method_last4 = card["last4"]
+        tab.payment_method_brand = card["brand"]
+        tab.save(update_fields=["payment_method_last4", "payment_method_brand", "updated_at"])
 
 
 def handle_charge_dispute_created(event: dict[str, Any]) -> None:
     """Log and notify admins about a chargeback."""
     dispute = event["data"]["object"]
-    charge_id = dispute.get("charge", "")
-    logger.warning("Charge dispute created for charge %s. Amount: %s", charge_id, dispute.get("amount", "unknown"))
+    charge_id = dispute["charge"]
+    logger.warning("Charge dispute created for charge %s. Amount: %s", charge_id, dispute["amount"])
