@@ -36,7 +36,15 @@
 <script>
 (function() {
     function init() {
-        const stripe = Stripe('{{ stripe_publishable_key }}');
+        const publishableKey = '{{ stripe_publishable_key }}';
+        if (!publishableKey) {
+            document.getElementById('payment-element').innerHTML =
+                '<p class="hub-text-muted">Payment setup is temporarily unavailable. Please try again later.</p>';
+            document.getElementById('submit-btn').style.display = 'none';
+            return;
+        }
+
+        const stripe = Stripe(publishableKey);
         const elements = stripe.elements({
             mode: 'setup',
             currency: 'usd',
