@@ -133,7 +133,7 @@ def describe_bill_tabs():
             assert cmd._is_billing_time(settings) is False
 
     def describe_processing():
-        @patch("billing.management.commands.bill_tabs.stripe_utils.create_payment_intent")
+        @patch("billing.stripe_utils.create_payment_intent")
         @patch("billing.management.commands.bill_tabs.send_receipt")
         def it_charges_tabs_with_pending_entries(mock_receipt, mock_stripe):
             mock_stripe.return_value = {
@@ -171,7 +171,7 @@ def describe_bill_tabs():
 
             assert "0 charged" in output
 
-        @patch("billing.management.commands.bill_tabs.stripe_utils.create_payment_intent")
+        @patch("billing.stripe_utils.create_payment_intent")
         @patch("billing.management.commands.bill_tabs.send_receipt")
         def it_skips_zero_balance(mock_receipt, mock_stripe):
             BillingSettingsFactory()
@@ -184,7 +184,7 @@ def describe_bill_tabs():
             assert "0 charged" in output
             mock_stripe.assert_not_called()
 
-        @patch("billing.management.commands.bill_tabs.stripe_utils.create_payment_intent")
+        @patch("billing.stripe_utils.create_payment_intent")
         @patch("billing.management.commands.bill_tabs.send_receipt")
         def it_skips_sub_minimum_balance(mock_receipt, mock_stripe):
             BillingSettingsFactory()
@@ -216,7 +216,7 @@ def describe_bill_tabs():
 
             assert "0 charged" in output
 
-        @patch("billing.management.commands.bill_tabs.stripe_utils.create_payment_intent")
+        @patch("billing.stripe_utils.create_payment_intent")
         @patch("billing.management.commands.bill_tabs.notify_admin_charge_failed")
         def it_handles_stripe_failure(mock_notify, mock_stripe):
             mock_stripe.side_effect = Exception("Card declined")
@@ -234,7 +234,7 @@ def describe_bill_tabs():
             assert charge.next_retry_at is not None
             mock_notify.assert_called_once()
 
-        @patch("billing.management.commands.bill_tabs.stripe_utils.create_payment_intent")
+        @patch("billing.stripe_utils.create_payment_intent")
         @patch("billing.management.commands.bill_tabs.send_receipt")
         def it_excludes_voided_entries_from_charge(mock_receipt, mock_stripe):
             mock_stripe.return_value = {
@@ -258,7 +258,7 @@ def describe_bill_tabs():
             charge = TabCharge.objects.get(tab=tab)
             assert charge.amount == Decimal("30.00")
 
-        @patch("billing.management.commands.bill_tabs.stripe_utils.create_payment_intent")
+        @patch("billing.stripe_utils.create_payment_intent")
         @patch("billing.management.commands.bill_tabs.send_receipt")
         def it_skips_sub_minimum_guild_group_but_charges_platform(mock_receipt, mock_stripe):
             mock_stripe.return_value = {
@@ -282,8 +282,8 @@ def describe_bill_tabs():
             assert "1 charged" in output  # Only platform group charged
 
         def describe_destination_routing():
-            @patch("billing.management.commands.bill_tabs.stripe_utils.create_payment_intent")
-            @patch("billing.management.commands.bill_tabs.stripe_utils.create_destination_payment_intent")
+            @patch("billing.stripe_utils.create_payment_intent")
+            @patch("billing.stripe_utils.create_destination_payment_intent")
             @patch("billing.management.commands.bill_tabs.send_receipt")
             def it_creates_separate_charges_per_guild(mock_receipt, mock_dest, mock_platform):
                 mock_dest.return_value = {
@@ -321,7 +321,7 @@ def describe_bill_tabs():
                 assert mock_dest.call_count == 2
                 assert mock_platform.call_count == 1
 
-            @patch("billing.management.commands.bill_tabs.stripe_utils.create_destination_payment_intent")
+            @patch("billing.stripe_utils.create_destination_payment_intent")
             @patch("billing.management.commands.bill_tabs.send_receipt")
             def it_includes_application_fee(mock_receipt, mock_dest):
                 mock_dest.return_value = {
@@ -348,7 +348,7 @@ def describe_bill_tabs():
                 call_kwargs = mock_dest.call_args[1]
                 assert call_kwargs["application_fee_cents"] == 1500
 
-            @patch("billing.management.commands.bill_tabs.stripe_utils.create_payment_intent")
+            @patch("billing.stripe_utils.create_payment_intent")
             @patch("billing.management.commands.bill_tabs.send_receipt")
             def it_skips_entries_with_disconnected_guild(mock_receipt, mock_platform):
                 mock_platform.return_value = {
@@ -385,8 +385,76 @@ def describe_bill_tabs():
                 assert "1 charged" in output
                 assert "1 skipped" in output
 
+    def describe_advisory_lock():
+        def it_acquire_lock_returns_true_for_sqlite():
+            from billing.management.commands.bill_tabs import Command
+
+            cmd = Command()
+            assert cmd._acquire_lock() is True
+
+        def it_acquire_lock_uses_pg_try_advisory_lock_for_postgres():
+            from unittest.mock import MagicMock, patch
+
+            from billing.management.commands.bill_tabs import Command
+
+            cmd = Command()
+            mock_cursor = MagicMock()
+            mock_cursor.__enter__ = lambda s: s
+            mock_cursor.__exit__ = MagicMock(return_value=False)
+            mock_cursor.fetchone.return_value = (True,)
+            mock_connection = MagicMock()
+            mock_connection.vendor = "postgresql"
+            mock_connection.cursor.return_value = mock_cursor
+            with patch("billing.management.commands.bill_tabs.connection", mock_connection):
+                result = cmd._acquire_lock()
+            assert result is True
+            mock_cursor.execute.assert_called_once()
+            call_sql = mock_cursor.execute.call_args[0][0]
+            assert "pg_try_advisory_lock" in call_sql
+
+        def it_acquire_lock_returns_false_when_lock_held():
+            from unittest.mock import MagicMock, patch
+
+            from billing.management.commands.bill_tabs import Command
+
+            cmd = Command()
+            mock_cursor = MagicMock()
+            mock_cursor.__enter__ = lambda s: s
+            mock_cursor.__exit__ = MagicMock(return_value=False)
+            mock_cursor.fetchone.return_value = (False,)
+            mock_connection = MagicMock()
+            mock_connection.vendor = "postgresql"
+            mock_connection.cursor.return_value = mock_cursor
+            with patch("billing.management.commands.bill_tabs.connection", mock_connection):
+                result = cmd._acquire_lock()
+            assert result is False
+
+        def it_release_lock_does_nothing_for_sqlite():
+            from billing.management.commands.bill_tabs import Command
+
+            cmd = Command()
+            cmd._release_lock()  # Should not raise
+
+        def it_release_lock_calls_pg_advisory_unlock_for_postgres():
+            from unittest.mock import MagicMock, patch
+
+            from billing.management.commands.bill_tabs import Command
+
+            cmd = Command()
+            mock_cursor = MagicMock()
+            mock_cursor.__enter__ = lambda s: s
+            mock_cursor.__exit__ = MagicMock(return_value=False)
+            mock_connection = MagicMock()
+            mock_connection.vendor = "postgresql"
+            mock_connection.cursor.return_value = mock_cursor
+            with patch("billing.management.commands.bill_tabs.connection", mock_connection):
+                cmd._release_lock()
+            mock_cursor.execute.assert_called_once()
+            call_sql = mock_cursor.execute.call_args[0][0]
+            assert "pg_advisory_unlock" in call_sql
+
     def describe_retries():
-        @patch("billing.management.commands.bill_tabs.stripe_utils.create_payment_intent")
+        @patch("billing.stripe_utils.create_payment_intent")
         @patch("billing.management.commands.bill_tabs.send_receipt")
         def it_retries_failed_charges(mock_receipt, mock_stripe):
             mock_stripe.return_value = {
@@ -412,7 +480,7 @@ def describe_bill_tabs():
             charge = TabCharge.objects.get(tab=tab)
             assert charge.status == TabCharge.Status.SUCCEEDED
 
-        @patch("billing.management.commands.bill_tabs.stripe_utils.create_payment_intent")
+        @patch("billing.stripe_utils.create_payment_intent")
         @patch("billing.management.commands.bill_tabs.notify_admin_charge_failed")
         def it_locks_tab_after_max_retries(mock_notify, mock_stripe):
             mock_stripe.side_effect = Exception("Still declined")
@@ -434,7 +502,7 @@ def describe_bill_tabs():
             assert "3 attempts" in tab.locked_reason
             mock_notify.assert_called_once()
 
-        @patch("billing.management.commands.bill_tabs.stripe_utils.create_payment_intent")
+        @patch("billing.stripe_utils.create_payment_intent")
         def it_schedules_next_retry_when_retries_remain(mock_stripe):
             mock_stripe.side_effect = Exception("Declined again")
             BillingSettingsFactory(max_retry_attempts=3, retry_interval_hours=12)

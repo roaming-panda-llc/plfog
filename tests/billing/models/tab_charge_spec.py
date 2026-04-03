@@ -84,3 +84,95 @@ def describe_TabCharge():
 
             result = TabCharge.objects.needs_retry()
             assert list(result) == [ready]
+
+    def describe_execute_stripe_charge():
+        def it_returns_true_and_sets_succeeded_on_success_without_stripe_account():
+            from unittest.mock import patch
+
+            charge = TabChargeFactory(amount=Decimal("50.00"), stripe_account=None)
+            mock_result = {"id": "pi_1", "charge_id": "ch_1", "receipt_url": "https://r.url"}
+
+            with patch("billing.stripe_utils.create_payment_intent", return_value=mock_result) as mock_create:
+                result = charge.execute_stripe_charge("idem-key-1")
+                mock_create.assert_called_once()
+
+            charge.refresh_from_db()
+            assert result is True
+            assert charge.status == TabCharge.Status.SUCCEEDED
+            assert charge.stripe_payment_intent_id == "pi_1"
+            assert charge.stripe_charge_id == "ch_1"
+            assert charge.stripe_receipt_url == "https://r.url"
+            assert charge.charged_at is not None
+
+        def it_returns_true_and_calls_destination_intent_when_stripe_account_set():
+            from unittest.mock import patch
+
+            from tests.billing.factories import StripeAccountFactory
+
+            stripe_account = StripeAccountFactory(stripe_account_id="acct_dest_123")
+            tab = TabFactory(stripe_customer_id="cus_test", stripe_payment_method_id="pm_test")
+            charge = TabChargeFactory(tab=tab, amount=Decimal("75.00"), stripe_account=stripe_account)
+            mock_result = {"id": "pi_2", "charge_id": "ch_2", "receipt_url": "https://r2.url"}
+
+            with patch("billing.stripe_utils.create_destination_payment_intent", return_value=mock_result) as mock_dest:
+                result = charge.execute_stripe_charge("idem-key-2")
+
+            assert result is True
+            mock_dest.assert_called_once()
+            call_kwargs = mock_dest.call_args[1]
+            assert call_kwargs["destination_account_id"] == "acct_dest_123"
+
+        def it_returns_false_and_sets_failed_on_stripe_exception():
+            from unittest.mock import patch
+
+            charge = TabChargeFactory(amount=Decimal("30.00"), stripe_account=None)
+
+            with patch("billing.stripe_utils.create_payment_intent", side_effect=Exception("boom")):
+                result = charge.execute_stripe_charge("idem-key-3")
+
+            charge.refresh_from_db()
+            assert result is False
+            assert charge.status == TabCharge.Status.FAILED
+            assert charge.failure_reason != ""
+
+        def it_computes_fee_cents_from_application_fee():
+            from unittest.mock import patch
+
+            from tests.billing.factories import StripeAccountFactory
+
+            stripe_account = StripeAccountFactory(stripe_account_id="acct_fee_456")
+            tab = TabFactory(stripe_customer_id="cus_fee", stripe_payment_method_id="pm_fee")
+            charge = TabChargeFactory(
+                tab=tab,
+                amount=Decimal("100.00"),
+                stripe_account=stripe_account,
+                application_fee=Decimal("2.50"),
+            )
+            mock_result = {"id": "pi_3", "charge_id": "ch_3", "receipt_url": ""}
+
+            with patch("billing.stripe_utils.create_destination_payment_intent", return_value=mock_result) as mock_dest:
+                charge.execute_stripe_charge("idem-key-4")
+
+            call_kwargs = mock_dest.call_args[1]
+            assert call_kwargs["application_fee_cents"] == 250
+
+        def it_passes_none_fee_when_no_application_fee():
+            from unittest.mock import patch
+
+            from tests.billing.factories import StripeAccountFactory
+
+            stripe_account = StripeAccountFactory(stripe_account_id="acct_nofee_789")
+            tab = TabFactory(stripe_customer_id="cus_nofee", stripe_payment_method_id="pm_nofee")
+            charge = TabChargeFactory(
+                tab=tab,
+                amount=Decimal("40.00"),
+                stripe_account=stripe_account,
+                application_fee=None,
+            )
+            mock_result = {"id": "pi_4", "charge_id": "ch_4", "receipt_url": ""}
+
+            with patch("billing.stripe_utils.create_destination_payment_intent", return_value=mock_result) as mock_dest:
+                charge.execute_stripe_charge("idem-key-5")
+
+            call_kwargs = mock_dest.call_args[1]
+            assert call_kwargs["application_fee_cents"] is None
