@@ -4,6 +4,8 @@ Django app for membership and studio rental management at Past Lives Makerspace 
 
 Repo: https://github.com/Past-Lives-Makerspace/plfog
 
+> **Quick orientation:** See [CODEBASE_INDEX.md](CODEBASE_INDEX.md) for the full app map, models, URL structure, and integration overview. Each app also has its own `CLAUDE.md` with per-app details.
+
 ## Commands
 
 - `pytest` - Run tests
