@@ -178,14 +178,25 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
     return HttpResponse(status=200)
 
 
+_VALID_TABS = {"overview", "open-tabs", "history", "settings", "stripe"}
+
+
 @staff_member_required
 def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
-    """Admin payments dashboard — aggregate stats, outstanding tabs, failed charges."""
-    from django.contrib import admin
+    """Admin payments dashboard — five-tab view of billing data."""
+    from django.contrib import admin as django_admin
+    from billing.forms import AdminAddTabEntryForm, BillingSettingsForm
+    from billing.models import BillingSettings, Product, StripeAccount
+    from membership.models import Guild
+
+    active_tab = request.GET.get("tab", "overview")
+    if active_tab not in _VALID_TABS:
+        active_tab = "overview"
 
     now = timezone.now()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
+    # --- Overview stats ---
     total_outstanding = TabEntry.objects.pending().aggregate(
         total=Coalesce(Sum("amount"), Value(Decimal("0.00")), output_field=DecimalField())
     )["total"]
@@ -213,14 +224,107 @@ def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
         .order_by("-created_at")[:20]
     )
 
+    # --- Open Tabs tab ---
+    tab_filter = request.GET.get("filter", "outstanding")
+    if tab_filter == "all":
+        open_tabs = Tab.objects.select_related("member").order_by("member__full_legal_name")
+    elif tab_filter == "failed":
+        open_tabs = (
+            Tab.objects.filter(charges__status=TabCharge.Status.FAILED)
+            .distinct()
+            .select_related("member")
+        )
+    else:  # outstanding (default)
+        open_tabs = (
+            Tab.objects.filter(
+                entries__tab_charge__isnull=True,
+                entries__voided_at__isnull=True,
+            )
+            .distinct()
+            .select_related("member")
+        )
+
+    # --- History tab ---
+    charge_status_filter = request.GET.get("status", "all")
+    if charge_status_filter == "succeeded":
+        history_charges = TabCharge.objects.succeeded().select_related("tab__member", "stripe_account")
+    elif charge_status_filter == "failed":
+        history_charges = TabCharge.objects.failed().select_related("tab__member", "stripe_account")
+    elif charge_status_filter == "needs_retry":
+        history_charges = TabCharge.objects.needs_retry().select_related("tab__member", "stripe_account")
+    else:
+        history_charges = (
+            TabCharge.objects.exclude(status=TabCharge.Status.PENDING)
+            .select_related("tab__member", "stripe_account")
+        )
+    history_charges = history_charges.order_by("-created_at")
+
+    history_collected = TabCharge.objects.filter(
+        status=TabCharge.Status.SUCCEEDED,
+        charged_at__gte=month_start,
+    ).aggregate(total=Coalesce(Sum("amount"), Value(Decimal("0.00")), output_field=DecimalField()))["total"]
+
+    history_failed_count = TabCharge.objects.filter(
+        status=TabCharge.Status.FAILED,
+        created_at__gte=month_start,
+    ).count()
+
+    history_total_count = (
+        TabCharge.objects.filter(created_at__gte=month_start)
+        .exclude(status=TabCharge.Status.PENDING)
+        .count()
+    )
+
+    history_succeeded_count = TabCharge.objects.filter(
+        status=TabCharge.Status.SUCCEEDED,
+        charged_at__gte=month_start,
+    ).count()
+
+    history_success_rate = (
+        int(history_succeeded_count / history_total_count * 100)
+        if history_total_count
+        else 100
+    )
+
+    # --- Settings tab ---
+    settings_obj = BillingSettings.load()
+    settings_form = BillingSettingsForm(instance=settings_obj)
+
+    # --- Stripe tab ---
+    stripe_accounts = StripeAccount.objects.select_related("guild").order_by("display_name")
+    products = Product.objects.select_related("guild").order_by("guild__name", "name")
+    guilds = Guild.objects.filter(is_active=True).order_by("name")
+
+    # --- Add Charge modal form ---
+    add_charge_form = AdminAddTabEntryForm()
+
     context = {
-        **admin.site.each_context(request),
+        **django_admin.site.each_context(request),
+        "active_tab": active_tab,
+        "tab_filter": tab_filter,
+        "charge_status_filter": charge_status_filter,
+        # Overview
         "total_outstanding": total_outstanding,
         "collected_this_month": collected_this_month,
         "failed_count": failed_count,
         "locked_count": locked_count,
         "outstanding_tabs": outstanding_tabs,
         "failed_charges": failed_charges,
+        # Open Tabs
+        "open_tabs": open_tabs,
+        # History
+        "history_charges": history_charges,
+        "history_collected": history_collected,
+        "history_failed_count": history_failed_count,
+        "history_success_rate": history_success_rate,
+        # Settings
+        "settings_form": settings_form,
+        # Stripe
+        "stripe_accounts": stripe_accounts,
+        "products": products,
+        "guilds": guilds,
+        # Shared
+        "add_charge_form": add_charge_form,
     }
 
     return render(request, "billing/admin_dashboard.html", context)
