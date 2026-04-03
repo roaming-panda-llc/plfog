@@ -11,6 +11,7 @@ urlpatterns = [
     path("admin/dashboard/", views.admin_tab_dashboard, name="billing_admin_dashboard"),
     path("admin/add-entry/", views.admin_add_tab_entry, name="billing_admin_add_entry"),
     path("admin/save-settings/", views.billing_admin_save_settings, name="billing_admin_save_settings"),
+    path("admin/retry-charge/<int:charge_pk>/", views.billing_admin_retry_charge, name="billing_admin_retry_charge"),
     path("connect/initiate/<int:guild_id>/", views.initiate_connect, name="billing_initiate_connect"),
     path("connect/callback/", views.connect_callback, name="billing_connect_callback"),
 ]

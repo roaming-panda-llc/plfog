@@ -270,6 +270,55 @@ def billing_admin_save_settings(request: HttpRequest) -> HttpResponse:
 
 
 @staff_member_required
+@require_POST
+def billing_admin_retry_charge(request: HttpRequest, charge_pk: int) -> JsonResponse:
+    """Immediately retry a single failed charge. Returns JSON with new status."""
+    import uuid as _uuid
+
+    try:
+        charge = TabCharge.objects.select_related("tab", "stripe_account").get(pk=charge_pk)
+    except TabCharge.DoesNotExist:
+        from django.http import Http404
+        raise Http404
+
+    tab = charge.tab
+    idempotency_key = f"admin-retry-{charge.pk}-{_uuid.uuid4()}"
+
+    try:
+        if charge.stripe_account:
+            fee_cents = int(charge.application_fee * 100) if charge.application_fee else None
+            result = stripe_utils.create_destination_payment_intent(
+                customer_id=tab.stripe_customer_id,
+                payment_method_id=tab.stripe_payment_method_id,
+                amount_cents=int(charge.amount * 100),
+                description=f"Past Lives Makerspace tab retry — {charge.entry_count} items",
+                metadata={"tab_id": str(tab.pk), "charge_id": str(charge.pk)},
+                idempotency_key=idempotency_key,
+                destination_account_id=charge.stripe_account.stripe_account_id,
+                application_fee_cents=fee_cents,
+            )
+        else:
+            result = stripe_utils.create_payment_intent(
+                customer_id=tab.stripe_customer_id,
+                payment_method_id=tab.stripe_payment_method_id,
+                amount_cents=int(charge.amount * 100),
+                description=f"Past Lives Makerspace tab retry — {charge.entry_count} items",
+                metadata={"tab_id": str(tab.pk), "charge_id": str(charge.pk)},
+                idempotency_key=idempotency_key,
+            )
+        charge.stripe_payment_intent_id = result["id"]
+        charge.stripe_charge_id = result["charge_id"]
+        charge.stripe_receipt_url = result["receipt_url"]
+        charge.status = TabCharge.Status.SUCCEEDED
+        charge.charged_at = timezone.now()
+        charge.save()
+        return JsonResponse({"status": "succeeded"})
+    except Exception:
+        logger.exception("Admin retry failed for charge %s.", charge.pk)
+        return JsonResponse({"status": "failed"})
+
+
+@staff_member_required
 def initiate_connect(request: HttpRequest, guild_id: int) -> HttpResponse:
     """Redirect admin to Stripe Connect OAuth to link a guild's account."""
     url = stripe_utils.get_connect_oauth_url(state=str(guild_id))
