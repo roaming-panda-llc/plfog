@@ -1,0 +1,137 @@
+{% load i18n admin_urls %}
+
+<div class="js-inline-admin-formset inline-group" id="{{ inline_admin_formset.formset.prefix }}-group" data-inline-type="tabular" data-inline-formset="{{ inline_admin_formset.inline_formset_data }}">
+    {{ inline_admin_formset.formset.management_form }}
+    {{ inline_admin_formset.formset.non_form_errors }}
+
+    {# Hidden existing-row forms — Django needs these to process saves/deletes #}
+    {% for inline_admin_form in inline_admin_formset %}
+        {% if inline_admin_form.original %}
+            {% for fieldset in inline_admin_form %}
+                {% for line in fieldset %}
+                    {% for field in line %}
+                        {% if field.field.is_hidden %}{{ field.field }}{% endif %}
+                    {% endfor %}
+                {% endfor %}
+            {% endfor %}
+            {{ inline_admin_form.pk_field.field }}
+        {% endif %}
+    {% endfor %}
+
+    <div class="pl-products-section" id="pl-products-section">
+        <h3 class="pl-products-title">Products</h3>
+
+        {# Products table #}
+        <div class="pl-products-table-wrap">
+            <table class="pl-products-table" id="pl-products-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Price</th>
+                        <th>Active</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inline_admin_form in inline_admin_formset %}
+                        {% if inline_admin_form.original %}
+                        <tr class="pl-product-row" id="pl-product-row-{{ inline_admin_form.original.pk }}" data-prefix="{{ inline_admin_formset.formset.prefix }}-{{ forloop.counter0 }}">
+                            <td class="pl-product-name">{{ inline_admin_form.original.name }}</td>
+                            <td class="pl-product-price">${{ inline_admin_form.original.price }}</td>
+                            <td class="pl-product-active">
+                                {% if inline_admin_form.original.is_active %}
+                                <span class="pl-product-badge pl-product-badge--active">Active</span>
+                                {% else %}
+                                <span class="pl-product-badge pl-product-badge--inactive">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td class="pl-product-actions">
+                                {% url 'admin:billing_product_change' inline_admin_form.original.pk as edit_url %}
+                                <a href="{{ edit_url }}" class="pl-product-btn pl-product-btn--edit">Edit</a>
+                                <button type="button" class="pl-product-btn pl-product-btn--delete"
+                                    onclick="plOpenDeleteModal('{{ inline_admin_form.original.name|escapejs }}', '{{ inline_admin_formset.formset.prefix }}-{{ forloop.counter0 }}')">
+                                    Delete
+                                </button>
+                                {# Hidden delete checkbox — checked by JS when user confirms #}
+                                <div style="display:none;">
+                                    {% for fieldset in inline_admin_form %}
+                                        {% for line in fieldset %}
+                                            {% for field in line %}
+                                                {% if not field.field.is_hidden %}{{ field.field }}{% endif %}
+                                            {% endfor %}
+                                        {% endfor %}
+                                    {% endfor %}
+                                    {{ inline_admin_form.deletion_field.field }}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% if not inline_admin_formset.formset.initial_forms %}
+            <p class="pl-products-empty">No products yet. Add one below.</p>
+            {% endif %}
+        </div>
+
+        {# Add product form — first non-original form; skip the last one (JS empty template) #}
+        {% for inline_admin_form in inline_admin_formset %}
+            {% if not inline_admin_form.original and not forloop.last %}
+            <div class="pl-add-product">
+                <h4 class="pl-add-product__title">Add Product</h4>
+                <div class="pl-add-product__fields">
+                    {% for fieldset in inline_admin_form %}
+                        {% for line in fieldset %}
+                            {% for field in line %}
+                                {% if not field.field.is_hidden %}
+                                <div class="pl-add-product__field">
+                                    <label for="{{ field.field.auto_id }}">{{ field.field.label }}</label>
+                                    {{ field.field }}
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        {% endfor %}
+                    {% endfor %}
+                </div>
+                <button type="submit" name="_save" class="pl-add-product__btn">Add Product</button>
+            </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+</div>
+
+{# Delete confirmation modal #}
+<div id="pl-product-delete-modal" class="changelog-overlay" style="display:none;" onclick="if(event.target===this)this.style.display='none'">
+    <div class="changelog-modal" style="max-width:400px;width:100%;">
+        <div class="changelog-modal__header">
+            <h2 class="changelog-modal__title">Delete product?</h2>
+            <button type="button" class="changelog-modal__close" onclick="document.getElementById('pl-product-delete-modal').style.display='none'">&times;</button>
+        </div>
+        <div class="changelog-modal__body">
+            <p style="margin:0 0 1.5rem;">Are you sure you want to delete <strong id="pl-delete-product-name"></strong>? This cannot be undone.</p>
+            <div style="display:flex;gap:0.75rem;">
+                <button type="submit" name="_save" id="pl-delete-confirm-btn" class="hub-btn hub-btn--danger" style="flex:1;" onclick="plConfirmDelete()">Yes, delete</button>
+                <button type="button" class="hub-btn" style="flex:1;" onclick="document.getElementById('pl-product-delete-modal').style.display='none'">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    var _pendingDeletePrefix = null;
+
+    window.plOpenDeleteModal = function(name, prefix) {
+        _pendingDeletePrefix = prefix;
+        document.getElementById('pl-delete-product-name').textContent = name;
+        document.getElementById('pl-product-delete-modal').style.display = 'flex';
+    };
+
+    window.plConfirmDelete = function() {
+        if (!_pendingDeletePrefix) return;
+        var deleteInput = document.querySelector('[name="' + _pendingDeletePrefix + '-DELETE"]');
+        if (deleteInput) deleteInput.checked = true;
+        document.getElementById('pl-product-delete-modal').style.display = 'none';
+    };
+})();
+</script>

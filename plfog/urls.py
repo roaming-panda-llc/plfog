@@ -12,6 +12,7 @@ admin_custom_urls = [
 urlpatterns = admin_custom_urls + [
     path("admin/", admin.site.urls),
     path("accounts/", include("allauth.urls")),
+    path("billing/", include("billing.urls")),
     # Member hub
     path("", include("hub.urls")),
     path("", include("core.urls")),

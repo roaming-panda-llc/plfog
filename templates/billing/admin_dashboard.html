@@ -1,0 +1,647 @@
+{% extends "admin/base.html" %}
+{% load i18n %}
+
+{% block title %}Payments Dashboard | {{ site_title }}{% endblock %}
+
+{% block content %}
+<style>
+  .pl-dashboard { display: flex; flex-direction: column; gap: 1.5rem; padding: 2rem 2.5rem; }
+  .pl-card { background-color: #092E4C; border: 1px solid transparent; border-radius: 10px; padding: 2rem; }
+  .pl-card__title { font-family: 'Lato', system-ui, sans-serif; font-size: 1.75rem; font-weight: 700; color: #F4EFDD; margin-bottom: 0.5rem; }
+  .pl-text-muted { color: #96ACBB; font-size: 0.9375rem; }
+  .pl-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+  .pl-stats--3 { grid-template-columns: repeat(3, 1fr); }
+  .pl-stat { background-color: rgba(255,255,255,0.04); border-radius: 8px; padding: 1.25rem; text-align: center; }
+  .pl-stat__value { font-family: 'Lato', system-ui, sans-serif; font-size: 2rem; font-weight: 900; color: #EEB44B; line-height: 1.2; }
+  .pl-stat__label { font-size: 0.8125rem; color: #96ACBB; margin-top: 0.25rem; }
+  .pl-section-label { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #96ACBB; margin-bottom: 0.75rem; }
+  .pl-table { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }
+  .pl-table thead th { text-align: left; padding: 0.5rem 0.75rem; font-weight: 500; color: #96ACBB; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 0.875rem; }
+  .pl-table thead th.text-right { text-align: right; }
+  .pl-table tbody td { padding: 0.5rem 0.75rem; color: #F4EFDD; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .pl-table tbody td.text-right { text-align: right; }
+  .pl-table tbody tr { cursor: pointer; }
+  .pl-table tbody tr:hover td { background: rgba(255,255,255,0.03); }
+  .pl-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+  .pl-btn { display: inline-flex; align-items: center; padding: 0.625rem 1.5rem; font-family: 'Inter', system-ui, sans-serif; font-size: 0.9375rem; font-weight: 700; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; transition: background-color 0.15s ease; }
+  .pl-btn--primary { background-color: #EEB44B; color: #092E4C; }
+  .pl-btn--primary:hover { background-color: #d4a043; color: #092E4C; }
+  .pl-btn--secondary { background-color: transparent; border: 1px solid rgba(255,255,255,0.12); color: #F4EFDD; }
+  .pl-btn--secondary:hover { background-color: rgba(255,255,255,0.06); color: #F4EFDD; }
+  .pl-btn--danger { background-color: transparent; border: 1px solid rgba(248,113,113,0.3); color: #f87171; }
+  .pl-btn--danger:hover { background-color: rgba(248,113,113,0.08); }
+  .pl-btn--sm { padding: 0.35rem 0.875rem; font-size: 0.8125rem; }
+
+  /* Tab navigation */
+  .pl-tab-nav { display: flex; border-bottom: 1px solid rgba(255,255,255,0.08); gap: 0; }
+  .pl-tab-nav a { padding: 0.625rem 1.25rem; font-size: 0.9375rem; color: #96ACBB; text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.15s ease; }
+  .pl-tab-nav a:hover { color: #F4EFDD; }
+  .pl-tab-nav a.active { color: #EEB44B; border-bottom-color: #EEB44B; }
+
+  /* Filter chips */
+  .pl-filters { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .pl-filter { padding: 0.3rem 0.875rem; border-radius: 20px; font-size: 0.8125rem; color: #96ACBB; border: 1px solid rgba(255,255,255,0.12); text-decoration: none; transition: all 0.15s ease; }
+  .pl-filter:hover { color: #F4EFDD; border-color: rgba(255,255,255,0.25); }
+  .pl-filter.active { background: rgba(238,180,75,0.12); border-color: rgba(238,180,75,0.4); color: #EEB44B; }
+
+  /* Badges */
+  .pl-badge { display: inline-block; font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 500; }
+  .pl-badge--ok { background: rgba(52,211,153,0.15); color: #6ee7b7; }
+  .pl-badge--warn { background: rgba(251,191,36,0.15); color: #fbbf24; }
+  .pl-badge--fail { background: rgba(220,60,60,0.15); color: #f87171; }
+  .pl-badge--muted { background: rgba(255,255,255,0.06); color: #96ACBB; }
+
+  /* Toolbar row */
+  .pl-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+
+  /* Modal */
+  .pl-modal-overlay { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; background-color: rgba(0,0,0,0.6); padding: 1rem; }
+  .pl-modal { background-color: #092E4C; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 20px 60px rgba(0,0,0,0.4); max-width: 560px; width: 100%; max-height: 90vh; overflow-y: auto; }
+  .pl-modal__header { display: flex; align-items: flex-start; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .pl-modal__title { font-family: 'Lato', system-ui, sans-serif; font-size: 1.1rem; font-weight: 700; color: #F4EFDD; margin: 0; }
+  .pl-modal__subtitle { font-size: 0.8125rem; color: #96ACBB; margin-top: 0.2rem; }
+  .pl-modal__close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #96ACBB; padding: 0; line-height: 1; flex-shrink: 0; }
+  .pl-modal__close:hover { color: #F4EFDD; }
+  .pl-modal__body { padding: 1.5rem; }
+  .pl-modal__footer { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.08); gap: 0.75rem; flex-wrap: wrap; }
+  .pl-modal__field { margin-bottom: 1.25rem; }
+  .pl-modal__field:last-child { margin-bottom: 0; }
+  .pl-modal__field label { display: block; font-size: 0.85rem; font-weight: 500; color: #96ACBB; margin-bottom: 0.375rem; }
+  .pl-modal__field select, .pl-modal__field input[type="text"], .pl-modal__field input[type="number"] { width: 100%; padding: 0.625rem 0.875rem; font-size: 0.9375rem; color: #F4EFDD; background-color: #0a1929; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; box-sizing: border-box; }
+  .pl-modal__field select:focus, .pl-modal__field input:focus { outline: none; border-color: #EEB44B; box-shadow: 0 0 0 3px rgba(238,180,75,0.15); }
+  .pl-modal__pills { display: flex; gap: 0.75rem; margin-bottom: 1.25rem; }
+  .pl-modal__pill { flex: 1; background: rgba(255,255,255,0.04); border-radius: 8px; padding: 0.75rem; text-align: center; }
+  .pl-modal__pill-value { font-size: 1.25rem; font-weight: 900; color: #EEB44B; }
+  .pl-modal__pill-label { font-size: 0.7rem; color: #96ACBB; margin-top: 0.15rem; }
+
+  /* Settings form */
+  .pl-form-row { margin-bottom: 1.25rem; }
+  .pl-form-row label { display: block; font-size: 0.875rem; font-weight: 500; color: #96ACBB; margin-bottom: 0.375rem; }
+  .pl-form-row select, .pl-form-row input[type="time"], .pl-form-row input[type="number"], .pl-form-row input[type="text"] { padding: 0.625rem 0.875rem; font-size: 0.9375rem; color: #F4EFDD; background-color: #0a1929; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; width: 100%; box-sizing: border-box; }
+  .pl-form-row select:focus, .pl-form-row input:focus { outline: none; border-color: #EEB44B; box-shadow: 0 0 0 3px rgba(238,180,75,0.15); }
+  .pl-form-hint { font-size: 0.8125rem; color: #96ACBB; margin-top: 0.25rem; }
+  .pl-form-errors { color: #f87171; font-size: 0.8125rem; margin-top: 0.25rem; }
+
+  @media (max-width: 768px) {
+    .pl-stats, .pl-stats--3 { grid-template-columns: 1fr; }
+    .pl-dashboard { padding: 1.25rem; }
+  }
+</style>
+
+<div class="pl-dashboard">
+
+  <div>
+    <h1 class="pl-card__title">Payments Dashboard</h1>
+    <p class="pl-text-muted">Tab billing, charge history, and Stripe configuration.</p>
+  </div>
+
+  {# --- Tab navigation --- #}
+  <div class="pl-tab-nav">
+    <a href="?tab=overview" class="{% if active_tab == 'overview' %}active{% endif %}">Overview</a>
+    <a href="?tab=open-tabs" class="{% if active_tab == 'open-tabs' %}active{% endif %}">Open Tabs</a>
+    <a href="?tab=history" class="{% if active_tab == 'history' %}active{% endif %}">History</a>
+    <a href="?tab=settings" class="{% if active_tab == 'settings' %}active{% endif %}">Settings</a>
+    <a href="?tab=stripe" class="{% if active_tab == 'stripe' %}active{% endif %}">Stripe</a>
+  </div>
+
+  {# ================================================================ #}
+  {# OVERVIEW TAB                                                      #}
+  {# ================================================================ #}
+  {% if active_tab == "overview" %}
+
+  <div class="pl-stats">
+    <div class="pl-stat">
+      <div class="pl-stat__value">${{ total_outstanding }}</div>
+      <div class="pl-stat__label">Total Outstanding</div>
+    </div>
+    <div class="pl-stat">
+      <div class="pl-stat__value">${{ collected_this_month }}</div>
+      <div class="pl-stat__label">Collected This Month</div>
+    </div>
+    <div class="pl-stat">
+      <div class="pl-stat__value" style="color:{% if failed_count %}#f87171{% else %}#EEB44B{% endif %}">{{ failed_count }}</div>
+      <div class="pl-stat__label">Failed Charges</div>
+    </div>
+    <div class="pl-stat">
+      <div class="pl-stat__value" style="color:{% if locked_count %}#f87171{% else %}#EEB44B{% endif %}">{{ locked_count }}</div>
+      <div class="pl-stat__label">Locked Tabs</div>
+    </div>
+  </div>
+
+  <div class="pl-actions">
+    <button type="button" class="pl-btn pl-btn--primary" onclick="document.getElementById('add-charge-modal').style.display='flex'">
+      + Add Charge
+    </button>
+  </div>
+
+  {% if outstanding_tabs %}
+  <div class="pl-card">
+    <div class="pl-section-label">Outstanding Tabs</div>
+    <table class="pl-table">
+      <thead>
+        <tr>
+          <th>Member</th>
+          <th class="text-right">Balance</th>
+          <th>Payment Method</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for tab in outstanding_tabs %}
+        <tr onclick="openTabModal({{ tab.pk }})">
+          <td>{{ tab.member.display_name }}</td>
+          <td class="text-right">${{ tab.current_balance }}</td>
+          <td>{% if tab.has_payment_method %}{{ tab.payment_method_brand }} ···· {{ tab.payment_method_last4 }}{% else %}<span class="pl-badge pl-badge--warn">None</span>{% endif %}</td>
+          <td>{% if tab.is_locked %}<span class="pl-badge pl-badge--fail">Locked</span>{% else %}<span class="pl-badge pl-badge--ok">Active</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if failed_charges %}
+  <div class="pl-card">
+    <div class="pl-section-label">Recent Failed Charges</div>
+    <table class="pl-table">
+      <thead>
+        <tr>
+          <th>Member</th>
+          <th class="text-right">Amount</th>
+          <th>Reason</th>
+          <th>Retries</th>
+          <th>Date</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for charge in failed_charges %}
+        <tr>
+          <td onclick="openTabModal({{ charge.tab.pk }})" style="cursor:pointer">{{ charge.tab.member.display_name }}</td>
+          <td class="text-right">${{ charge.amount }}</td>
+          <td style="color:#96ACBB">{{ charge.failure_reason|truncatewords:8 }}</td>
+          <td>{{ charge.retry_count }}</td>
+          <td style="color:#96ACBB">{{ charge.created_at|date:"M j, Y" }}</td>
+          <td>
+            <button class="pl-btn pl-btn--sm pl-btn--secondary" onclick="retryCharge({{ charge.pk }}, this)">Retry</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% endif %}{# /overview #}
+
+  {# ================================================================ #}
+  {# OPEN TABS TAB                                                     #}
+  {# ================================================================ #}
+  {% if active_tab == "open-tabs" %}
+
+  <div class="pl-toolbar">
+    <div class="pl-filters">
+      <a href="?tab=open-tabs&filter=outstanding" class="pl-filter {% if tab_filter == 'outstanding' %}active{% endif %}">Outstanding</a>
+      <a href="?tab=open-tabs&filter=all" class="pl-filter {% if tab_filter == 'all' %}active{% endif %}">All Members</a>
+      <a href="?tab=open-tabs&filter=failed" class="pl-filter {% if tab_filter == 'failed' %}active{% endif %}">Failed Charges</a>
+    </div>
+    <button type="button" class="pl-btn pl-btn--primary pl-btn--sm" onclick="document.getElementById('add-charge-modal').style.display='flex'">
+      + Add Charge
+    </button>
+  </div>
+
+  <div class="pl-card">
+    <table class="pl-table">
+      <thead>
+        <tr>
+          <th>Member</th>
+          <th class="text-right">Balance</th>
+          <th class="text-right">Limit</th>
+          <th>Payment Method</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for tab in open_tabs %}
+        <tr onclick="openTabModal({{ tab.pk }})">
+          <td>{{ tab.member.display_name }}</td>
+          <td class="text-right">${{ tab.current_balance }}</td>
+          <td class="text-right" style="color:#96ACBB">${{ tab.effective_tab_limit }}</td>
+          <td>{% if tab.has_payment_method %}{{ tab.payment_method_brand }} ···· {{ tab.payment_method_last4 }}{% else %}<span class="pl-badge pl-badge--warn">None</span>{% endif %}</td>
+          <td>{% if tab.is_locked %}<span class="pl-badge pl-badge--fail">Locked</span>{% elif not tab.has_payment_method %}<span class="pl-badge pl-badge--warn">No card</span>{% else %}<span class="pl-badge pl-badge--ok">Active</span>{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" style="text-align:center;color:#96ACBB;padding:2rem">No tabs match this filter.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% endif %}{# /open-tabs #}
+
+  {# ================================================================ #}
+  {# HISTORY TAB                                                       #}
+  {# ================================================================ #}
+  {% if active_tab == "history" %}
+
+  <div class="pl-stats pl-stats--3">
+    <div class="pl-stat">
+      <div class="pl-stat__value">${{ history_collected }}</div>
+      <div class="pl-stat__label">Collected This Month</div>
+    </div>
+    <div class="pl-stat">
+      <div class="pl-stat__value" style="color:{% if history_failed_count %}#f87171{% else %}#EEB44B{% endif %}">{{ history_failed_count }}</div>
+      <div class="pl-stat__label">Failed This Month</div>
+    </div>
+    <div class="pl-stat">
+      <div class="pl-stat__value">{{ history_success_rate }}%</div>
+      <div class="pl-stat__label">Success Rate</div>
+    </div>
+  </div>
+
+  <div class="pl-toolbar">
+    <div class="pl-filters">
+      <a href="?tab=history&status=all" class="pl-filter {% if charge_status_filter == 'all' %}active{% endif %}">All</a>
+      <a href="?tab=history&status=succeeded" class="pl-filter {% if charge_status_filter == 'succeeded' %}active{% endif %}">Succeeded</a>
+      <a href="?tab=history&status=failed" class="pl-filter {% if charge_status_filter == 'failed' %}active{% endif %}">Failed</a>
+      <a href="?tab=history&status=needs_retry" class="pl-filter {% if charge_status_filter == 'needs_retry' %}active{% endif %}">Needs Retry</a>
+    </div>
+  </div>
+
+  <div class="pl-card">
+    <table class="pl-table">
+      <thead>
+        <tr>
+          <th>Member</th>
+          <th class="text-right">Amount</th>
+          <th>Guild / Account</th>
+          <th>Status</th>
+          <th>Retries</th>
+          <th>Date</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for charge in history_charges %}
+        <tr>
+          <td onclick="openTabModal({{ charge.tab.pk }})" style="cursor:pointer;color:#EEB44B">{{ charge.tab.member.display_name }}</td>
+          <td class="text-right">${{ charge.amount }}</td>
+          <td style="color:#96ACBB">{% if charge.stripe_account %}{{ charge.stripe_account.display_name }}{% else %}Platform{% endif %}</td>
+          <td>
+            {% if charge.status == "succeeded" %}<span class="pl-badge pl-badge--ok">Succeeded</span>
+            {% elif charge.status == "failed" %}<span class="pl-badge pl-badge--fail">Failed</span>
+            {% elif charge.status == "processing" %}<span class="pl-badge pl-badge--warn">Processing</span>
+            {% else %}<span class="pl-badge pl-badge--muted">{{ charge.get_status_display }}</span>{% endif %}
+          </td>
+          <td style="color:#96ACBB">{{ charge.retry_count }}</td>
+          <td style="color:#96ACBB">{% if charge.charged_at %}{{ charge.charged_at|date:"M j, Y" }}{% else %}{{ charge.created_at|date:"M j, Y" }}{% endif %}</td>
+          <td>
+            {% if charge.status == "succeeded" and charge.stripe_receipt_url %}
+              <a href="{{ charge.stripe_receipt_url }}" target="_blank" class="pl-btn pl-btn--sm pl-btn--secondary">Receipt</a>
+            {% elif charge.status == "failed" %}
+              <button class="pl-btn pl-btn--sm pl-btn--secondary" onclick="retryCharge({{ charge.pk }}, this)">Retry</button>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" style="text-align:center;color:#96ACBB;padding:2rem">No charges match this filter.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% endif %}{# /history #}
+
+  {# ================================================================ #}
+  {# SETTINGS TAB                                                      #}
+  {# ================================================================ #}
+  {% if active_tab == "settings" %}
+
+  <div class="pl-card">
+    <div class="pl-section-label">Billing Configuration</div>
+
+    <form method="post" action="{% url 'billing_admin_save_settings' %}">
+      {% csrf_token %}
+
+      <div class="pl-form-row">
+        <label for="{{ settings_form.charge_frequency.id_for_label }}">Charge Frequency</label>
+        {{ settings_form.charge_frequency }}
+        {% if settings_form.charge_frequency.errors %}<div class="pl-form-errors">{{ settings_form.charge_frequency.errors }}</div>{% endif %}
+      </div>
+
+      <div class="pl-form-row">
+        <label for="{{ settings_form.charge_time.id_for_label }}">Charge Time (Pacific)</label>
+        {{ settings_form.charge_time }}
+        {% if settings_form.charge_time.errors %}<div class="pl-form-errors">{{ settings_form.charge_time.errors }}</div>{% endif %}
+      </div>
+
+      <div class="pl-form-row" id="dow-field" style="display:{% if settings_form.charge_frequency.value == 'weekly' %}block{% else %}none{% endif %}">
+        <label for="{{ settings_form.charge_day_of_week.id_for_label }}">Day of Week (0=Monday … 6=Sunday)</label>
+        {{ settings_form.charge_day_of_week }}
+        {% if settings_form.charge_day_of_week.errors %}<div class="pl-form-errors">{{ settings_form.charge_day_of_week.errors }}</div>{% endif %}
+      </div>
+
+      <div class="pl-form-row" id="dom-field" style="display:{% if settings_form.charge_frequency.value == 'monthly' %}block{% else %}none{% endif %}">
+        <label for="{{ settings_form.charge_day_of_month.id_for_label }}">Day of Month (1–28)</label>
+        {{ settings_form.charge_day_of_month }}
+        {% if settings_form.charge_day_of_month.errors %}<div class="pl-form-errors">{{ settings_form.charge_day_of_month.errors }}</div>{% endif %}
+      </div>
+
+      <div class="pl-form-row">
+        <label for="{{ settings_form.default_tab_limit.id_for_label }}">Default Tab Limit ($)</label>
+        {{ settings_form.default_tab_limit }}
+        <div class="pl-form-hint">Maximum balance before new entries are blocked.</div>
+        {% if settings_form.default_tab_limit.errors %}<div class="pl-form-errors">{{ settings_form.default_tab_limit.errors }}</div>{% endif %}
+      </div>
+
+      <div class="pl-form-row">
+        <label for="{{ settings_form.max_retry_attempts.id_for_label }}">Max Retry Attempts</label>
+        {{ settings_form.max_retry_attempts }}
+        <div class="pl-form-hint">Number of times to retry a failed charge before locking the tab.</div>
+        {% if settings_form.max_retry_attempts.errors %}<div class="pl-form-errors">{{ settings_form.max_retry_attempts.errors }}</div>{% endif %}
+      </div>
+
+      <div class="pl-form-row">
+        <label for="{{ settings_form.retry_interval_hours.id_for_label }}">Retry Interval (hours)</label>
+        {{ settings_form.retry_interval_hours }}
+        {% if settings_form.retry_interval_hours.errors %}<div class="pl-form-errors">{{ settings_form.retry_interval_hours.errors }}</div>{% endif %}
+      </div>
+
+      <button type="submit" class="pl-btn pl-btn--primary">Save Settings</button>
+    </form>
+  </div>
+
+  {% endif %}{# /settings #}
+
+  {# ================================================================ #}
+  {# STRIPE TAB                                                        #}
+  {# ================================================================ #}
+  {% if active_tab == "stripe" %}
+
+  <div class="pl-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <div class="pl-section-label" style="margin-bottom:0">Connected Stripe Accounts</div>
+      <button type="button" class="pl-btn pl-btn--primary pl-btn--sm" onclick="document.getElementById('connect-stripe-modal').style.display='flex'">
+        + Connect Stripe Account
+      </button>
+    </div>
+    {% if stripe_accounts %}
+    <table class="pl-table">
+      <thead>
+        <tr>
+          <th>Display Name</th>
+          <th>Guild</th>
+          <th>Account ID</th>
+          <th>Platform Fee</th>
+          <th>Active</th>
+          <th>Connected</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for acct in stripe_accounts %}
+        <tr>
+          <td>{{ acct.display_name }}</td>
+          <td style="color:#96ACBB">{% if acct.guild %}{{ acct.guild.name }}{% else %}—{% endif %}</td>
+          <td style="color:#96ACBB;font-size:0.8125rem">{{ acct.stripe_account_id|truncatechars:20 }}</td>
+          <td>{{ acct.platform_fee_percent }}%</td>
+          <td>{% if acct.is_active %}<span class="pl-badge pl-badge--ok">Active</span>{% else %}<span class="pl-badge pl-badge--muted">Inactive</span>{% endif %}</td>
+          <td style="color:#96ACBB">{% if acct.connected_at %}{{ acct.connected_at|date:"M j, Y" }}{% else %}—{% endif %}</td>
+          <td><a href="{% url 'admin:billing_stripeaccount_change' acct.pk %}" class="pl-btn pl-btn--sm pl-btn--secondary">Edit</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="text-align:center;padding:3rem 1rem">
+      <div style="font-size:2rem;margin-bottom:0.75rem;opacity:0.3">⚡</div>
+      <div style="color:#F4EFDD;font-weight:600;margin-bottom:0.375rem">No Stripe accounts connected</div>
+      <div style="color:#96ACBB;font-size:0.875rem;margin-bottom:1.5rem">Connect a guild's Stripe account to start routing charges.</div>
+      <button type="button" class="pl-btn pl-btn--primary" onclick="document.getElementById('connect-stripe-modal').style.display='flex'">
+        + Connect Stripe Account
+      </button>
+    </div>
+    {% endif %}
+  </div>
+
+  {% endif %}{# /stripe #}
+
+</div>{# /pl-dashboard #}
+
+{# ================================================================ #}
+{# TAB DETAIL MODAL (shared, loaded via AJAX)                        #}
+{# ================================================================ #}
+<div id="tab-detail-modal" class="pl-modal-overlay" style="display:none"
+     onclick="if(event.target===this)closeTabModal()">
+  <div class="pl-modal">
+    <div class="pl-modal__header">
+      <div>
+        <div class="pl-modal__title" id="tdm-name">—</div>
+        <div class="pl-modal__subtitle" id="tdm-subtitle"></div>
+      </div>
+      <button class="pl-modal__close" onclick="closeTabModal()" aria-label="Close">&times;</button>
+    </div>
+    <div class="pl-modal__body">
+      <div class="pl-modal__pills">
+        <div class="pl-modal__pill">
+          <div class="pl-modal__pill-value" id="tdm-balance">—</div>
+          <div class="pl-modal__pill-label">Outstanding</div>
+        </div>
+        <div class="pl-modal__pill">
+          <div class="pl-modal__pill-value" style="color:#F4EFDD" id="tdm-limit">—</div>
+          <div class="pl-modal__pill-label">Tab Limit</div>
+        </div>
+        <div class="pl-modal__pill">
+          <div class="pl-modal__pill-value" id="tdm-pm" style="font-size:0.9rem;padding-top:0.25rem">—</div>
+          <div class="pl-modal__pill-label">Payment Method</div>
+        </div>
+      </div>
+
+      <div class="pl-section-label" style="margin-top:0.5rem">Pending Entries</div>
+      <table class="pl-table" id="tdm-entries-table">
+        <thead><tr><th>Description</th><th>Date</th><th class="text-right">Amount</th></tr></thead>
+        <tbody id="tdm-entries"></tbody>
+      </table>
+
+      <div class="pl-section-label" style="margin-top:1.25rem">Charge History</div>
+      <table class="pl-table" id="tdm-history-table">
+        <thead><tr><th>Date</th><th>Status</th><th class="text-right">Amount</th><th></th></tr></thead>
+        <tbody id="tdm-history"></tbody>
+      </table>
+    </div>
+    <div class="pl-modal__footer">
+      <div style="display:flex;gap:0.5rem" id="tdm-actions"></div>
+      <a id="tdm-admin-link" href="#" class="pl-btn pl-btn--sm pl-btn--secondary">View in Admin →</a>
+    </div>
+  </div>
+</div>
+
+{# ================================================================ #}
+{# CONNECT STRIPE MODAL                                              #}
+{# ================================================================ #}
+<div id="connect-stripe-modal" class="pl-modal-overlay" style="display:none"
+     onclick="if(event.target===this)this.style.display='none'">
+  <div class="pl-modal" style="max-width:420px">
+    <div class="pl-modal__header">
+      <div class="pl-modal__title">Connect Stripe Account</div>
+      <button class="pl-modal__close" onclick="document.getElementById('connect-stripe-modal').style.display='none'" aria-label="Close">&times;</button>
+    </div>
+    <div class="pl-modal__body">
+      <p style="color:#96ACBB;font-size:0.875rem;margin:0 0 1.25rem">Select the guild to link, then you'll be redirected to Stripe to authorise the connection.</p>
+      <div class="pl-modal__field">
+        <label for="connect-guild-select">Guild</label>
+        <select id="connect-guild-select">
+          <option value="">— Select a guild —</option>
+          {% for guild in guilds %}
+          <option value="{% url 'billing_initiate_connect' guild.pk %}">{{ guild.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="pl-modal__footer">
+      <button type="button" class="pl-btn pl-btn--secondary" onclick="document.getElementById('connect-stripe-modal').style.display='none'">Cancel</button>
+      <button type="button" class="pl-btn pl-btn--primary" onclick="initiateStripeConnect()">Connect via Stripe →</button>
+    </div>
+  </div>
+</div>
+
+{# ================================================================ #}
+{# ADD CHARGE MODAL                                                   #}
+{# ================================================================ #}
+<div id="add-charge-modal" class="pl-modal-overlay" style="display:none"
+     onclick="if(event.target===this)this.style.display='none'">
+  <div class="pl-modal" style="max-width:480px">
+    <div class="pl-modal__header">
+      <div class="pl-modal__title">Add Charge to Tab</div>
+      <button class="pl-modal__close" onclick="document.getElementById('add-charge-modal').style.display='none'" aria-label="Close">&times;</button>
+    </div>
+    <form method="post" action="{% url 'billing_admin_add_entry' %}">
+      {% csrf_token %}
+      <div class="pl-modal__body">
+        <div class="pl-modal__field">
+          <label for="{{ add_charge_form.member.id_for_label }}">Member</label>
+          {{ add_charge_form.member }}
+        </div>
+        <div class="pl-modal__field">
+          <label for="{{ add_charge_form.product.id_for_label }}">Product (optional)</label>
+          {{ add_charge_form.product }}
+        </div>
+        <div class="pl-modal__field">
+          <label for="{{ add_charge_form.description.id_for_label }}">Description</label>
+          {{ add_charge_form.description }}
+        </div>
+        <div class="pl-modal__field">
+          <label for="{{ add_charge_form.amount.id_for_label }}">Amount ($)</label>
+          {{ add_charge_form.amount }}
+        </div>
+        {% if add_charge_form.non_field_errors %}
+        <div class="pl-form-errors">{{ add_charge_form.non_field_errors }}</div>
+        {% endif %}
+      </div>
+      <div class="pl-modal__footer">
+        <button type="button" class="pl-btn pl-btn--secondary" onclick="document.getElementById('add-charge-modal').style.display='none'">Cancel</button>
+        <button type="submit" class="pl-btn pl-btn--primary">Add Charge</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  let _currentTabPk = null;
+
+  function getCsrfToken() {
+    const match = document.cookie.split('; ').find(r => r.startsWith('csrftoken='));
+    return match ? match.split('=')[1] : '';
+  }
+
+  function openTabModal(tabPk) {
+    _currentTabPk = tabPk;
+    fetch('/billing/admin/tab/' + tabPk + '/detail/')
+      .then(r => r.json())
+      .then(data => {
+        document.getElementById('tdm-name').textContent = data.member_name;
+        document.getElementById('tdm-subtitle').textContent = data.is_locked ? ('Locked: ' + data.locked_reason) : '';
+        document.getElementById('tdm-balance').textContent = '$' + data.balance;
+        document.getElementById('tdm-limit').textContent = '$' + data.limit;
+        document.getElementById('tdm-pm').textContent = data.payment_method || '— none —';
+
+        const entriesEl = document.getElementById('tdm-entries');
+        entriesEl.innerHTML = data.pending_entries.length
+          ? data.pending_entries.map(e =>
+              '<tr><td>' + e.description + '</td><td style="color:#96ACBB">' + e.date + '</td><td class="text-right">$' + e.amount + '</td></tr>'
+            ).join('')
+          : '<tr><td colspan="3" style="color:#96ACBB;text-align:center;padding:0.75rem">No pending entries.</td></tr>';
+
+        const historyEl = document.getElementById('tdm-history');
+        historyEl.innerHTML = data.charge_history.length
+          ? data.charge_history.map(c => {
+              const badge = c.status === 'succeeded'
+                ? '<span class="pl-badge pl-badge--ok">Succeeded</span>'
+                : '<span class="pl-badge pl-badge--fail">Failed</span>';
+              const action = (c.status === 'succeeded' && c.receipt_url)
+                ? '<a href="' + c.receipt_url + '" target="_blank" class="pl-btn pl-btn--sm pl-btn--secondary">Receipt</a>'
+                : '';
+              return '<tr><td style="color:#96ACBB">' + c.date + '</td><td>' + badge + '</td><td class="text-right">$' + c.amount + '</td><td>' + action + '</td></tr>';
+            }).join('')
+          : '<tr><td colspan="4" style="color:#96ACBB;text-align:center;padding:0.75rem">No charge history.</td></tr>';
+
+        const adminLink = document.getElementById('tdm-admin-link');
+        adminLink.href = '/admin/billing/tab/' + tabPk + '/change/';
+
+        const actionsEl = document.getElementById('tdm-actions');
+        actionsEl.innerHTML =
+          '<button class="pl-btn pl-btn--sm pl-btn--secondary" onclick="document.getElementById(\'add-charge-modal\').style.display=\'flex\'">+ Add Charge</button>';
+
+        document.getElementById('tab-detail-modal').style.display = 'flex';
+      });
+  }
+
+  function closeTabModal() {
+    document.getElementById('tab-detail-modal').style.display = 'none';
+    _currentTabPk = null;
+  }
+
+  function retryCharge(chargePk, btn) {
+    btn.disabled = true;
+    btn.textContent = 'Retrying…';
+    fetch('/billing/admin/retry-charge/' + chargePk + '/', {
+      method: 'POST',
+      headers: {'X-CSRFToken': getCsrfToken()}
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 'succeeded') {
+        const row = btn.closest('tr');
+        const statusCell = row.querySelector('.pl-badge');
+        if (statusCell) {
+          statusCell.className = 'pl-badge pl-badge--ok';
+          statusCell.textContent = 'Succeeded';
+        }
+        btn.remove();
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Retry';
+        alert('Retry failed. Check the charge in Stripe.');
+      }
+    });
+  }
+
+  function initiateStripeConnect() {
+    const url = document.getElementById('connect-guild-select').value;
+    if (!url) { alert('Please select a guild first.'); return; }
+    window.location.href = url;
+  }
+
+  /* Settings tab: show/hide day-of-week / day-of-month */
+  const freqEl = document.getElementById('id_charge_frequency');
+  if (freqEl) {
+    function updateDayFields() {
+      const freq = freqEl.value;
+      document.getElementById('dow-field').style.display = freq === 'weekly' ? 'block' : 'none';
+      document.getElementById('dom-field').style.display = freq === 'monthly' ? 'block' : 'none';
+    }
+    freqEl.addEventListener('change', updateDayFields);
+    updateDayFields();
+  }
+</script>
+{% endblock %}

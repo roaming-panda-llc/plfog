@@ -13,18 +13,32 @@ register = template.Library()
 
 
 @register.simple_tag(takes_context=True)
-def active_nav(context: dict[str, Any], url_name: str, pk: int | None = None) -> str:
-    """Return 'active' if the current URL matches the given URL name."""
+def active_nav(context: dict[str, Any], *args: str | int) -> str:
+    """Return 'active' if the current URL matches any of the given URL names.
+
+    Examples:
+        {% active_nav 'hub_guild_voting' %}
+        {% active_nav 'hub_guild_detail' guild.pk %}
+        {% active_nav 'hub_tab_detail' 'hub_tab_history' %}
+    """
     request = context.get("request")
     if request is None:
         return ""
     from django.urls import reverse
 
-    if pk is not None:
-        target = reverse(url_name, args=[pk])
-    else:
-        target = reverse(url_name)
-    return "active" if request.path == target else ""
+    url_names: list[str] = []
+    pk: int | None = None
+    for arg in args:
+        if isinstance(arg, int):
+            pk = arg
+        else:
+            url_names.append(arg)
+
+    for name in url_names:
+        target = reverse(name, args=[pk] if pk is not None else [])
+        if request.path == target:
+            return "active"
+    return ""
 
 
 @register.simple_tag(takes_context=True)

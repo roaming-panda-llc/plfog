@@ -1,0 +1,116 @@
+{% extends "hub/base.html" %}
+{% block title %}Payment Method{% endblock %}
+
+{% block content %}
+<div class="tab-page-header">
+    <h1 class="hub-page-title">Payment Method</h1>
+    <a href="{% url 'hub_tab_detail' %}" class="tab-history-link">Back to My Tab</a>
+</div>
+
+{% if tab.has_payment_method %}
+<div class="hub-card">
+    <h2 class="tab-section-title">Current Card</h2>
+    <p style="margin-bottom: 1rem;">
+        <strong>{{ tab.payment_method_brand|title }}</strong> ending in <strong>{{ tab.payment_method_last4 }}</strong>
+    </p>
+    <form method="post" action="{% url 'billing_remove_payment_method' %}">
+        {% csrf_token %}
+        <button type="submit" class="tab-add-form__btn" style="background: var(--color-error-bg); color: var(--color-error);">
+            Remove Card
+        </button>
+    </form>
+</div>
+{% endif %}
+
+<div class="hub-card">
+    <h2 class="tab-section-title">{% if tab.has_payment_method %}Replace Card{% else %}Add a Card{% endif %}</h2>
+    <p class="hub-text-muted" style="margin-bottom: 1rem;">
+        By adding a payment method, you authorize Past Lives Makerspace to charge your card
+        for accumulated tab balances on the billing schedule set by the organization.
+    </p>
+    <div id="card-element" style="padding: 0.75rem; background: var(--hub-input-bg); border: 1px solid var(--hub-input-border); border-radius: 6px; margin-bottom: 1rem;"></div>
+    <div id="card-errors" class="tab-form-error" style="margin-bottom: 0.75rem;"></div>
+    <button id="submit-btn" class="tab-add-form__btn" disabled>Save Card</button>
+</div>
+
+<script src="https://js.stripe.com/v3/"></script>
+<script>
+(function() {
+    const stripe = Stripe('{{ stripe_publishable_key }}');
+    const elements = stripe.elements();
+    const cardElement = elements.create('card', {
+        style: {
+            base: {
+                color: getComputedStyle(document.documentElement).getPropertyValue('--hub-text').trim() || '#F4EFDD',
+                fontFamily: 'Inter, system-ui, sans-serif',
+                fontSize: '14px',
+                '::placeholder': { color: '#96ACBB' }
+            }
+        }
+    });
+    cardElement.mount('#card-element');
+
+    const errorEl = document.getElementById('card-errors');
+    const submitBtn = document.getElementById('submit-btn');
+
+    cardElement.on('change', function(event) {
+        errorEl.textContent = event.error ? event.error.message : '';
+        submitBtn.disabled = !event.complete;
+    });
+
+    submitBtn.addEventListener('click', async function() {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+
+        // 1. Create SetupIntent via our API
+        const intentResp = await fetch('{% url "billing_create_setup_intent" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            }
+        });
+        const intentData = await intentResp.json();
+
+        if (intentData.error) {
+            errorEl.textContent = intentData.error;
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Card';
+            return;
+        }
+
+        // 2. Confirm the SetupIntent with the card element
+        const { setupIntent, error } = await stripe.confirmCardSetup(intentData.client_secret, {
+            payment_method: { card: cardElement }
+        });
+
+        if (error) {
+            errorEl.textContent = error.message;
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Card';
+            return;
+        }
+
+        // 3. POST the payment method ID to our confirm endpoint
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{% url "billing_confirm_setup" %}';
+
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = '{{ csrf_token }}';
+        form.appendChild(csrfInput);
+
+        const pmInput = document.createElement('input');
+        pmInput.type = 'hidden';
+        pmInput.name = 'payment_method_id';
+        pmInput.value = setupIntent.payment_method;
+        form.appendChild(pmInput);
+
+        document.body.appendChild(form);
+        form.submit();
+    });
+})();
+</script>
+{% endblock %}

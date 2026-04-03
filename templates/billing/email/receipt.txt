@@ -1,0 +1,17 @@
+Past Lives Makerspace
+Portland, OR
+
+RECEIPT
+-------
+
+Date: {{ charged_at|date:"F j, Y" }}
+Member: {{ member.display_name }}
+
+Items:
+{% for entry in entries %}  - {{ entry.description }}: ${{ entry.amount }}
+{% endfor %}
+Total Charged: ${{ charge.amount }}
+
+{% if charge.stripe_receipt_url %}View your Stripe receipt: {{ charge.stripe_receipt_url }}{% endif %}
+
+Thank you for being a member of Past Lives Makerspace!

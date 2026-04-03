@@ -5,16 +5,18 @@
 <div class="hub-card">
     <h1 class="hub-page-title">{{ guild.name }}</h1>
 
-    {% if guild.notes %}
     <div class="hub-detail-section">
         <h3 class="hub-detail-label">About</h3>
-        <p>{{ guild.notes|linebreaksbr }}</p>
+        {% if guild.about %}
+        <p>{{ guild.about|linebreaksbr }}</p>
+        {% else %}
+        <p class="hub-text-muted">Nothing here yet.</p>
+        {% endif %}
     </div>
-    {% endif %}
 
+    {% if guild.guild_lead %}
     <div class="hub-detail-section">
-        <h3 class="hub-detail-label">Members</h3>
-        {% if guild.guild_lead %}
+        <h3 class="hub-detail-label">Guild Lead</h3>
         <div class="hub-member-row">
             <div class="hub-member-avatar">
                 {{ guild.guild_lead.display_name|make_list|first|upper }}
@@ -24,16 +26,31 @@
                 <span class="hub-badge">Lead</span>
             </div>
         </div>
-        {% else %}
-        <p class="hub-text-muted">No guild lead assigned.</p>
-        {% endif %}
-        <p class="hub-text-muted hub-note" style="margin-top: 1rem;">Full guild pages coming soon.</p>
     </div>
-
+    {% endif %}
 </div>
 
-<div class="hub-card" style="margin-top: 1.5rem;">
-    <h3 class="hub-detail-label">Buyables</h3>
-    <p class="hub-text-muted">Coming soon.</p>
+<div class="hub-card" style="margin-top:1.5rem;">
+    <h3 class="hub-detail-label" style="margin-bottom:1rem;">Products</h3>
+    {% if products %}
+    <table style="width:100%;border-collapse:collapse;">
+        <thead>
+            <tr>
+                <th style="text-align:left;padding:0.5rem 0.75rem;color:var(--color-muted,#96ACBB);font-size:0.8125rem;font-weight:500;border-bottom:1px solid rgba(255,255,255,0.08);">Product</th>
+                <th style="text-align:right;padding:0.5rem 0.75rem;color:var(--color-muted,#96ACBB);font-size:0.8125rem;font-weight:500;border-bottom:1px solid rgba(255,255,255,0.08);">Price</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for product in products %}
+            <tr>
+                <td style="padding:0.625rem 0.75rem;border-bottom:1px solid rgba(255,255,255,0.05);">{{ product.name }}</td>
+                <td style="padding:0.625rem 0.75rem;text-align:right;border-bottom:1px solid rgba(255,255,255,0.05);">${{ product.price }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="hub-text-muted">No products listed yet.</p>
+    {% endif %}
 </div>
 {% endblock %}

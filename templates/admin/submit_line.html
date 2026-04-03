@@ -7,16 +7,6 @@
         <button type="submit" name="_save" class="hub-btn hub-btn--primary">Save</button>
         {% endif %}
 
-        {% if show_save_and_continue %}
-        <button type="submit" name="_continue" class="hub-btn hub-btn--secondary">
-            {% if can_change %}Save and continue editing{% else %}Save and view{% endif %}
-        </button>
-        {% endif %}
-
-        {% if show_save_and_add_another %}
-        <button type="submit" name="_addanother" class="hub-btn hub-btn--secondary">Save and add another</button>
-        {% endif %}
-
         {% if show_save_as_new %}
         <button type="submit" name="_saveasnew" class="hub-btn hub-btn--secondary">Save as new</button>
         {% endif %}
@@ -30,7 +20,23 @@
 
         {% if show_delete_link and original %}
             {% url opts|admin_urlname:'delete' original.pk|admin_urlquote as delete_url %}
-            <a href="{% add_preserved_filters delete_url %}" class="pl-admin-submit__delete">Delete {{ opts.verbose_name }}</a>
+            <button type="button" class="pl-admin-submit__delete" onclick="document.getElementById('pl-delete-modal').style.display='flex'">Delete {{ opts.verbose_name }}</button>
+
+            <div id="pl-delete-modal" class="changelog-overlay" style="display:none;" onclick="if(event.target===this)this.style.display='none'">
+                <div class="changelog-modal" style="max-width:420px;width:100%;">
+                    <div class="changelog-modal__header">
+                        <h2 class="changelog-modal__title">Delete {{ opts.verbose_name }}?</h2>
+                        <button class="changelog-modal__close" type="button" onclick="document.getElementById('pl-delete-modal').style.display='none'" aria-label="Close">&times;</button>
+                    </div>
+                    <div class="changelog-modal__body">
+                        <p style="margin:0 0 1.5rem;">Are you sure you want to delete <strong>{{ original }}</strong>? This cannot be undone.</p>
+                        <div style="display:flex;gap:0.75rem;">
+                            <a href="{% add_preserved_filters delete_url %}" class="hub-btn hub-btn--danger" style="flex:1;text-align:center;">Yes, delete</a>
+                            <button type="button" class="hub-btn" style="flex:1;" onclick="document.getElementById('pl-delete-modal').style.display='none'">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         {% endif %}
     </div>
     {% endblock %}

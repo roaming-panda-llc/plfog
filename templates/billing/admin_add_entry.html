@@ -1,0 +1,32 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Add Tab Entry{% endblock %}
+{% block content_title %}<h1>Add Charge to Member Tab</h1>{% endblock %}
+
+{% block content %}
+<form method="post">
+    {% csrf_token %}
+    <fieldset>
+        {% for field in form %}
+        <div style="margin-bottom: 1rem;">
+            <label for="{{ field.id_for_label }}" style="display: block; font-weight: 600; margin-bottom: 0.25rem;">
+                {{ field.label }}
+            </label>
+            {{ field }}
+            {% if field.errors %}
+            <ul class="errorlist">
+                {% for error in field.errors %}
+                <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </fieldset>
+    <div style="margin-top: 1rem;">
+        <input type="submit" value="Add Entry" class="default">
+        <a href="{% url 'billing_admin_dashboard' %}" style="margin-left: 1rem;">Cancel</a>
+    </div>
+</form>
+{% endblock %}

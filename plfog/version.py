@@ -2,9 +2,31 @@
 
 from __future__ import annotations
 
-VERSION = "1.2.1"
+VERSION = "1.3.0"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.3.0",
+        "date": "2026-04-02",
+        "title": "Tab Billing System",
+        "changes": [
+            "New tab system — charges accumulate on your tab and get billed on a schedule, just like a bar tab",
+            "See your tab balance at a glance with the new balance pill in the top bar",
+            "My Tab page shows your pending charges, tab limit, and remaining balance",
+            "Tab History page shows all past charges with itemized details you can expand",
+            "Add items to your own tab with the self-service form",
+            "Set up a payment method securely through Stripe — your card info never touches our server",
+            "Automated billing engine charges tabs on a configurable schedule (daily, weekly, or monthly)",
+            "Failed charges automatically retry up to 3 times before locking the tab",
+            "Email receipts after every successful charge with an itemized breakdown",
+            "Guild Stripe accounts can be connected via Stripe Connect — each guild receives their share of charges directly",
+            "Members can pick products when adding to their tab — price and description are filled in automatically",
+            "Unified Payments admin — one page for outstanding tabs, charge history, billing settings, and Stripe accounts",
+            "All financial records are preserved forever — entries are voided, never deleted",
+            "Guild pages — each guild now has its own page with an about section and a list of products",
+            "Guild leads can edit their guild's about text and manage their product listings directly from the guild page",
+        ],
+    },
     {
         "version": "1.2.1",
         "date": "2026-04-01",

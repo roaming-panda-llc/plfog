@@ -11,4 +11,6 @@ urlpatterns = [
     path("settings/profile/", views.profile_settings, name="hub_profile_settings"),
     path("settings/emails/", views.email_preferences, name="hub_email_preferences"),
     path("feedback/", views.beta_feedback, name="hub_beta_feedback"),
+    path("tab/", views.tab_detail, name="hub_tab_detail"),
+    path("tab/history/", views.tab_history, name="hub_tab_history"),
 ]
