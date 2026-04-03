@@ -254,6 +254,60 @@ def admin_add_tab_entry(request: HttpRequest) -> HttpResponse:
 
 
 @staff_member_required
+def billing_admin_tab_detail_api(request: HttpRequest, tab_pk: int) -> JsonResponse:
+    """Return JSON tab detail for the tab detail modal."""
+    try:
+        tab = Tab.objects.select_related("member").get(pk=tab_pk)
+    except Tab.DoesNotExist:
+        from django.http import Http404
+        raise Http404
+
+    pending_entries = list(
+        tab.entries.filter(tab_charge__isnull=True, voided_at__isnull=True)
+        .select_related("product__guild")
+        .order_by("-created_at")
+        .values("description", "amount", "created_at")
+    )
+
+    charge_history = list(
+        tab.charges.exclude(status=TabCharge.Status.PENDING)
+        .order_by("-created_at")[:20]
+        .values("amount", "status", "charged_at", "stripe_receipt_url")
+    )
+
+    payment_method = ""
+    if tab.payment_method_brand and tab.payment_method_last4:
+        payment_method = f"{tab.payment_method_brand} {tab.payment_method_last4}"
+
+    return JsonResponse({
+        "member_name": tab.member.display_name,
+        "balance": f"{tab.current_balance:.2f}",
+        "limit": f"{tab.effective_tab_limit:.2f}",
+        "payment_method": payment_method,
+        "is_locked": tab.is_locked,
+        "locked_reason": tab.locked_reason,
+        "tab_pk": tab.pk,
+        "pending_entries": [
+            {
+                "description": e["description"],
+                "amount": f"{e['amount']:.2f}",
+                "date": e["created_at"].strftime("%-d %b") if e["created_at"] else "",
+            }
+            for e in pending_entries
+        ],
+        "charge_history": [
+            {
+                "amount": f"{c['amount']:.2f}",
+                "status": c["status"],
+                "date": c["charged_at"].strftime("%-d %b %Y") if c["charged_at"] else "—",
+                "receipt_url": c["stripe_receipt_url"] or "",
+            }
+            for c in charge_history
+        ],
+    })
+
+
+@staff_member_required
 @require_POST
 def billing_admin_save_settings(request: HttpRequest) -> HttpResponse:
     """Save BillingSettings singleton from the Settings tab form."""

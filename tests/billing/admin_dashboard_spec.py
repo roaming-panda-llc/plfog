@@ -68,6 +68,71 @@ def describe_admin_tab_dashboard():
         assert response.context["locked_count"] == 1
 
 
+def describe_billing_admin_tab_detail_api():
+    def it_requires_staff(client: Client):
+        response = client.get("/billing/admin/tab/999/detail/")
+        assert response.status_code == 302
+
+    def it_returns_404_for_missing_tab(client: Client):
+        _create_superuser(client)
+        response = client.get("/billing/admin/tab/999999/detail/")
+        assert response.status_code == 404
+
+    def it_returns_tab_data_as_json(client: Client):
+        _create_superuser(client)
+        member = MemberFactory(full_legal_name="Jane Doe")
+        tab = TabFactory(
+            member=member,
+            stripe_payment_method_id="pm_test",
+            payment_method_brand="visa",
+            payment_method_last4="4242",
+            tab_limit=Decimal("150.00"),
+        )
+        TabEntryFactory(tab=tab, description="Laser time", amount=Decimal("20.00"))
+
+        response = client.get(f"/billing/admin/tab/{tab.pk}/detail/")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["member_name"] == "Jane Doe"
+        assert data["balance"] == "20.00"
+        assert data["limit"] == "150.00"
+        assert data["payment_method"] == "visa 4242"
+        assert data["is_locked"] is False
+        assert len(data["pending_entries"]) == 1
+        assert data["pending_entries"][0]["description"] == "Laser time"
+        assert data["pending_entries"][0]["amount"] == "20.00"
+
+    def it_returns_charge_history(client: Client):
+        _create_superuser(client)
+        member = MemberFactory()
+        tab = TabFactory(member=member)
+        TabChargeFactory(
+            tab=tab,
+            status=TabCharge.Status.SUCCEEDED,
+            amount=Decimal("50.00"),
+            stripe_receipt_url="https://receipt.test",
+        )
+
+        response = client.get(f"/billing/admin/tab/{tab.pk}/detail/")
+        data = response.json()
+
+        assert len(data["charge_history"]) == 1
+        assert data["charge_history"][0]["amount"] == "50.00"
+        assert data["charge_history"][0]["status"] == "succeeded"
+        assert data["charge_history"][0]["receipt_url"] == "https://receipt.test"
+
+    def it_shows_no_payment_method_when_absent(client: Client):
+        _create_superuser(client)
+        member = MemberFactory()
+        tab = TabFactory(member=member, stripe_payment_method_id="", payment_method_brand="", payment_method_last4="")
+
+        response = client.get(f"/billing/admin/tab/{tab.pk}/detail/")
+        data = response.json()
+
+        assert data["payment_method"] == ""
+
+
 def describe_billing_admin_save_settings():
     def it_requires_staff(client: Client):
         response = client.post("/billing/admin/save-settings/", {})
