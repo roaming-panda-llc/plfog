@@ -60,3 +60,13 @@ def describe_connect_callback():
         assert response.status_code == 302
         acct = StripeAccount.objects.get(guild=guild)
         assert acct.stripe_account_id == "acct_updated_456"
+
+    def it_redirects_on_missing_code(client: Client):
+        _create_superuser(client)
+        response = client.get("/billing/connect/callback/", {"state": "1"})
+        assert response.status_code == 302
+
+    def it_redirects_on_missing_state(client: Client):
+        _create_superuser(client)
+        response = client.get("/billing/connect/callback/", {"code": "ac_test_code"})
+        assert response.status_code == 302

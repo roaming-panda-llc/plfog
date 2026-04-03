@@ -462,8 +462,12 @@ def connect_callback(request: HttpRequest) -> HttpResponse:
         django_messages.error(request, f"Stripe Connect failed: {request.GET.get('error_description', error)}")
         return redirect("billing_admin_dashboard")
 
-    code = request.GET.get("code", "")
-    guild_id = request.GET.get("state", "")
+    try:
+        code = request.GET["code"]
+        guild_id = request.GET["state"]
+    except KeyError:
+        django_messages.error(request, "Stripe Connect callback is missing required parameters.")
+        return redirect("billing_admin_dashboard")
     account_id = stripe_utils.complete_connect_oauth(code=code)
     guild = Guild.objects.get(pk=int(guild_id))
 

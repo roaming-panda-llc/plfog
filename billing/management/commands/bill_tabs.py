@@ -232,7 +232,7 @@ class Command(BaseCommand):
             send_receipt(charge)
             return True
         logger.exception("Tab %s: Stripe charge failed.", tab.pk)
-        charge.retry_count = 1
+        charge.retry_count += 1
         charge.next_retry_at = timezone.now() + timedelta(hours=settings.retry_interval_hours)
         charge.save(update_fields=["retry_count", "next_retry_at"])
         notify_admin_charge_failed(charge)

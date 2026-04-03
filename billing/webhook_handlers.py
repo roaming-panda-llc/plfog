@@ -67,7 +67,7 @@ def handle_payment_intent_succeeded(event: dict[str, Any]) -> None:
     charges_data = payment_intent["charges"]["data"]
     if charges_data:
         charge.stripe_charge_id = charges_data[0]["id"]
-        charge.stripe_receipt_url = charges_data[0].get("receipt_url", "")
+        charge.stripe_receipt_url = charges_data[0]["receipt_url"] or ""
 
     charge.save()
     send_receipt(charge)
@@ -88,9 +88,9 @@ def handle_payment_intent_failed(event: dict[str, Any]) -> None:
     if charge.status == TabCharge.Status.FAILED:
         return
 
-    last_error = payment_intent["last_payment_error"]
+    last_error = payment_intent.get("last_payment_error") or {}
     charge.status = TabCharge.Status.FAILED
-    charge.failure_reason = last_error["message"]
+    charge.failure_reason = last_error.get("message", "Payment failed")
     charge.save(update_fields=["status", "failure_reason"])
     notify_admin_charge_failed(charge)
 
