@@ -144,6 +144,7 @@ def describe_admin_tab_dashboard_extended():
 
     def it_provides_history_charges_filter_needs_retry(client: Client):
         from django.utils import timezone as tz
+
         _create_superuser(client)
         tab = TabFactory()
         retryable = TabChargeFactory(
@@ -160,8 +161,7 @@ def describe_admin_tab_dashboard_extended():
     def it_provides_history_month_stats(client: Client):
         _create_superuser(client)
         tab = TabFactory()
-        TabChargeFactory(tab=tab, status=TabCharge.Status.SUCCEEDED, amount=Decimal("75.00"),
-                         charged_at=timezone.now())
+        TabChargeFactory(tab=tab, status=TabCharge.Status.SUCCEEDED, amount=Decimal("75.00"), charged_at=timezone.now())
 
         response = client.get("/billing/admin/dashboard/?tab=history")
         assert response.context["history_collected"] == Decimal("75.00")
@@ -174,6 +174,7 @@ def describe_admin_tab_dashboard_extended():
         response = client.get("/billing/admin/dashboard/?tab=settings")
         assert "settings_form" in response.context
         from billing.forms import BillingSettingsForm
+
         assert isinstance(response.context["settings_form"], BillingSettingsForm)
 
     def it_provides_stripe_context(client: Client):
@@ -264,15 +265,18 @@ def describe_billing_admin_save_settings():
         _create_superuser(client)
         BillingSettingsFactory()
 
-        response = client.post("/billing/admin/save-settings/", {
-            "charge_frequency": "weekly",
-            "charge_time": "22:00",
-            "charge_day_of_week": "1",
-            "charge_day_of_month": "",
-            "default_tab_limit": "150.00",
-            "max_retry_attempts": "5",
-            "retry_interval_hours": "12",
-        })
+        response = client.post(
+            "/billing/admin/save-settings/",
+            {
+                "charge_frequency": "weekly",
+                "charge_time": "22:00",
+                "charge_day_of_week": "1",
+                "charge_day_of_month": "",
+                "default_tab_limit": "150.00",
+                "max_retry_attempts": "5",
+                "retry_interval_hours": "12",
+            },
+        )
 
         assert response.status_code == 302
         assert response.url == "/billing/admin/dashboard/?tab=settings"
@@ -284,15 +288,18 @@ def describe_billing_admin_save_settings():
         _create_superuser(client)
         BillingSettingsFactory()
 
-        response = client.post("/billing/admin/save-settings/", {
-            "charge_frequency": "daily",
-            "charge_time": "23:00",
-            "charge_day_of_week": "",
-            "charge_day_of_month": "",
-            "default_tab_limit": "-50.00",
-            "max_retry_attempts": "3",
-            "retry_interval_hours": "24",
-        })
+        response = client.post(
+            "/billing/admin/save-settings/",
+            {
+                "charge_frequency": "daily",
+                "charge_time": "23:00",
+                "charge_day_of_week": "",
+                "charge_day_of_month": "",
+                "default_tab_limit": "-50.00",
+                "max_retry_attempts": "3",
+                "retry_interval_hours": "24",
+            },
+        )
 
         assert response.status_code == 302
         assert "tab=settings" in response.url
@@ -338,6 +345,7 @@ def describe_billing_admin_retry_charge():
     def it_succeeds_destination_charge_when_stripe_account_present(client: Client):
         _create_superuser(client)
         from tests.billing.factories import StripeAccountFactory
+
         stripe_acct = StripeAccountFactory(stripe_account_id="acct_test")
         tab = TabFactory(stripe_customer_id="cus_test", stripe_payment_method_id="pm_test")
         charge = TabChargeFactory(

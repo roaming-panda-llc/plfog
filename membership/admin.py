@@ -241,6 +241,7 @@ class GuildAdmin(ModelAdmin):
 
     def response_change(self, request, obj):
         from django.http import HttpResponseRedirect
+
         return HttpResponseRedirect(request.path + "#pl-products-section")
 
     @admin.display(description="Notes")

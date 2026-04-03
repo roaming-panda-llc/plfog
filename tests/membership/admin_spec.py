@@ -266,6 +266,54 @@ def describe_GuildAdmin():
 
 
 @pytest.mark.django_db
+def describe_GuildAdmin_actions():
+    def it_view_guild_page_redirects_to_guild_url():
+        guild = GuildFactory()
+        guild_admin = admin.site._registry[Guild]
+        request = MagicMock()
+        response = guild_admin.view_guild_page(request, guild.pk)
+        assert response.status_code == 302
+        assert response["Location"] == f"/guilds/{guild.pk}/"
+
+    def it_response_change_stays_on_page():
+        guild = GuildFactory()
+        guild_admin = admin.site._registry[Guild]
+        request = MagicMock()
+        request.path = f"/admin/membership/guild/{guild.pk}/change/"
+        response = guild_admin.response_change(request, guild)
+        assert response.status_code == 302
+        assert response["Location"].endswith("#pl-products-section")
+
+    def it_formfield_for_foreignkey_sets_unassigned_label_for_guild_lead():
+        from unittest.mock import patch
+
+        guild_admin = admin.site._registry[Guild]
+        request = MagicMock()
+        db_field = MagicMock()
+        db_field.name = "guild_lead"
+        sentinel = object()
+        with patch("membership.admin.ModelAdmin.formfield_for_foreignkey", return_value=sentinel) as mock_super:
+            result = guild_admin.formfield_for_foreignkey(db_field, request)
+        assert result is sentinel
+        _, _, kwargs = mock_super.mock_calls[0]
+        assert kwargs.get("empty_label") == "Unassigned"
+
+    def it_formfield_for_foreignkey_skips_label_for_other_fields():
+        from unittest.mock import patch
+
+        guild_admin = admin.site._registry[Guild]
+        request = MagicMock()
+        db_field = MagicMock()
+        db_field.name = "some_other_field"
+        sentinel = object()
+        with patch("membership.admin.ModelAdmin.formfield_for_foreignkey", return_value=sentinel) as mock_super:
+            result = guild_admin.formfield_for_foreignkey(db_field, request)
+        assert result is sentinel
+        _, _, kwargs = mock_super.mock_calls[0]
+        assert "empty_label" not in kwargs
+
+
+@pytest.mark.django_db
 def describe_admin_guild_computed_fields():
     def it_displays_notes_preview_short():
         guild = GuildFactory(name="Short Notes Guild", notes="Brief note")

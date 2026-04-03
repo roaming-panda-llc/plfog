@@ -229,11 +229,7 @@ def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
     if tab_filter == "all":
         open_tabs = Tab.objects.select_related("member").order_by("member__full_legal_name")
     elif tab_filter == "failed":
-        open_tabs = (
-            Tab.objects.filter(charges__status=TabCharge.Status.FAILED)
-            .distinct()
-            .select_related("member")
-        )
+        open_tabs = Tab.objects.filter(charges__status=TabCharge.Status.FAILED).distinct().select_related("member")
     else:  # outstanding (default)
         open_tabs = (
             Tab.objects.filter(
@@ -253,9 +249,8 @@ def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
     elif charge_status_filter == "needs_retry":
         history_charges = TabCharge.objects.needs_retry().select_related("tab__member", "stripe_account")
     else:
-        history_charges = (
-            TabCharge.objects.exclude(status=TabCharge.Status.PENDING)
-            .select_related("tab__member", "stripe_account")
+        history_charges = TabCharge.objects.exclude(status=TabCharge.Status.PENDING).select_related(
+            "tab__member", "stripe_account"
         )
     history_charges = history_charges.order_by("-created_at")
 
@@ -270,9 +265,7 @@ def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
     ).count()
 
     history_total_count = (
-        TabCharge.objects.filter(created_at__gte=month_start)
-        .exclude(status=TabCharge.Status.PENDING)
-        .count()
+        TabCharge.objects.filter(created_at__gte=month_start).exclude(status=TabCharge.Status.PENDING).count()
     )
 
     history_succeeded_count = TabCharge.objects.filter(
@@ -280,11 +273,7 @@ def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
         charged_at__gte=month_start,
     ).count()
 
-    history_success_rate = (
-        int(history_succeeded_count / history_total_count * 100)
-        if history_total_count
-        else 100
-    )
+    history_success_rate = int(history_succeeded_count / history_total_count * 100) if history_total_count else 100
 
     # --- Settings tab ---
     settings_obj = BillingSettings.load()
@@ -364,6 +353,7 @@ def billing_admin_tab_detail_api(request: HttpRequest, tab_pk: int) -> JsonRespo
         tab = Tab.objects.select_related("member").get(pk=tab_pk)
     except Tab.DoesNotExist:
         from django.http import Http404
+
         raise Http404
 
     pending_entries = list(
@@ -383,32 +373,34 @@ def billing_admin_tab_detail_api(request: HttpRequest, tab_pk: int) -> JsonRespo
     if tab.payment_method_brand and tab.payment_method_last4:
         payment_method = f"{tab.payment_method_brand} {tab.payment_method_last4}"
 
-    return JsonResponse({
-        "member_name": tab.member.display_name,
-        "balance": f"{tab.current_balance:.2f}",
-        "limit": f"{tab.effective_tab_limit:.2f}",
-        "payment_method": payment_method,
-        "is_locked": tab.is_locked,
-        "locked_reason": tab.locked_reason,
-        "tab_pk": tab.pk,
-        "pending_entries": [
-            {
-                "description": e["description"],
-                "amount": f"{e['amount']:.2f}",
-                "date": e["created_at"].strftime("%-d %b") if e["created_at"] else "",
-            }
-            for e in pending_entries
-        ],
-        "charge_history": [
-            {
-                "amount": f"{c['amount']:.2f}",
-                "status": c["status"],
-                "date": c["charged_at"].strftime("%-d %b %Y") if c["charged_at"] else "—",
-                "receipt_url": c["stripe_receipt_url"] or "",
-            }
-            for c in charge_history
-        ],
-    })
+    return JsonResponse(
+        {
+            "member_name": tab.member.display_name,
+            "balance": f"{tab.current_balance:.2f}",
+            "limit": f"{tab.effective_tab_limit:.2f}",
+            "payment_method": payment_method,
+            "is_locked": tab.is_locked,
+            "locked_reason": tab.locked_reason,
+            "tab_pk": tab.pk,
+            "pending_entries": [
+                {
+                    "description": e["description"],
+                    "amount": f"{e['amount']:.2f}",
+                    "date": e["created_at"].strftime("%-d %b") if e["created_at"] else "",
+                }
+                for e in pending_entries
+            ],
+            "charge_history": [
+                {
+                    "amount": f"{c['amount']:.2f}",
+                    "status": c["status"],
+                    "date": c["charged_at"].strftime("%-d %b %Y") if c["charged_at"] else "—",
+                    "receipt_url": c["stripe_receipt_url"] or "",
+                }
+                for c in charge_history
+            ],
+        }
+    )
 
 
 @staff_member_required
@@ -437,6 +429,7 @@ def billing_admin_retry_charge(request: HttpRequest, charge_pk: int) -> JsonResp
         charge = TabCharge.objects.select_related("tab", "stripe_account").get(pk=charge_pk)
     except TabCharge.DoesNotExist:
         from django.http import Http404
+
         raise Http404
 
     tab = charge.tab

@@ -4,15 +4,16 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('membership', '0018_alter_memberemail_member'),
+        ("membership", "0018_alter_memberemail_member"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='guild',
-            name='about',
-            field=models.TextField(blank=True, default='', help_text='Member-facing description or announcement shown on the guild page.'),
+            model_name="guild",
+            name="about",
+            field=models.TextField(
+                blank=True, default="", help_text="Member-facing description or announcement shown on the guild page."
+            ),
         ),
     ]
