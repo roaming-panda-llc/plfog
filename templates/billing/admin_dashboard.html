@@ -77,7 +77,7 @@
   /* Settings form */
   .pl-form-row { margin-bottom: 1.25rem; }
   .pl-form-row label { display: block; font-size: 0.875rem; font-weight: 500; color: #96ACBB; margin-bottom: 0.375rem; }
-  .pl-form-row select, .pl-form-row input[type="time"], .pl-form-row input[type="number"], .pl-form-row input[type="text"] { padding: 0.625rem 0.875rem; font-size: 0.9375rem; color: #F4EFDD; background-color: #0a1929; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; width: 100%; max-width: 320px; box-sizing: border-box; }
+  .pl-form-row select, .pl-form-row input[type="time"], .pl-form-row input[type="number"], .pl-form-row input[type="text"] { padding: 0.625rem 0.875rem; font-size: 0.9375rem; color: #F4EFDD; background-color: #0a1929; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; width: 100%; box-sizing: border-box; }
   .pl-form-row select:focus, .pl-form-row input:focus { outline: none; border-color: #EEB44B; box-shadow: 0 0 0 3px rgba(238,180,75,0.15); }
   .pl-form-hint { font-size: 0.8125rem; color: #96ACBB; margin-top: 0.25rem; }
   .pl-form-errors { color: #f87171; font-size: 0.8125rem; margin-top: 0.25rem; }
@@ -379,7 +379,13 @@
   {% if active_tab == "stripe" %}
 
   <div class="pl-card">
-    <div class="pl-section-label">Connected Stripe Accounts</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+      <div class="pl-section-label" style="margin-bottom:0">Connected Stripe Accounts</div>
+      <button type="button" class="pl-btn pl-btn--primary pl-btn--sm" onclick="document.getElementById('connect-stripe-modal').style.display='flex'">
+        + Connect Stripe Account
+      </button>
+    </div>
+    {% if stripe_accounts %}
     <table class="pl-table">
       <thead>
         <tr>
@@ -403,49 +409,19 @@
           <td style="color:#96ACBB">{% if acct.connected_at %}{{ acct.connected_at|date:"M j, Y" }}{% else %}—{% endif %}</td>
           <td><a href="{% url 'admin:billing_stripeaccount_change' acct.pk %}" class="pl-btn pl-btn--sm pl-btn--secondary">Edit</a></td>
         </tr>
-        {% empty %}
-        <tr><td colspan="7" style="text-align:center;color:#96ACBB;padding:2rem">No Stripe accounts connected yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
-    <div style="margin-top:1.25rem;display:flex;gap:0.75rem;flex-wrap:wrap">
-      {% for guild in guilds %}
-      <a href="{% url 'billing_initiate_connect' guild.pk %}" class="pl-btn pl-btn--secondary pl-btn--sm">
-        Connect {{ guild.name }}
-      </a>
-      {% endfor %}
+    {% else %}
+    <div style="text-align:center;padding:3rem 1rem">
+      <div style="font-size:2rem;margin-bottom:0.75rem;opacity:0.3">⚡</div>
+      <div style="color:#F4EFDD;font-weight:600;margin-bottom:0.375rem">No Stripe accounts connected</div>
+      <div style="color:#96ACBB;font-size:0.875rem;margin-bottom:1.5rem">Connect a guild's Stripe account to start routing charges.</div>
+      <button type="button" class="pl-btn pl-btn--primary" onclick="document.getElementById('connect-stripe-modal').style.display='flex'">
+        + Connect Stripe Account
+      </button>
     </div>
-  </div>
-
-  <div class="pl-card">
-    <div class="pl-section-label">Products</div>
-    <table class="pl-table">
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Guild</th>
-          <th class="text-right">Price</th>
-          <th>Active</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for product in products %}
-        <tr>
-          <td>{{ product.name }}</td>
-          <td style="color:#96ACBB">{{ product.guild.name }}</td>
-          <td class="text-right">${{ product.price }}</td>
-          <td>{% if product.is_active %}<span class="pl-badge pl-badge--ok">Active</span>{% else %}<span class="pl-badge pl-badge--muted">Inactive</span>{% endif %}</td>
-          <td><a href="{% url 'admin:billing_product_change' product.pk %}" class="pl-btn pl-btn--sm pl-btn--secondary">Edit</a></td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="5" style="text-align:center;color:#96ACBB;padding:2rem">No products yet.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    <div style="margin-top:1.25rem">
-      <a href="{% url 'admin:billing_product_add' %}" class="pl-btn pl-btn--secondary pl-btn--sm">+ Add Product</a>
-    </div>
+    {% endif %}
   </div>
 
   {% endif %}{# /stripe #}
@@ -496,6 +472,35 @@
     <div class="pl-modal__footer">
       <div style="display:flex;gap:0.5rem" id="tdm-actions"></div>
       <a id="tdm-admin-link" href="#" class="pl-btn pl-btn--sm pl-btn--secondary">View in Admin →</a>
+    </div>
+  </div>
+</div>
+
+{# ================================================================ #}
+{# CONNECT STRIPE MODAL                                              #}
+{# ================================================================ #}
+<div id="connect-stripe-modal" class="pl-modal-overlay" style="display:none"
+     onclick="if(event.target===this)this.style.display='none'">
+  <div class="pl-modal" style="max-width:420px">
+    <div class="pl-modal__header">
+      <div class="pl-modal__title">Connect Stripe Account</div>
+      <button class="pl-modal__close" onclick="document.getElementById('connect-stripe-modal').style.display='none'" aria-label="Close">&times;</button>
+    </div>
+    <div class="pl-modal__body">
+      <p style="color:#96ACBB;font-size:0.875rem;margin:0 0 1.25rem">Select the guild to link, then you'll be redirected to Stripe to authorise the connection.</p>
+      <div class="pl-modal__field">
+        <label for="connect-guild-select">Guild</label>
+        <select id="connect-guild-select">
+          <option value="">— Select a guild —</option>
+          {% for guild in guilds %}
+          <option value="{% url 'billing_initiate_connect' guild.pk %}">{{ guild.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="pl-modal__footer">
+      <button type="button" class="pl-btn pl-btn--secondary" onclick="document.getElementById('connect-stripe-modal').style.display='none'">Cancel</button>
+      <button type="button" class="pl-btn pl-btn--primary" onclick="initiateStripeConnect()">Connect via Stripe →</button>
     </div>
   </div>
 </div>
@@ -619,6 +624,12 @@
         alert('Retry failed. Check the charge in Stripe.');
       }
     });
+  }
+
+  function initiateStripeConnect() {
+    const url = document.getElementById('connect-guild-select').value;
+    if (!url) { alert('Please select a guild first.'); return; }
+    window.location.href = url;
   }
 
   /* Settings tab: show/hide day-of-week / day-of-month */

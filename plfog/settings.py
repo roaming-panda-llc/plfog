@@ -339,7 +339,7 @@ UNFOLD = {
             {
                 "items": [
                     {
-                        "title": "Voting Dashboard",
+                        "title": "Voting",
                         "icon": "how_to_vote",
                         "link": reverse_lazy("admin:index"),
                     },
@@ -365,45 +365,9 @@ UNFOLD = {
                 "title": "Billing",
                 "items": [
                     {
-                        "title": "Payments Dashboard",
-                        "icon": "dashboard",
-                        "link": reverse_lazy("billing_admin_dashboard"),
-                        "permission": lambda request: request.user.is_superuser,
-                    },
-                    {
-                        "title": "Tabs",
-                        "icon": "receipt_long",
-                        "link": reverse_lazy("admin:billing_tab_changelist"),
-                        "permission": lambda request: request.user.is_superuser,
-                    },
-                    {
-                        "title": "Tab Entries",
-                        "icon": "list_alt",
-                        "link": reverse_lazy("admin:billing_tabentry_changelist"),
-                        "permission": lambda request: request.user.is_superuser,
-                    },
-                    {
-                        "title": "Tab Charges",
+                        "title": "Payments",
                         "icon": "payments",
-                        "link": reverse_lazy("admin:billing_tabcharge_changelist"),
-                        "permission": lambda request: request.user.is_superuser,
-                    },
-                    {
-                        "title": "Billing Settings",
-                        "icon": "tune",
-                        "link": reverse_lazy("admin:billing_billingsettings_changelist"),
-                        "permission": lambda request: request.user.is_superuser,
-                    },
-                    {
-                        "title": "Stripe Accounts",
-                        "icon": "account_balance",
-                        "link": reverse_lazy("admin:billing_stripeaccount_changelist"),
-                        "permission": lambda request: request.user.is_superuser,
-                    },
-                    {
-                        "title": "Products",
-                        "icon": "inventory_2",
-                        "link": reverse_lazy("admin:billing_product_changelist"),
+                        "link": reverse_lazy("billing_admin_dashboard"),
                         "permission": lambda request: request.user.is_superuser,
                     },
                 ],
