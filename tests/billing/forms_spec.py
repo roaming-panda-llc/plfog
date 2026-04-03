@@ -6,9 +6,9 @@ from decimal import Decimal
 
 import pytest
 
-from billing.forms import AdminAddTabEntryForm, VoidTabEntryForm
+from billing.forms import AdminAddTabEntryForm, BillingSettingsForm, VoidTabEntryForm
 from hub.forms import AddTabEntryForm
-from tests.billing.factories import ProductFactory
+from tests.billing.factories import BillingSettingsFactory, ProductFactory
 from tests.membership.factories import MemberFactory
 
 pytestmark = pytest.mark.django_db
@@ -98,3 +98,64 @@ def describe_VoidTabEntryForm():
         form = VoidTabEntryForm(data={"reason": ""})
         assert not form.is_valid()
         assert "reason" in form.errors
+
+
+def describe_BillingSettingsForm():
+    def it_is_valid_with_daily_frequency():
+        form = BillingSettingsForm(data={
+            "charge_frequency": "daily",
+            "charge_time": "23:00",
+            "charge_day_of_week": "",
+            "charge_day_of_month": "",
+            "default_tab_limit": "200.00",
+            "max_retry_attempts": "3",
+            "retry_interval_hours": "24",
+        })
+        assert form.is_valid(), form.errors
+
+    def it_is_valid_with_weekly_frequency():
+        form = BillingSettingsForm(data={
+            "charge_frequency": "weekly",
+            "charge_time": "23:00",
+            "charge_day_of_week": "0",
+            "charge_day_of_month": "",
+            "default_tab_limit": "200.00",
+            "max_retry_attempts": "3",
+            "retry_interval_hours": "24",
+        })
+        assert form.is_valid(), form.errors
+
+    def it_is_valid_with_monthly_frequency():
+        form = BillingSettingsForm(data={
+            "charge_frequency": "monthly",
+            "charge_time": "23:00",
+            "charge_day_of_week": "",
+            "charge_day_of_month": "15",
+            "default_tab_limit": "200.00",
+            "max_retry_attempts": "3",
+            "retry_interval_hours": "24",
+        })
+        assert form.is_valid(), form.errors
+
+    def it_populates_from_instance(db):
+        settings = BillingSettingsFactory(
+            charge_frequency="weekly",
+            charge_day_of_week=2,
+            default_tab_limit="150.00",
+        )
+        form = BillingSettingsForm(instance=settings)
+        assert form.initial.get("charge_frequency") == "weekly" or form["charge_frequency"].value() == "weekly"
+        assert form["default_tab_limit"].value() == "150.00"
+
+    def it_rejects_negative_tab_limit():
+        form = BillingSettingsForm(data={
+            "charge_frequency": "daily",
+            "charge_time": "23:00",
+            "charge_day_of_week": "",
+            "charge_day_of_month": "",
+            "default_tab_limit": "-10.00",
+            "max_retry_attempts": "3",
+            "retry_interval_hours": "24",
+        })
+        assert not form.is_valid()
+        assert "default_tab_limit" in form.errors

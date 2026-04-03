@@ -6,7 +6,7 @@ from decimal import Decimal
 
 from django import forms
 
-from billing.models import Product
+from billing.models import BillingSettings, Product
 from membership.models import Member
 
 
@@ -57,3 +57,29 @@ class VoidTabEntryForm(forms.Form):
         widget=forms.TextInput(attrs={"placeholder": "Reason for voiding"}),
         label="Void Reason",
     )
+
+
+class BillingSettingsForm(forms.ModelForm):
+    """Admin form for editing the BillingSettings singleton."""
+
+    class Meta:
+        model = BillingSettings
+        fields = [
+            "charge_frequency",
+            "charge_time",
+            "charge_day_of_week",
+            "charge_day_of_month",
+            "default_tab_limit",
+            "max_retry_attempts",
+            "retry_interval_hours",
+        ]
+        widgets = {
+            "charge_frequency": forms.Select(),
+            "charge_time": forms.TimeInput(attrs={"type": "time"}),
+        }
+
+    def clean_default_tab_limit(self) -> Decimal:
+        value: Decimal = self.cleaned_data["default_tab_limit"]
+        if value < Decimal("0.00"):
+            raise forms.ValidationError("Tab limit must be zero or positive.")
+        return value
