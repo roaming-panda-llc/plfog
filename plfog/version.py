@@ -2,9 +2,23 @@
 
 from __future__ import annotations
 
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.5.0",
+        "date": "2026-04-02",
+        "title": "Payments Dashboard Redesign",
+        "changes": [
+            "Payments Dashboard is now a unified five-tab page — Overview, Open Tabs, History, Settings, and Stripe all in one place",
+            "Dark card design matches the rest of the admin — no more white-on-white cards",
+            "Click any member row to see their full tab detail — pending entries, charge history, and quick actions in a slide-up modal",
+            "Retry failed charges with a single click — no need to navigate away",
+            "History tab shows all charge records with filter chips (All, Succeeded, Failed, Needs Retry) and inline receipt links",
+            "Settings tab lets you edit billing schedule, tab limits, and retry settings without leaving the dashboard",
+            "Stripe tab manages connected accounts and the product catalog in one view",
+        ],
+    },
     {
         "version": "1.4.0",
         "date": "2026-04-02",
