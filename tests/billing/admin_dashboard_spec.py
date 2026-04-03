@@ -397,6 +397,7 @@ def describe_admin_add_tab_entry():
     def it_creates_entry_on_valid_post(client: Client):
         _create_superuser(client)
         member = MemberFactory(status="active")
+        TabFactory(member=member, stripe_payment_method_id="pm_test123")
 
         response = client.post(
             "/billing/admin/add-entry/",
@@ -424,3 +425,20 @@ def describe_admin_add_tab_entry():
         )
 
         assert response.status_code == 200  # Re-renders form with errors
+
+    def it_shows_error_when_tab_add_entry_raises(client: Client):
+        _create_superuser(client)
+        member = MemberFactory(status="active")
+        # Tab with no payment method — add_entry raises NoPaymentMethodError
+        TabFactory(member=member, stripe_payment_method_id="")
+
+        response = client.post(
+            "/billing/admin/add-entry/",
+            {
+                "member": member.pk,
+                "description": "Charge",
+                "amount": "10.00",
+            },
+        )
+
+        assert response.status_code == 200  # Re-renders form with error message

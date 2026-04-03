@@ -193,6 +193,19 @@ def describe_handle_payment_method_updated():
             {"data": {"object": {"id": "pm_unknown", "card": {"last4": "0000", "brand": "amex"}}}}
         )
 
+    def it_skips_update_when_no_card_key():
+        tab = TabFactory(
+            stripe_payment_method_id="pm_nocard",
+            payment_method_last4="4242",
+            payment_method_brand="visa",
+        )
+
+        handle_payment_method_updated({"data": {"object": {"id": "pm_nocard"}}})
+
+        tab.refresh_from_db()
+        assert tab.payment_method_last4 == "4242"  # unchanged
+        assert tab.payment_method_brand == "visa"  # unchanged
+
 
 def describe_handle_charge_dispute_created():
     def it_logs_without_error():
