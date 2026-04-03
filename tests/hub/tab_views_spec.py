@@ -10,7 +10,6 @@ from django.db.models.signals import post_save
 from django.test import Client
 
 from billing.models import TabCharge
-from membership.models import Member
 from membership.signals import ensure_user_has_member
 from tests.billing.factories import BillingSettingsFactory, TabChargeFactory, TabEntryFactory, TabFactory
 
@@ -36,7 +35,7 @@ def describe_tab_detail():
         """When user has no Member, _get_member returns None → tab is None."""
         post_save.disconnect(ensure_user_has_member, sender=User)
         try:
-            user = User.objects.create_user(username="orphan", password="pass")
+            User.objects.create_user(username="orphan", password="pass")
             client.login(username="orphan", password="pass")
             response = client.get("/tab/")
             assert response.status_code == 200
@@ -142,7 +141,7 @@ def describe_tab_history():
     def it_handles_user_with_no_member(client: Client):
         post_save.disconnect(ensure_user_has_member, sender=User)
         try:
-            user = User.objects.create_user(username="orphan2", password="pass")
+            User.objects.create_user(username="orphan2", password="pass")
             client.login(username="orphan2", password="pass")
             response = client.get("/tab/history/")
             assert response.status_code == 200
