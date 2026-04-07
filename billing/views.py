@@ -18,7 +18,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from billing import stripe_utils, webhook_handlers
-from billing.exceptions import NoPaymentMethodError, TabLimitExceededError, TabLockedError
+from billing.exceptions import TabLimitExceededError, TabLockedError
 from billing.forms import AdminAddTabEntryForm
 from billing.models import BillingSettings, StripeAccount, Tab, TabCharge, TabEntry
 
@@ -295,7 +295,7 @@ def admin_add_tab_entry(request: HttpRequest) -> HttpResponse:
                     added_by=request.user,  # type: ignore[misc]
                     product=product,
                 )
-            except (TabLockedError, NoPaymentMethodError, TabLimitExceededError) as exc:
+            except (TabLockedError, TabLimitExceededError) as exc:
                 django_messages.error(request, str(exc))
                 context = {**admin.site.each_context(request), "form": form}
                 return render(request, "billing/admin_add_entry.html", context)

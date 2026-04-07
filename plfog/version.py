@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
-VERSION = "1.4.0"
+VERSION = "1.4.1"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.4.1",
+        "date": "2026-04-07",
+        "title": "Pay-as-you-go Tabs & Guild Product Cards",
+        "changes": [
+            "You no longer need to save a card before adding things to your tab — just add the item and pay later",
+            "When you have charges ready to pay, a 'Pay Now' button appears on your Tab page that opens Stripe's secure checkout",
+            "Money goes directly to the guild that owns the items you bought",
+            "Guild pages now show products as cards instead of a table — easier to scan",
+        ],
+    },
     {
         "version": "1.4.0",
         "date": "2026-04-07",

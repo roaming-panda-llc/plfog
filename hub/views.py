@@ -11,7 +11,7 @@ from django.db.models import Count
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
-from billing.exceptions import NoPaymentMethodError, TabLimitExceededError, TabLockedError
+from billing.exceptions import TabLimitExceededError, TabLockedError
 from billing.models import Product, Tab, TabCharge
 from hub.forms import AddTabEntryForm, BetaFeedbackForm, EmailPreferencesForm, ProfileSettingsForm, VotePreferenceForm
 from membership.cycle import get_cycle_context
@@ -258,6 +258,11 @@ def tab_detail(request: HttpRequest) -> HttpResponse:
     tab, _created = Tab.objects.get_or_create(member=member)
     entries = tab.entries.pending().select_related("product__guild").order_by("-created_at")
     products = Product.objects.filter(is_active=True).select_related("guild").order_by("guild__name", "name")
+    pending_checkout_charges = (
+        tab.charges.filter(status=TabCharge.Status.PENDING_CHECKOUT)
+        .select_related("stripe_account")
+        .order_by("-created_at")
+    )
 
     if request.method == "POST":
         form = AddTabEntryForm(request.POST)
@@ -274,8 +279,6 @@ def tab_detail(request: HttpRequest) -> HttpResponse:
                 return redirect("hub_tab_detail")
             except TabLockedError:
                 messages.error(request, "Your tab is locked. Please contact an admin.")
-            except NoPaymentMethodError:
-                messages.error(request, "Please add a payment method before adding items to your tab.")
             except TabLimitExceededError:
                 messages.error(request, "This item would exceed your tab limit.")
     else:
@@ -284,7 +287,14 @@ def tab_detail(request: HttpRequest) -> HttpResponse:
     return render(
         request,
         "hub/tab_detail.html",
-        {**ctx, "tab": tab, "entries": entries, "form": form, "products": products},
+        {
+            **ctx,
+            "tab": tab,
+            "entries": entries,
+            "form": form,
+            "products": products,
+            "pending_checkout_charges": pending_checkout_charges,
+        },
     )
 
 

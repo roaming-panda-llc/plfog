@@ -12,7 +12,7 @@ from django.db.models import DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from .exceptions import NoPaymentMethodError, TabLimitExceededError, TabLockedError
+from .exceptions import TabLimitExceededError, TabLockedError
 from .fields import EncryptedCharField
 
 if TYPE_CHECKING:
@@ -430,8 +430,14 @@ class Tab(models.Model):
 
     @property
     def can_add_entry(self) -> bool:
-        """True if the tab is not locked and has a payment method."""
-        return not self.is_locked and self.has_payment_method
+        """True if the tab is not locked.
+
+        Note: a saved payment method is no longer required. Direct-keys guilds bill
+        via Stripe Checkout sessions (one-off hosted pages), so the member does not
+        need to save a card up front. They pay at the end of each billing cycle by
+        opening the per-charge `stripe_checkout_url`.
+        """
+        return not self.is_locked
 
     @property
     def remaining_limit(self) -> Decimal:
@@ -454,7 +460,6 @@ class Tab(models.Model):
 
         Raises:
             TabLockedError: If the tab is locked.
-            NoPaymentMethodError: If no payment method is on file.
             TabLimitExceededError: If the entry would exceed the tab limit.
         """
         with transaction.atomic():
@@ -463,9 +468,6 @@ class Tab(models.Model):
 
             if locked_self.is_locked:
                 raise TabLockedError(f"Tab is locked: {locked_self.locked_reason}")
-
-            if not locked_self.has_payment_method:
-                raise NoPaymentMethodError("No payment method on file.")
 
             # Compute current balance under the lock
             current = locked_self.current_balance
