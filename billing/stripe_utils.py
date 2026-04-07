@@ -234,10 +234,6 @@ def verify_account_credentials(secret_key: str) -> dict[str, Any]:
     display_name = ""
     if account.business_profile and account.business_profile.name:
         display_name = account.business_profile.name
-    elif account.settings and account.settings.dashboard and account.settings.dashboard.display_name:
-        display_name = account.settings.dashboard.display_name
-    elif account.email:
-        display_name = account.email
     return {
         "stripe_account_id": account.id,
         "display_name": display_name or account.id,

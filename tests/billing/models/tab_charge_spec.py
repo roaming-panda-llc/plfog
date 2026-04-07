@@ -177,7 +177,7 @@ def describe_TabCharge():
             call_kwargs = mock_dest.call_args[1]
             assert call_kwargs["application_fee_cents"] is None
 
-        def context_with_direct_keys_account():
+        def describe_with_direct_keys_account():
             def it_creates_a_checkout_session_and_marks_pending_checkout():
                 from unittest.mock import patch
 

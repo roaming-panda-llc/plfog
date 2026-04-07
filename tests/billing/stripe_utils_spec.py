@@ -292,6 +292,19 @@ def describe_verify_account_credentials():
         assert result["country"] == "US"
         client.v1.accounts.retrieve.assert_called_once_with("self")
 
+    @patch("billing.stripe_utils.stripe.StripeClient")
+    def it_falls_back_to_account_id_when_no_business_profile_name(mock_stripe_client_cls):
+        mock_account = MagicMock(id="acct_no_name", charges_enabled=False, country="")
+        mock_account.business_profile = None
+        client = MagicMock()
+        client.v1.accounts.retrieve.return_value = mock_account
+        mock_stripe_client_cls.return_value = client
+
+        result = stripe_utils.verify_account_credentials("sk_test_real")
+        assert result["display_name"] == "acct_no_name"
+        assert result["charges_enabled"] is False
+        assert result["country"] == ""
+
 
 def describe_create_checkout_session_for_account():
     def it_creates_a_checkout_session_via_account_client(db):

@@ -180,6 +180,29 @@ def describe_billing_save_direct_keys():
         assert not StripeAccount.objects.filter(guild=guild).exists()
 
     @patch("billing.views.stripe_utils.verify_account_credentials")
+    def it_succeeds_without_webhook_secret(mock_verify, client: Client):
+        mock_verify.return_value = {
+            "stripe_account_id": "acct_no_whsec",
+            "display_name": "Wood",
+            "charges_enabled": True,
+            "country": "US",
+        }
+        _create_superuser(client)
+        guild = GuildFactory(name="Wood")
+        response = client.post(
+            "/billing/admin/direct-keys/save/",
+            {
+                "guild_id": str(guild.pk),
+                "secret_key": "sk_test_x",
+                "publishable_key": "pk_test_x",
+                "webhook_secret": "",
+            },
+        )
+        assert response.status_code == 302
+        acct = StripeAccount.objects.get(guild=guild)
+        assert acct.direct_webhook_secret == ""
+
+    @patch("billing.views.stripe_utils.verify_account_credentials")
     def it_redirects_on_unknown_guild(mock_verify, client: Client):
         mock_verify.return_value = {
             "stripe_account_id": "acct_x",
@@ -257,6 +280,29 @@ def describe_stripe_webhook_for_guild():
             )
         assert response.status_code == 200
         handler.assert_called_once()
+
+    @patch("billing.views.stripe_utils.construct_webhook_event_for_account")
+    def it_returns_500_when_handler_raises(mock_construct, client: Client):
+        from unittest.mock import MagicMock
+        from tests.billing.factories import DirectKeysStripeAccountFactory
+
+        guild = GuildFactory()
+        DirectKeysStripeAccountFactory(guild=guild, direct_webhook_secret="whsec_ok")
+        event = MagicMock()
+        event.type = "payment_intent.succeeded"
+        event.to_dict.return_value = {}
+        mock_construct.return_value = event
+
+        with patch("billing.views._WEBHOOK_HANDLERS") as mock_handlers:
+            handler = MagicMock(side_effect=RuntimeError("boom"))
+            mock_handlers.get.return_value = handler
+            response = client.post(
+                f"/billing/webhooks/stripe/guild/{guild.pk}/",
+                data=b"{}",
+                content_type="application/json",
+                HTTP_STRIPE_SIGNATURE="t=1,v1=foo",
+            )
+        assert response.status_code == 500
 
     @patch("billing.views.stripe_utils.construct_webhook_event_for_account")
     def it_returns_200_for_unhandled_event_type(mock_construct, client: Client):

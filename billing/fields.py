@@ -49,17 +49,6 @@ class EncryptedCharField(models.CharField):
             return value
         return _fernet().decrypt(value.encode()).decode()
 
-    def to_python(self, value: Any) -> str | None:
-        if value is None or value == "":
-            return value
-        if isinstance(value, str) and value.startswith("gAAAAA"):
-            # Already-encrypted Fernet token; decrypt for in-memory access.
-            try:
-                return _fernet().decrypt(value.encode()).decode()
-            except Exception:
-                return value
-        return value
-
     def get_prep_value(self, value: Any) -> str | None:
         if value is None or value == "":
             return value
