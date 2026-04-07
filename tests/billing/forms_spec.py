@@ -6,7 +6,12 @@ from decimal import Decimal
 
 import pytest
 
-from billing.forms import AdminAddTabEntryForm, BillingSettingsForm, VoidTabEntryForm
+from billing.forms import (
+    AdminAddTabEntryForm,
+    BillingSettingsForm,
+    ConnectPlatformSettingsForm,
+    VoidTabEntryForm,
+)
 from hub.forms import AddTabEntryForm
 from tests.billing.factories import BillingSettingsFactory, ProductFactory
 from tests.membership.factories import MemberFactory
@@ -167,3 +172,58 @@ def describe_BillingSettingsForm():
         )
         assert not form.is_valid()
         assert "default_tab_limit" in form.errors
+
+
+def describe_ConnectPlatformSettingsForm():
+    def it_is_valid_when_disabled_with_all_fields_empty():
+        form = ConnectPlatformSettingsForm(
+            data={
+                "connect_enabled": "",
+                "connect_client_id": "",
+                "connect_platform_publishable_key": "",
+                "connect_platform_secret_key": "",
+                "connect_platform_webhook_secret": "",
+            }
+        )
+        assert form.is_valid()
+
+    def it_is_valid_when_enabled_with_all_fields():
+        form = ConnectPlatformSettingsForm(
+            data={
+                "connect_enabled": "on",
+                "connect_client_id": "ca_test_1",
+                "connect_platform_publishable_key": "pk_test_1",
+                "connect_platform_secret_key": "sk_test_1",
+                "connect_platform_webhook_secret": "whsec_1",
+            }
+        )
+        assert form.is_valid()
+
+    def it_errors_when_enabled_with_missing_secret_key():
+        form = ConnectPlatformSettingsForm(
+            data={
+                "connect_enabled": "on",
+                "connect_client_id": "ca_test_1",
+                "connect_platform_publishable_key": "pk_test_1",
+                "connect_platform_secret_key": "",
+                "connect_platform_webhook_secret": "whsec_1",
+            }
+        )
+        assert not form.is_valid()
+        assert "connect_platform_secret_key" in form.errors
+
+    def it_errors_on_all_missing_fields_when_enabled():
+        form = ConnectPlatformSettingsForm(
+            data={
+                "connect_enabled": "on",
+                "connect_client_id": "",
+                "connect_platform_publishable_key": "",
+                "connect_platform_secret_key": "",
+                "connect_platform_webhook_secret": "",
+            }
+        )
+        assert not form.is_valid()
+        assert "connect_client_id" in form.errors
+        assert "connect_platform_publishable_key" in form.errors
+        assert "connect_platform_secret_key" in form.errors
+        assert "connect_platform_webhook_secret" in form.errors

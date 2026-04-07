@@ -20,9 +20,15 @@ def _mock_client() -> MagicMock:
 
 
 def describe_get_stripe_client():
-    def it_returns_a_stripe_client():
+    def it_returns_a_stripe_client(configured_billing_stripe):
         client = stripe_utils._get_stripe_client()
         assert isinstance(client, stripe.StripeClient)
+
+    def it_raises_when_platform_secret_not_configured():
+        from django.core.exceptions import ImproperlyConfigured
+
+        with pytest.raises(ImproperlyConfigured, match="platform secret key is not set"):
+            stripe_utils._get_stripe_client()
 
 
 def describe_create_customer():
@@ -169,7 +175,7 @@ def describe_create_payment_intent():
 
 def describe_construct_webhook_event():
     @patch("billing.stripe_utils.stripe.Webhook.construct_event")
-    def it_delegates_to_stripe_sdk(mock_construct):
+    def it_delegates_to_stripe_sdk(mock_construct, configured_billing_stripe):
         mock_event = MagicMock()
         mock_construct.return_value = mock_event
 
@@ -181,6 +187,12 @@ def describe_construct_webhook_event():
             sig_header="sig_123",
             secret="whsec_fake_for_testing",
         )
+
+    def it_raises_when_platform_webhook_secret_not_configured():
+        from django.core.exceptions import ImproperlyConfigured
+
+        with pytest.raises(ImproperlyConfigured, match="platform webhook secret is not set"):
+            stripe_utils.construct_webhook_event(payload=b"{}", sig_header="t=1,v1=foo")
 
 
 def describe_create_destination_payment_intent():
@@ -238,12 +250,22 @@ def describe_create_destination_payment_intent():
 
 
 def describe_get_connect_oauth_url():
-    def it_builds_url_with_client_id(settings):
-        settings.STRIPE_CONNECT_CLIENT_ID = "ca_test_123"
+    def it_builds_url_with_client_id_from_billing_settings():
+        from billing.models import BillingSettings
+
+        bs = BillingSettings.load()
+        bs.connect_client_id = "ca_test_123"
+        bs.save()
         url = stripe_utils.get_connect_oauth_url(state="guild-42")
         assert "ca_test_123" in url
         assert "guild-42" in url
         assert "stripe_landing=login" in url
+
+    def it_raises_when_client_id_not_configured():
+        from django.core.exceptions import ImproperlyConfigured
+
+        with pytest.raises(ImproperlyConfigured, match="Connect client ID is not set"):
+            stripe_utils.get_connect_oauth_url(state="guild-1")
 
 
 def describe_complete_connect_oauth():

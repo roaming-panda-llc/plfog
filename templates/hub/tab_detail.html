@@ -20,14 +20,6 @@
 </div>
 {% endif %}
 
-{% if not tab.has_payment_method %}
-<div class="tab-banner tab-banner--warning">
-    No payment method on file.
-    <a href="{% url 'billing_setup_payment_method' %}" style="color: inherit; text-decoration: underline;">Add a card</a>
-    before items can go on your tab.
-</div>
-{% endif %}
-
 {# Summary card #}
 <div class="hub-card tab-summary">
     <div class="tab-summary__row">
@@ -42,18 +34,38 @@
         <span class="tab-summary__label">Remaining</span>
         <span class="tab-summary__value">${{ tab.remaining_limit }}</span>
     </div>
-    <div class="tab-summary__row">
-        <span class="tab-summary__label">Payment Method</span>
-        <span class="tab-summary__value">
-            {% if tab.has_payment_method %}
-            {{ tab.payment_method_brand|title }} ending in {{ tab.payment_method_last4 }}
-            (<a href="{% url 'billing_setup_payment_method' %}" class="tab-history-link">change</a>)
-            {% else %}
-            <a href="{% url 'billing_setup_payment_method' %}" class="tab-history-link">Add a card</a>
+</div>
+
+{# Pending checkout — direct-keys charges awaiting member payment #}
+{% if pending_checkout_charges %}
+<div class="hub-card">
+    <h2 class="tab-section-title">Action Required — Pay Now</h2>
+    <p class="hub-text-muted" style="margin: 0 0 1rem">
+        These charges are ready to pay. Click <strong>Pay Now</strong> to open Stripe's secure checkout — money goes
+        directly to the guild that owns the items.
+    </p>
+    <div class="tab-checkout-list">
+        {% for charge in pending_checkout_charges %}
+        <div class="tab-checkout-item">
+            <div class="tab-checkout-item__info">
+                <div class="tab-checkout-item__title">
+                    {% if charge.stripe_account %}{{ charge.stripe_account.display_name }}{% else %}Past Lives{% endif %}
+                    — ${{ charge.amount }}
+                </div>
+                <div class="tab-checkout-item__meta">
+                    {{ charge.entry_count }} item{{ charge.entry_count|pluralize }} · created {{ charge.created_at|date:"M j, Y" }}
+                </div>
+            </div>
+            {% if charge.stripe_checkout_url %}
+            <a href="{{ charge.stripe_checkout_url }}" target="_blank" rel="noopener" class="tab-checkout-item__btn">
+                Pay Now →
+            </a>
             {% endif %}
-        </span>
+        </div>
+        {% endfor %}
     </div>
 </div>
+{% endif %}
 
 {# Pending entries #}
 <div class="hub-card">

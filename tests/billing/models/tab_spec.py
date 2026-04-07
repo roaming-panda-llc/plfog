@@ -5,7 +5,7 @@ from decimal import Decimal
 import pytest
 from django.db.models import ProtectedError
 
-from billing.exceptions import NoPaymentMethodError, TabLimitExceededError, TabLockedError
+from billing.exceptions import TabLimitExceededError, TabLockedError
 from tests.billing.factories import BillingSettingsFactory, TabEntryFactory, TabFactory, UserFactory
 
 pytestmark = pytest.mark.django_db
@@ -69,17 +69,18 @@ def describe_Tab():
             assert tab.has_payment_method is False
 
     def describe_can_add_entry():
-        def it_returns_true_when_unlocked_with_payment_method():
-            tab = TabFactory(is_locked=False, stripe_payment_method_id="pm_test_123")
+        def it_returns_true_when_unlocked():
+            tab = TabFactory(is_locked=False)
             assert tab.can_add_entry is True
 
         def it_returns_false_when_locked():
-            tab = TabFactory(is_locked=True, stripe_payment_method_id="pm_test_123")
+            tab = TabFactory(is_locked=True)
             assert tab.can_add_entry is False
 
-        def it_returns_false_when_no_payment_method():
+        def it_returns_true_without_a_saved_payment_method():
+            # Direct-keys mode bills via Checkout sessions; no card needed up front.
             tab = TabFactory(is_locked=False, stripe_payment_method_id="")
-            assert tab.can_add_entry is False
+            assert tab.can_add_entry is True
 
     def describe_remaining_limit():
         def it_returns_full_limit_with_no_entries():
@@ -115,10 +116,11 @@ def describe_Tab():
             with pytest.raises(TabLockedError, match="Payment failed"):
                 tab.add_entry(description="Test", amount=Decimal("10.00"))
 
-        def it_raises_NoPaymentMethodError_when_no_payment_method():
+        def it_allows_entry_without_a_saved_payment_method():
+            # Direct-keys mode bills via Stripe Checkout, so no saved card is needed.
             tab = TabFactory(stripe_payment_method_id="")
-            with pytest.raises(NoPaymentMethodError, match="No payment method"):
-                tab.add_entry(description="Test", amount=Decimal("10.00"))
+            entry = tab.add_entry(description="Test", amount=Decimal("10.00"))
+            assert entry.pk is not None
 
         def it_raises_TabLimitExceededError_when_over_limit():
             BillingSettingsFactory(default_tab_limit=Decimal("50.00"))

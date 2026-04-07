@@ -429,8 +429,8 @@ def describe_admin_add_tab_entry():
     def it_shows_error_when_tab_add_entry_raises(client: Client):
         _create_superuser(client)
         member = MemberFactory(status="active")
-        # Tab with no payment method — add_entry raises NoPaymentMethodError
-        TabFactory(member=member, stripe_payment_method_id="")
+        # Locked tab — add_entry raises TabLockedError
+        TabFactory(member=member, is_locked=True, locked_reason="Frozen for testing")
 
         response = client.post(
             "/billing/admin/add-entry/",

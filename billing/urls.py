@@ -22,4 +22,14 @@ urlpatterns = [
     path("connect/callback/", views.connect_callback, name="billing_connect_callback"),
     path("admin/direct-keys/test/", views.billing_test_direct_keys, name="billing_test_direct_keys"),
     path("admin/direct-keys/save/", views.billing_save_direct_keys, name="billing_save_direct_keys"),
+    path(
+        "admin/connect-platform/test/",
+        views.billing_test_platform_connection,
+        name="billing_test_platform_connection",
+    ),
+    path(
+        "admin/connect-platform/save/",
+        views.billing_save_connect_platform,
+        name="billing_save_connect_platform",
+    ),
 ]

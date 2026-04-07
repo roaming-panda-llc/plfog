@@ -12,7 +12,7 @@ from django.db.models import DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from .exceptions import NoPaymentMethodError, TabLimitExceededError, TabLockedError
+from .exceptions import TabLimitExceededError, TabLockedError
 from .fields import EncryptedCharField
 
 if TYPE_CHECKING:
@@ -68,6 +68,39 @@ class BillingSettings(models.Model):
         default=24,
         help_text="Hours between retry attempts for failed charges.",
     )
+
+    # ---- Stripe Connect platform configuration ----
+    # Used by OAuth-mode StripeAccount rows. Direct-keys mode does not need any
+    # of these — each guild's keys live on the StripeAccount row instead.
+    connect_enabled = models.BooleanField(
+        default=False,
+        help_text="Master switch for Stripe Connect platform billing. When off, the OAuth tab is hidden.",
+    )
+    connect_client_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Stripe Connect application client ID (ca_…). From dashboard.stripe.com/settings/connect.",
+    )
+    connect_platform_publishable_key = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="PL platform Stripe publishable key (pk_…). Sent to the browser for the payment-method setup flow.",
+    )
+    connect_platform_secret_key = EncryptedCharField(
+        max_length=512,
+        blank=True,
+        default="",
+        help_text="PL platform Stripe secret key (sk_…). Used for OAuth Connect destination charges. Encrypted at rest.",
+    )
+    connect_platform_webhook_secret = EncryptedCharField(
+        max_length=512,
+        blank=True,
+        default="",
+        help_text="Webhook signing secret for the global /billing/webhooks/stripe/ endpoint. Encrypted at rest.",
+    )
+
     updated_at = models.DateTimeField(auto_now=True, help_text="Last time billing settings were changed.")
 
     class Meta:
@@ -98,6 +131,22 @@ class BillingSettings(models.Model):
 
     def __str__(self) -> str:
         return "Billing Settings"
+
+    def clean(self) -> None:
+        """If Connect is enabled, all four platform credential fields must be non-empty."""
+        super().clean()
+        if self.connect_enabled:
+            missing = []
+            if not self.connect_client_id:
+                missing.append("connect_client_id")
+            if not self.connect_platform_publishable_key:
+                missing.append("connect_platform_publishable_key")
+            if not self.connect_platform_secret_key:
+                missing.append("connect_platform_secret_key")
+            if not self.connect_platform_webhook_secret:
+                missing.append("connect_platform_webhook_secret")
+            if missing:
+                raise ValidationError({field: "Required when Stripe Connect is enabled." for field in missing})
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         """Force singleton by always using pk=1."""
@@ -228,11 +277,13 @@ class StripeAccount(models.Model):
         """
         import stripe
 
+        from billing import stripe_utils as _stripe_utils
+
         if self.auth_mode == self.AuthMode.DIRECT_KEYS:
             if not self.direct_secret_key:
                 raise ValueError(f"StripeAccount {self.pk} is in direct-keys mode but has no secret key.")
             return stripe.StripeClient(self.direct_secret_key)
-        return stripe.StripeClient(settings.STRIPE_SECRET_KEY)
+        return stripe.StripeClient(_stripe_utils._platform_secret_key())
 
     @classmethod
     def upsert_for_guild(cls, guild: object, account_id: str) -> StripeAccount:
@@ -430,8 +481,14 @@ class Tab(models.Model):
 
     @property
     def can_add_entry(self) -> bool:
-        """True if the tab is not locked and has a payment method."""
-        return not self.is_locked and self.has_payment_method
+        """True if the tab is not locked.
+
+        Note: a saved payment method is no longer required. Direct-keys guilds bill
+        via Stripe Checkout sessions (one-off hosted pages), so the member does not
+        need to save a card up front. They pay at the end of each billing cycle by
+        opening the per-charge `stripe_checkout_url`.
+        """
+        return not self.is_locked
 
     @property
     def remaining_limit(self) -> Decimal:
@@ -454,7 +511,6 @@ class Tab(models.Model):
 
         Raises:
             TabLockedError: If the tab is locked.
-            NoPaymentMethodError: If no payment method is on file.
             TabLimitExceededError: If the entry would exceed the tab limit.
         """
         with transaction.atomic():
@@ -463,9 +519,6 @@ class Tab(models.Model):
 
             if locked_self.is_locked:
                 raise TabLockedError(f"Tab is locked: {locked_self.locked_reason}")
-
-            if not locked_self.has_payment_method:
-                raise NoPaymentMethodError("No payment method on file.")
 
             # Compute current balance under the lock
             current = locked_self.current_balance

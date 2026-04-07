@@ -2,18 +2,30 @@
 
 from __future__ import annotations
 
-VERSION = "1.4.0"
+VERSION = "1.3.2"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
     {
-        "version": "1.4.0",
+        "version": "1.3.2",
+        "date": "2026-04-07",
+        "title": "Pay-as-you-go Tabs, Guild Product Cards & Stripe in Settings",
+        "changes": [
+            "You no longer need to save a card before adding things to your tab — just add the item and pay later",
+            "When you have charges ready to pay, a 'Pay Now' button appears on your Tab page that opens Stripe's secure checkout",
+            "Money goes directly to the guild that owns the items you bought",
+            "Guild pages now show products as cards instead of a table — easier to scan",
+            "All Stripe configuration now lives in the admin Payments → Settings page — no more editing server environment variables",
+            "Stripe Connect platform billing can now be enabled with a single toggle in Settings (for future membership and space-lease billing)",
+        ],
+    },
+    {
+        "version": "1.3.1",
         "date": "2026-04-07",
         "title": "Pay Guilds Directly for Consumables",
         "changes": [
             "Guilds can now connect their own Stripe account by pasting their API keys — no platform setup required",
             "Money for consumables (clay, materials, etc.) goes straight to the guild that owns the items",
             "Admins can test a guild's Stripe keys before saving to make sure everything is connected",
-            "The existing one-click Stripe Connect option is still available for future membership and lease billing",
         ],
     },
     {

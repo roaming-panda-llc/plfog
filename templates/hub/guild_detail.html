@@ -33,22 +33,14 @@
 <div class="hub-card" style="margin-top:1.5rem;">
     <h3 class="hub-detail-label" style="margin-bottom:1rem;">Products</h3>
     {% if products %}
-    <table style="width:100%;border-collapse:collapse;">
-        <thead>
-            <tr>
-                <th style="text-align:left;padding:0.5rem 0.75rem;color:var(--color-muted,#96ACBB);font-size:0.8125rem;font-weight:500;border-bottom:1px solid rgba(255,255,255,0.08);">Product</th>
-                <th style="text-align:right;padding:0.5rem 0.75rem;color:var(--color-muted,#96ACBB);font-size:0.8125rem;font-weight:500;border-bottom:1px solid rgba(255,255,255,0.08);">Price</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for product in products %}
-            <tr>
-                <td style="padding:0.625rem 0.75rem;border-bottom:1px solid rgba(255,255,255,0.05);">{{ product.name }}</td>
-                <td style="padding:0.625rem 0.75rem;text-align:right;border-bottom:1px solid rgba(255,255,255,0.05);">${{ product.price }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="guild-product-grid">
+        {% for product in products %}
+        <div class="guild-product-card">
+            <div class="guild-product-card__name">{{ product.name }}</div>
+            <div class="guild-product-card__price">${{ product.price }}</div>
+        </div>
+        {% endfor %}
+    </div>
     {% else %}
     <p class="hub-text-muted">No products listed yet.</p>
     {% endif %}

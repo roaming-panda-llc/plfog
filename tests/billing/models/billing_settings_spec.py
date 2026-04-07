@@ -113,3 +113,47 @@ def describe_BillingSettings():
             settings.save()
             settings.refresh_from_db()
             assert settings.charge_day_of_month == 28
+
+    def describe_clean_connect_validation():
+        def it_passes_when_connect_disabled_and_fields_empty():
+            settings = BillingSettings.load()
+            settings.connect_enabled = False
+            settings.clean()  # should not raise
+
+        def it_passes_when_connect_enabled_and_all_fields_set():
+            settings = BillingSettings.load()
+            settings.connect_enabled = True
+            settings.connect_client_id = "ca_test_1"
+            settings.connect_platform_publishable_key = "pk_test_1"
+            settings.connect_platform_secret_key = "sk_test_1"
+            settings.connect_platform_webhook_secret = "whsec_1"
+            settings.clean()  # should not raise
+
+        def it_raises_when_enabled_with_missing_client_id():
+            from django.core.exceptions import ValidationError
+
+            settings = BillingSettings.load()
+            settings.connect_enabled = True
+            settings.connect_platform_publishable_key = "pk_x"
+            settings.connect_platform_secret_key = "sk_x"
+            settings.connect_platform_webhook_secret = "whsec_x"
+            settings.connect_client_id = ""
+            with pytest.raises(ValidationError) as excinfo:
+                settings.clean()
+            assert "connect_client_id" in excinfo.value.message_dict
+
+        def it_raises_when_enabled_with_all_fields_missing():
+            from django.core.exceptions import ValidationError
+
+            settings = BillingSettings.load()
+            settings.connect_enabled = True
+            settings.connect_client_id = ""
+            settings.connect_platform_publishable_key = ""
+            settings.connect_platform_secret_key = ""
+            settings.connect_platform_webhook_secret = ""
+            with pytest.raises(ValidationError) as excinfo:
+                settings.clean()
+            assert "connect_client_id" in excinfo.value.message_dict
+            assert "connect_platform_publishable_key" in excinfo.value.message_dict
+            assert "connect_platform_secret_key" in excinfo.value.message_dict
+            assert "connect_platform_webhook_secret" in excinfo.value.message_dict
