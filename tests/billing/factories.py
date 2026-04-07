@@ -34,9 +34,18 @@ class StripeAccountFactory(factory.django.DjangoModelFactory):
         model = StripeAccount
 
     guild = factory.SubFactory(GuildFactory)
+    auth_mode = StripeAccount.AuthMode.OAUTH
     stripe_account_id = factory.Sequence(lambda n: f"acct_test_{n:04d}")
     display_name = factory.LazyAttribute(lambda o: f"{o.guild.name} Account" if o.guild else "Platform Account")
     is_active = True
+    platform_fee_percent = Decimal("0.00")
+
+
+class DirectKeysStripeAccountFactory(StripeAccountFactory):
+    auth_mode = StripeAccount.AuthMode.DIRECT_KEYS
+    direct_secret_key = "sk_test_directkeysfactory"
+    direct_publishable_key = "pk_test_directkeysfactory"
+    direct_webhook_secret = "whsec_directkeysfactory"
     platform_fee_percent = Decimal("0.00")
 
 

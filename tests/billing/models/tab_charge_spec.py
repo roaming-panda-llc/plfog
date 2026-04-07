@@ -176,3 +176,35 @@ def describe_TabCharge():
 
             call_kwargs = mock_dest.call_args[1]
             assert call_kwargs["application_fee_cents"] is None
+
+        def context_with_direct_keys_account():
+            def it_creates_a_checkout_session_and_marks_pending_checkout():
+                from unittest.mock import patch
+
+                from tests.billing.factories import DirectKeysStripeAccountFactory
+
+                stripe_account = DirectKeysStripeAccountFactory()
+                tab = TabFactory()
+                charge = TabChargeFactory(tab=tab, amount=Decimal("15.00"), stripe_account=stripe_account)
+                mock_session = {"id": "cs_test_clay", "url": "https://checkout.stripe.com/c/pay/cs_test_clay"}
+
+                with (
+                    patch(
+                        "billing.stripe_utils.create_checkout_session_for_account",
+                        return_value=mock_session,
+                    ) as mock_checkout,
+                    patch("billing.stripe_utils.create_destination_payment_intent") as mock_dest,
+                ):
+                    result = charge.execute_stripe_charge("idem-direct-1")
+
+                charge.refresh_from_db()
+                assert result is True
+                assert charge.status == TabCharge.Status.PENDING_CHECKOUT
+                assert charge.stripe_checkout_session_id == "cs_test_clay"
+                assert charge.stripe_checkout_url == "https://checkout.stripe.com/c/pay/cs_test_clay"
+                # Did NOT use the OAuth destination charge path
+                mock_dest.assert_not_called()
+                # Did call the direct-keys checkout helper with the right account
+                mock_checkout.assert_called_once()
+                assert mock_checkout.call_args.kwargs["stripe_account"] == stripe_account
+                assert mock_checkout.call_args.kwargs["amount_cents"] == 1500

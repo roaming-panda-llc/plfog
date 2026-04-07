@@ -391,6 +391,7 @@
         <tr>
           <th>Display Name</th>
           <th>Guild</th>
+          <th>Mode</th>
           <th>Account ID</th>
           <th>Platform Fee</th>
           <th>Active</th>
@@ -403,6 +404,13 @@
         <tr>
           <td>{{ acct.display_name }}</td>
           <td style="color:#96ACBB">{% if acct.guild %}{{ acct.guild.name }}{% else %}—{% endif %}</td>
+          <td>
+            {% if acct.auth_mode == "direct_keys" %}
+              <span class="pl-badge" style="background:#2d4a3a;color:#a0e0c0">direct keys</span>
+            {% else %}
+              <span class="pl-badge" style="background:#2a3a52;color:#a0c0e0">oauth</span>
+            {% endif %}
+          </td>
           <td style="color:#96ACBB;font-size:0.8125rem">{{ acct.stripe_account_id|truncatechars:20 }}</td>
           <td>{{ acct.platform_fee_percent }}%</td>
           <td>{% if acct.is_active %}<span class="pl-badge pl-badge--ok">Active</span>{% else %}<span class="pl-badge pl-badge--muted">Inactive</span>{% endif %}</td>
@@ -481,29 +489,115 @@
 {# ================================================================ #}
 <div id="connect-stripe-modal" class="pl-modal-overlay" style="display:none"
      onclick="if(event.target===this)this.style.display='none'">
-  <div class="pl-modal" style="max-width:420px">
+  <div class="pl-modal" style="max-width:520px">
     <div class="pl-modal__header">
       <div class="pl-modal__title">Connect Stripe Account</div>
       <button class="pl-modal__close" onclick="document.getElementById('connect-stripe-modal').style.display='none'" aria-label="Close">&times;</button>
     </div>
     <div class="pl-modal__body">
-      <p style="color:#96ACBB;font-size:0.875rem;margin:0 0 1.25rem">Select the guild to link, then you'll be redirected to Stripe to authorise the connection.</p>
-      <div class="pl-modal__field">
-        <label for="connect-guild-select">Guild</label>
-        <select id="connect-guild-select">
-          <option value="">— Select a guild —</option>
-          {% for guild in guilds %}
-          <option value="{% url 'billing_initiate_connect' guild.pk %}">{{ guild.name }}</option>
-          {% endfor %}
-        </select>
+      <div style="display:flex;gap:0.5rem;border-bottom:1px solid #2a3340;margin-bottom:1rem">
+        <button type="button" id="csm-tab-direct-btn" class="pl-btn pl-btn--sm pl-btn--primary" onclick="csmShowTab('direct')">Paste API Keys</button>
+        <button type="button" id="csm-tab-oauth-btn" class="pl-btn pl-btn--sm pl-btn--secondary" onclick="csmShowTab('oauth')">Connect via OAuth</button>
       </div>
-    </div>
-    <div class="pl-modal__footer">
-      <button type="button" class="pl-btn pl-btn--secondary" onclick="document.getElementById('connect-stripe-modal').style.display='none'">Cancel</button>
-      <button type="button" class="pl-btn pl-btn--primary" onclick="initiateStripeConnect()">Connect via Stripe →</button>
+
+      {# --- Direct keys tab (default) --- #}
+      <div id="csm-tab-direct">
+        <p style="color:#96ACBB;font-size:0.875rem;margin:0 0 1rem">
+          Paste this guild's own Stripe API keys. Money lands directly in their Stripe balance.
+          No platform fee. Use this for consumables (clay, materials, etc.).
+        </p>
+        <form method="post" action="{% url 'billing_save_direct_keys' %}" id="csm-direct-form">
+          {% csrf_token %}
+          <div class="pl-modal__field">
+            <label for="csm-guild">Guild</label>
+            <select name="guild_id" id="csm-guild" required>
+              <option value="">— Select a guild —</option>
+              {% for guild in guilds %}
+              <option value="{{ guild.pk }}">{{ guild.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="pl-modal__field">
+            <label for="csm-pk">Publishable key</label>
+            <input type="text" name="publishable_key" id="csm-pk" placeholder="pk_test_…" required autocomplete="off">
+          </div>
+          <div class="pl-modal__field">
+            <label for="csm-sk">Secret key</label>
+            <input type="password" name="secret_key" id="csm-sk" placeholder="sk_test_… or rk_test_…" required autocomplete="off">
+          </div>
+          <div class="pl-modal__field">
+            <label for="csm-whsec">Webhook signing secret <span style="color:#96ACBB;font-weight:400">(optional — paste after creating the webhook)</span></label>
+            <input type="password" name="webhook_secret" id="csm-whsec" placeholder="whsec_…" autocomplete="off">
+          </div>
+          <div id="csm-test-result" style="font-size:0.875rem;margin:0.5rem 0;min-height:1.2em"></div>
+          <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem">
+            <button type="button" class="pl-btn pl-btn--secondary pl-btn--sm" onclick="csmTestKeys()">Test connection</button>
+            <button type="submit" class="pl-btn pl-btn--primary pl-btn--sm">Save</button>
+          </div>
+        </form>
+        <p style="color:#96ACBB;font-size:0.75rem;margin:1rem 0 0;border-top:1px solid #2a3340;padding-top:0.75rem">
+          After saving, configure a webhook in this guild's Stripe dashboard pointing at
+          <code style="color:#a0e0c0">/billing/webhooks/stripe/guild/&lt;guild_id&gt;/</code>,
+          then re-open this modal and paste the signing secret.
+        </p>
+      </div>
+
+      {# --- OAuth tab --- #}
+      <div id="csm-tab-oauth" style="display:none">
+        <p style="color:#96ACBB;font-size:0.875rem;margin:0 0 1.25rem">
+          Use Stripe Connect OAuth. Requires the platform's STRIPE_CONNECT_CLIENT_ID to be configured.
+          Use this when PL needs to collect a platform fee (membership, space leases).
+        </p>
+        <div class="pl-modal__field">
+          <label for="connect-guild-select">Guild</label>
+          <select id="connect-guild-select">
+            <option value="">— Select a guild —</option>
+            {% for guild in guilds %}
+            <option value="{% url 'billing_initiate_connect' guild.pk %}">{{ guild.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem">
+          <button type="button" class="pl-btn pl-btn--secondary pl-btn--sm" onclick="document.getElementById('connect-stripe-modal').style.display='none'">Cancel</button>
+          <button type="button" class="pl-btn pl-btn--primary pl-btn--sm" onclick="initiateStripeConnect()">Connect via Stripe →</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
+
+<script>
+function csmShowTab(which) {
+  document.getElementById('csm-tab-direct').style.display = which === 'direct' ? 'block' : 'none';
+  document.getElementById('csm-tab-oauth').style.display = which === 'oauth' ? 'block' : 'none';
+  document.getElementById('csm-tab-direct-btn').className = 'pl-btn pl-btn--sm ' + (which === 'direct' ? 'pl-btn--primary' : 'pl-btn--secondary');
+  document.getElementById('csm-tab-oauth-btn').className = 'pl-btn pl-btn--sm ' + (which === 'oauth' ? 'pl-btn--primary' : 'pl-btn--secondary');
+}
+function csmTestKeys() {
+  var sk = document.getElementById('csm-sk').value;
+  var resultEl = document.getElementById('csm-test-result');
+  resultEl.style.color = '#96ACBB';
+  resultEl.textContent = 'Testing…';
+  var fd = new FormData();
+  fd.append('secret_key', sk);
+  fd.append('csrfmiddlewaretoken', document.querySelector('#csm-direct-form [name=csrfmiddlewaretoken]').value);
+  fetch('{% url "billing_test_direct_keys" %}', {method:'POST', body:fd, credentials:'same-origin'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if (d.ok) {
+        resultEl.style.color = '#a0e0c0';
+        resultEl.textContent = '✓ Connected to ' + d.stripe_account_id + ' — ' + d.display_name;
+      } else {
+        resultEl.style.color = '#e0a0a0';
+        resultEl.textContent = '✗ ' + d.error;
+      }
+    })
+    .catch(function(e){
+      resultEl.style.color = '#e0a0a0';
+      resultEl.textContent = '✗ ' + e;
+    });
+}
+</script>
 
 {# ================================================================ #}
 {# ADD CHARGE MODAL                                                   #}

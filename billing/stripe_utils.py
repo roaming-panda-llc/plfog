@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import stripe
 from django.conf import settings
+
+if TYPE_CHECKING:
+    from billing.models import StripeAccount
 
 
 def _get_stripe_client() -> stripe.StripeClient:
@@ -190,3 +193,94 @@ def construct_webhook_event(*, payload: bytes, sig_header: str) -> stripe.Event:
         sig_header=sig_header,
         secret=settings.STRIPE_WEBHOOK_SECRET,
     )
+
+
+def construct_webhook_event_for_account(
+    *,
+    payload: bytes,
+    sig_header: str,
+    webhook_secret: str,
+) -> stripe.Event:
+    """Verify a webhook event using a per-account signing secret (direct-keys mode).
+
+    Raises:
+        stripe.SignatureVerificationError: If the signature is invalid.
+        ValueError: If webhook_secret is empty.
+    """
+    if not webhook_secret:
+        raise ValueError("webhook_secret is required to verify direct-keys webhook events.")
+    return stripe.Webhook.construct_event(
+        payload=payload,
+        sig_header=sig_header,
+        secret=webhook_secret,
+    )
+
+
+def verify_account_credentials(secret_key: str) -> dict[str, Any]:
+    """Make a test API call against the given secret key to verify it works.
+
+    Calls accounts.retrieve("self") which works on any Stripe account
+    (Standard, Express, Custom, or just a regular non-Connect account).
+
+    Returns:
+        dict with 'stripe_account_id', 'display_name', 'charges_enabled', 'country'.
+
+    Raises:
+        stripe.AuthenticationError: Invalid API key.
+        stripe.StripeError: Other Stripe API failures.
+    """
+    client = stripe.StripeClient(secret_key)
+    account = client.v1.accounts.retrieve("self")
+    display_name = ""
+    if account.business_profile and account.business_profile.name:
+        display_name = account.business_profile.name
+    elif account.settings and account.settings.dashboard and account.settings.dashboard.display_name:
+        display_name = account.settings.dashboard.display_name
+    elif account.email:
+        display_name = account.email
+    return {
+        "stripe_account_id": account.id,
+        "display_name": display_name or account.id,
+        "charges_enabled": bool(account.charges_enabled),
+        "country": account.country or "",
+    }
+
+
+def create_checkout_session_for_account(
+    *,
+    stripe_account: StripeAccount,
+    amount_cents: int,
+    description: str,
+    metadata: dict[str, str],
+    idempotency_key: str,
+    success_url: str | None = None,
+    cancel_url: str | None = None,
+) -> dict[str, Any]:
+    """Create a hosted Stripe Checkout session on a direct-keys guild's own account.
+
+    No platform fee, no transfer_data — money settles in the guild's balance directly.
+    The returned `url` is what the member opens to pay.
+    """
+    client = stripe_account.get_stripe_client()
+    site_url = getattr(settings, "SITE_URL", "https://pastlives.plaza.codes").rstrip("/")
+    session = client.v1.checkout.sessions.create(
+        params={
+            "mode": "payment",
+            "line_items": [
+                {
+                    "price_data": {
+                        "currency": "usd",
+                        "product_data": {"name": description},
+                        "unit_amount": amount_cents,
+                    },
+                    "quantity": 1,
+                }
+            ],
+            "metadata": metadata,
+            "payment_intent_data": {"metadata": metadata},
+            "success_url": success_url or f"{site_url}/billing/checkout/success/",
+            "cancel_url": cancel_url or f"{site_url}/billing/checkout/cancel/",
+        },
+        options={"idempotency_key": idempotency_key},
+    )
+    return {"id": session.id, "url": session.url or ""}

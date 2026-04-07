@@ -29,3 +29,5 @@ def _fake_stripe_keys(settings):
     settings.STRIPE_PUBLISHABLE_KEY = "pk_test_fake_for_testing"
     settings.STRIPE_WEBHOOK_SECRET = "whsec_fake_for_testing"
     settings.STRIPE_CONNECT_CLIENT_ID = "ca_test_fake_for_testing"
+    # Stable Fernet key so EncryptedCharField round-trips work in tests.
+    settings.STRIPE_FIELD_ENCRYPTION_KEY = "b4-PlK9DFN7ABVCQwOHuQXMydh5IUj1ysLKGJOqMEWI="

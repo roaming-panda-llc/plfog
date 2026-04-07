@@ -226,6 +226,11 @@ STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_CONNECT_CLIENT_ID = os.environ.get("STRIPE_CONNECT_CLIENT_ID", "")
+# Symmetric encryption key (Fernet) for guild Stripe secret keys + webhook secrets
+# stored on StripeAccount in direct-keys mode. Generate with:
+#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Losing this key bricks all stored direct-mode credentials.
+STRIPE_FIELD_ENCRYPTION_KEY = os.environ.get("STRIPE_FIELD_ENCRYPTION_KEY", "")
 
 if DEBUG and STRIPE_SECRET_KEY.startswith("sk_live"):
     raise ValueError("DANGER: Live Stripe key detected in DEBUG mode. Use sk_test_ keys for development.")
