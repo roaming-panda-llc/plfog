@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.4.0",
+        "date": "2026-04-07",
+        "title": "Pay Guilds Directly for Consumables",
+        "changes": [
+            "Guilds can now connect their own Stripe account by pasting their API keys — no platform setup required",
+            "Money for consumables (clay, materials, etc.) goes straight to the guild that owns the items",
+            "Admins can test a guild's Stripe keys before saving to make sure everything is connected",
+            "The existing one-click Stripe Connect option is still available for future membership and lease billing",
+        ],
+    },
     {
         "version": "1.3.0",
         "date": "2026-04-02",

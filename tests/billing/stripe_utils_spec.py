@@ -254,3 +254,80 @@ def describe_complete_connect_oauth():
         mock_get_client.return_value = client
         result = stripe_utils.complete_connect_oauth(code="ac_test_code")
         assert result == "acct_connected_123"
+
+
+def describe_construct_webhook_event_for_account():
+    def it_raises_when_secret_is_empty():
+        with pytest.raises(ValueError, match="webhook_secret is required"):
+            stripe_utils.construct_webhook_event_for_account(payload=b"{}", sig_header="t=1,v1=foo", webhook_secret="")
+
+    @patch("billing.stripe_utils.stripe.Webhook.construct_event")
+    def it_passes_per_account_secret_to_stripe_sdk(mock_construct):
+        mock_event = MagicMock()
+        mock_construct.return_value = mock_event
+        result = stripe_utils.construct_webhook_event_for_account(
+            payload=b"{}", sig_header="t=1,v1=foo", webhook_secret="whsec_perguild"
+        )
+        assert result == mock_event
+        mock_construct.assert_called_once_with(payload=b"{}", sig_header="t=1,v1=foo", secret="whsec_perguild")
+
+
+def describe_verify_account_credentials():
+    @patch("billing.stripe_utils.stripe.StripeClient")
+    def it_returns_account_metadata(mock_stripe_client_cls):
+        mock_account = MagicMock(
+            id="acct_verified_001",
+            charges_enabled=True,
+            country="US",
+        )
+        mock_account.business_profile.name = "Ceramics Guild"
+        client = MagicMock()
+        client.v1.accounts.retrieve.return_value = mock_account
+        mock_stripe_client_cls.return_value = client
+
+        result = stripe_utils.verify_account_credentials("sk_test_real")
+        assert result["stripe_account_id"] == "acct_verified_001"
+        assert result["display_name"] == "Ceramics Guild"
+        assert result["charges_enabled"] is True
+        assert result["country"] == "US"
+        client.v1.accounts.retrieve.assert_called_once_with("self")
+
+    @patch("billing.stripe_utils.stripe.StripeClient")
+    def it_falls_back_to_account_id_when_no_business_profile_name(mock_stripe_client_cls):
+        mock_account = MagicMock(id="acct_no_name", charges_enabled=False, country="")
+        mock_account.business_profile = None
+        client = MagicMock()
+        client.v1.accounts.retrieve.return_value = mock_account
+        mock_stripe_client_cls.return_value = client
+
+        result = stripe_utils.verify_account_credentials("sk_test_real")
+        assert result["display_name"] == "acct_no_name"
+        assert result["charges_enabled"] is False
+        assert result["country"] == ""
+
+
+def describe_create_checkout_session_for_account():
+    def it_creates_a_checkout_session_via_account_client(db):
+        from tests.billing.factories import DirectKeysStripeAccountFactory
+
+        account = DirectKeysStripeAccountFactory(direct_secret_key="sk_test_clayguild")
+        mock_session = MagicMock(id="cs_test_123", url="https://checkout.stripe.com/c/pay/cs_test_123")
+        mock_client = MagicMock()
+        mock_client.v1.checkout.sessions.create.return_value = mock_session
+
+        with patch.object(account, "get_stripe_client", return_value=mock_client):
+            result = stripe_utils.create_checkout_session_for_account(
+                stripe_account=account,
+                amount_cents=1500,
+                description="Clay (3 lbs)",
+                metadata={"tab_id": "1"},
+                idempotency_key="charge-1-attempt-1",
+            )
+        assert result == {"id": "cs_test_123", "url": "https://checkout.stripe.com/c/pay/cs_test_123"}
+        call = mock_client.v1.checkout.sessions.create.call_args
+        params = call.kwargs["params"]
+        assert params["mode"] == "payment"
+        assert params["line_items"][0]["price_data"]["unit_amount"] == 1500
+        assert params["line_items"][0]["price_data"]["product_data"]["name"] == "Clay (3 lbs)"
+        assert params["metadata"] == {"tab_id": "1"}
+        assert call.kwargs["options"]["idempotency_key"] == "charge-1-attempt-1"
