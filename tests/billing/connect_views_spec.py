@@ -25,8 +25,12 @@ def describe_initiate_connect():
         response = client.get("/billing/connect/initiate/1/")
         assert response.status_code == 302
 
-    def it_redirects_to_stripe(client: Client, settings):
-        settings.STRIPE_CONNECT_CLIENT_ID = "ca_test_abc"
+    def it_redirects_to_stripe(client: Client):
+        from billing.models import BillingSettings
+
+        bs = BillingSettings.load()
+        bs.connect_client_id = "ca_test_abc"
+        bs.save()
         _create_superuser(client)
         guild = GuildFactory()
         response = client.get(f"/billing/connect/initiate/{guild.pk}/")
@@ -323,3 +327,106 @@ def describe_stripe_webhook_for_guild():
             HTTP_STRIPE_SIGNATURE="t=1,v1=foo",
         )
         assert response.status_code == 200
+
+
+def describe_billing_test_platform_connection():
+    def it_requires_staff(client: Client):
+        response = client.post("/billing/admin/connect-platform/test/")
+        assert response.status_code == 302
+
+    def it_returns_error_when_secret_missing(client: Client):
+        _create_superuser(client)
+        response = client.post("/billing/admin/connect-platform/test/", {"secret_key": ""})
+        data = response.json()
+        assert data["ok"] is False
+
+    def it_returns_error_for_unrecognized_prefix(client: Client):
+        _create_superuser(client)
+        response = client.post("/billing/admin/connect-platform/test/", {"secret_key": "garbage"})
+        data = response.json()
+        assert data["ok"] is False
+        assert "sk_test_" in data["error"]
+
+    @patch("billing.views.stripe_utils.verify_account_credentials")
+    def it_returns_account_metadata_on_success(mock_verify, client: Client):
+        mock_verify.return_value = {
+            "stripe_account_id": "acct_platform_001",
+            "display_name": "Past Lives",
+            "charges_enabled": True,
+            "country": "US",
+        }
+        _create_superuser(client)
+        response = client.post("/billing/admin/connect-platform/test/", {"secret_key": "sk_test_real"})
+        data = response.json()
+        assert data["ok"] is True
+        assert data["stripe_account_id"] == "acct_platform_001"
+
+    @patch("billing.views.stripe_utils.verify_account_credentials", side_effect=Exception("nope"))
+    def it_returns_error_on_stripe_failure(mock_verify, client: Client):
+        _create_superuser(client)
+        response = client.post("/billing/admin/connect-platform/test/", {"secret_key": "sk_test_x"})
+        data = response.json()
+        assert data["ok"] is False
+        assert "nope" in data["error"]
+
+
+def describe_billing_save_connect_platform():
+    def it_requires_staff(client: Client):
+        response = client.post("/billing/admin/connect-platform/save/")
+        assert response.status_code == 302
+
+    def it_saves_when_disabled_with_empty_fields(client: Client):
+        from billing.models import BillingSettings
+
+        _create_superuser(client)
+        response = client.post(
+            "/billing/admin/connect-platform/save/",
+            {
+                "connect_enabled": "",
+                "connect_client_id": "",
+                "connect_platform_publishable_key": "",
+                "connect_platform_secret_key": "",
+                "connect_platform_webhook_secret": "",
+            },
+        )
+        assert response.status_code == 302
+        bs = BillingSettings.load()
+        assert bs.connect_enabled is False
+
+    def it_saves_when_enabled_with_all_fields(client: Client):
+        from billing.models import BillingSettings
+
+        _create_superuser(client)
+        response = client.post(
+            "/billing/admin/connect-platform/save/",
+            {
+                "connect_enabled": "on",
+                "connect_client_id": "ca_save_test",
+                "connect_platform_publishable_key": "pk_save_test",
+                "connect_platform_secret_key": "sk_save_test",
+                "connect_platform_webhook_secret": "whsec_save_test",
+            },
+        )
+        assert response.status_code == 302
+        bs = BillingSettings.load()
+        assert bs.connect_enabled is True
+        assert bs.connect_client_id == "ca_save_test"
+        assert bs.connect_platform_secret_key == "sk_save_test"  # decrypted on read
+
+    def it_redirects_with_errors_when_form_invalid(client: Client):
+        from billing.models import BillingSettings
+
+        _create_superuser(client)
+        response = client.post(
+            "/billing/admin/connect-platform/save/",
+            {
+                "connect_enabled": "on",
+                "connect_client_id": "",
+                "connect_platform_publishable_key": "",
+                "connect_platform_secret_key": "",
+                "connect_platform_webhook_secret": "",
+            },
+        )
+        assert response.status_code == 302
+        bs = BillingSettings.load()
+        assert bs.connect_enabled is False  # not saved

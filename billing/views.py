@@ -7,7 +7,6 @@ from decimal import Decimal
 
 from django.contrib import messages as django_messages
 from django.contrib.admin.views.decorators import staff_member_required
-from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db.models import DecimalField, Sum, Value
 from django.db.models.functions import Coalesce
@@ -51,7 +50,7 @@ def setup_payment_method(request: HttpRequest) -> HttpResponse:
         "billing/setup_payment_method.html",
         {
             "tab": tab,
-            "stripe_publishable_key": settings.STRIPE_PUBLISHABLE_KEY,
+            "stripe_publishable_key": BillingSettings.load().connect_platform_publishable_key,
         },
     )
 
@@ -234,8 +233,11 @@ def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
     history_success_rate = int(history_succeeded_count / history_total_count * 100) if history_total_count else 100
 
     # --- Settings tab ---
+    from billing.forms import ConnectPlatformSettingsForm
+
     settings_obj = BillingSettings.load()
     settings_form = BillingSettingsForm(instance=settings_obj)
+    connect_platform_form = ConnectPlatformSettingsForm(instance=settings_obj)
 
     # --- Stripe tab ---
     stripe_accounts = StripeAccount.objects.select_related("guild").order_by("display_name")
@@ -266,6 +268,8 @@ def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
         "history_success_rate": history_success_rate,
         # Settings
         "settings_form": settings_form,
+        "connect_platform_form": connect_platform_form,
+        "billing_settings": settings_obj,
         # Stripe
         "stripe_accounts": stripe_accounts,
         "products": products,
@@ -407,6 +411,44 @@ def initiate_connect(request: HttpRequest, guild_id: int) -> HttpResponse:
     """Redirect admin to Stripe Connect OAuth to link a guild's account."""
     url = stripe_utils.get_connect_oauth_url(state=str(guild_id))
     return redirect(url)
+
+
+@staff_member_required
+@require_POST
+def billing_test_platform_connection(request: HttpRequest) -> JsonResponse:
+    """AJAX: verify a candidate Stripe Connect platform secret key.
+
+    Mirrors `billing_test_direct_keys` but for the platform key instead of a
+    per-guild key. Always returns 200 so the frontend can render inline.
+    """
+    secret_key = request.POST.get("secret_key", "").strip()
+    if not secret_key:
+        return JsonResponse({"ok": False, "error": "Secret key is required."})
+    if not (secret_key.startswith("sk_test_") or secret_key.startswith("sk_live_") or secret_key.startswith("rk_")):
+        return JsonResponse({"ok": False, "error": "Key must start with sk_test_, sk_live_, or rk_."})
+    try:
+        result = stripe_utils.verify_account_credentials(secret_key)
+    except Exception as exc:
+        return JsonResponse({"ok": False, "error": f"Stripe rejected the key: {exc}"})
+    return JsonResponse({"ok": True, **result})
+
+
+@staff_member_required
+@require_POST
+def billing_save_connect_platform(request: HttpRequest) -> HttpResponse:
+    """Save the Stripe Connect platform credentials to BillingSettings."""
+    from billing.forms import ConnectPlatformSettingsForm
+
+    settings_obj = BillingSettings.load()
+    form = ConnectPlatformSettingsForm(request.POST, instance=settings_obj)
+    if form.is_valid():
+        form.save()
+        django_messages.success(request, "Stripe Connect platform settings saved.")
+    else:
+        for field, errors in form.errors.items():
+            for error in errors:
+                django_messages.error(request, f"{field}: {error}")
+    return redirect("/billing/admin/dashboard/?tab=settings")
 
 
 @staff_member_required

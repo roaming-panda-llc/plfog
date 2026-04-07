@@ -68,6 +68,39 @@ class BillingSettings(models.Model):
         default=24,
         help_text="Hours between retry attempts for failed charges.",
     )
+
+    # ---- Stripe Connect platform configuration ----
+    # Used by OAuth-mode StripeAccount rows. Direct-keys mode does not need any
+    # of these — each guild's keys live on the StripeAccount row instead.
+    connect_enabled = models.BooleanField(
+        default=False,
+        help_text="Master switch for Stripe Connect platform billing. When off, the OAuth tab is hidden.",
+    )
+    connect_client_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Stripe Connect application client ID (ca_…). From dashboard.stripe.com/settings/connect.",
+    )
+    connect_platform_publishable_key = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="PL platform Stripe publishable key (pk_…). Sent to the browser for the payment-method setup flow.",
+    )
+    connect_platform_secret_key = EncryptedCharField(
+        max_length=512,
+        blank=True,
+        default="",
+        help_text="PL platform Stripe secret key (sk_…). Used for OAuth Connect destination charges. Encrypted at rest.",
+    )
+    connect_platform_webhook_secret = EncryptedCharField(
+        max_length=512,
+        blank=True,
+        default="",
+        help_text="Webhook signing secret for the global /billing/webhooks/stripe/ endpoint. Encrypted at rest.",
+    )
+
     updated_at = models.DateTimeField(auto_now=True, help_text="Last time billing settings were changed.")
 
     class Meta:
@@ -98,6 +131,22 @@ class BillingSettings(models.Model):
 
     def __str__(self) -> str:
         return "Billing Settings"
+
+    def clean(self) -> None:
+        """If Connect is enabled, all four platform credential fields must be non-empty."""
+        super().clean()
+        if self.connect_enabled:
+            missing = []
+            if not self.connect_client_id:
+                missing.append("connect_client_id")
+            if not self.connect_platform_publishable_key:
+                missing.append("connect_platform_publishable_key")
+            if not self.connect_platform_secret_key:
+                missing.append("connect_platform_secret_key")
+            if not self.connect_platform_webhook_secret:
+                missing.append("connect_platform_webhook_secret")
+            if missing:
+                raise ValidationError({field: "Required when Stripe Connect is enabled." for field in missing})
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         """Force singleton by always using pk=1."""
@@ -228,11 +277,13 @@ class StripeAccount(models.Model):
         """
         import stripe
 
+        from billing import stripe_utils as _stripe_utils
+
         if self.auth_mode == self.AuthMode.DIRECT_KEYS:
             if not self.direct_secret_key:
                 raise ValueError(f"StripeAccount {self.pk} is in direct-keys mode but has no secret key.")
             return stripe.StripeClient(self.direct_secret_key)
-        return stripe.StripeClient(settings.STRIPE_SECRET_KEY)
+        return stripe.StripeClient(_stripe_utils._platform_secret_key())
 
     @classmethod
     def upsert_for_guild(cls, guild: object, account_id: str) -> StripeAccount:

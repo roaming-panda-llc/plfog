@@ -59,13 +59,17 @@ Entries for products under different guilds are grouped by `StripeAccount`. If a
 
 ### Encryption key
 
-Direct-keys mode requires `STRIPE_FIELD_ENCRYPTION_KEY` (a Fernet key) in the env. Generate with:
+The Fernet encryption key (`STRIPE_FIELD_ENCRYPTION_KEY`) is the **only** Stripe-related env var the app still uses. It encrypts every secret stored in the DB — guild secret keys, guild webhook secrets, the platform secret key, and the platform webhook secret. Generate with:
 
 ```bash
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-Set on local, Hetzner, and Render. **Losing this key bricks all stored direct-mode credentials.**
+Set on local, Hetzner, and Render. **Losing this key bricks all stored Stripe credentials.** Back it up to 1Password.
+
+### Stripe configuration lives in BillingSettings
+
+All other Stripe config — platform secret key, publishable key, webhook signing secret, Connect client ID, and the on/off toggle for Connect — lives in the `BillingSettings` singleton row in the database, configured via the admin Payments dashboard → **Settings** tab. No env vars. The `stripe_utils._platform_secret_key()` / `_platform_webhook_secret()` / `_connect_client_id()` helpers raise `ImproperlyConfigured` if a value is needed and unset, with a message pointing the admin to the Settings page.
 
 ### Webhook URLs
 

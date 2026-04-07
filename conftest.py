@@ -24,10 +24,26 @@ def _disable_airtable_sync(settings):
 
 @pytest.fixture(autouse=True)
 def _fake_stripe_keys(settings):
-    """Use fake Stripe keys in all tests to prevent accidental live calls."""
-    settings.STRIPE_SECRET_KEY = "sk_test_fake_for_testing"
-    settings.STRIPE_PUBLISHABLE_KEY = "pk_test_fake_for_testing"
-    settings.STRIPE_WEBHOOK_SECRET = "whsec_fake_for_testing"
-    settings.STRIPE_CONNECT_CLIENT_ID = "ca_test_fake_for_testing"
-    # Stable Fernet key so EncryptedCharField round-trips work in tests.
+    """Stable Fernet encryption key so EncryptedCharField round-trips work in tests.
+
+    All other Stripe credentials live in BillingSettings DB rows — see
+    `_fake_billing_stripe_settings` below for the autouse DB fixture that populates them.
+    """
     settings.STRIPE_FIELD_ENCRYPTION_KEY = "b4-PlK9DFN7ABVCQwOHuQXMydh5IUj1ysLKGJOqMEWI="
+
+
+@pytest.fixture
+def configured_billing_stripe(db):
+    """Populate BillingSettings.connect_* with fake values for tests that hit
+    stripe_utils helpers without patching. Most tests patch `_get_stripe_client`
+    or `construct_webhook_event` directly and don't need this fixture.
+    """
+    from billing.models import BillingSettings
+
+    bs = BillingSettings.load()
+    bs.connect_client_id = "ca_test_fake_for_testing"
+    bs.connect_platform_publishable_key = "pk_test_fake_for_testing"
+    bs.connect_platform_secret_key = "sk_test_fake_for_testing"
+    bs.connect_platform_webhook_secret = "whsec_fake_for_testing"
+    bs.save()
+    return bs

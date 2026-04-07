@@ -222,18 +222,13 @@ AIRTABLE_BASE_ID = os.environ.get("AIRTABLE_BASE_ID", "")
 AIRTABLE_SYNC_ENABLED = os.environ.get("AIRTABLE_SYNC_ENABLED", "false").lower() == "true"
 
 # Stripe — billing integration
-STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
-STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
-STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
-STRIPE_CONNECT_CLIENT_ID = os.environ.get("STRIPE_CONNECT_CLIENT_ID", "")
-# Symmetric encryption key (Fernet) for guild Stripe secret keys + webhook secrets
-# stored on StripeAccount in direct-keys mode. Generate with:
+# All Stripe API credentials live in the BillingSettings DB row, configured via
+# the admin Payments dashboard → Settings tab. The only env var required is the
+# Fernet encryption key that protects secrets at rest.
+# Generate one with:
 #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-# Losing this key bricks all stored direct-mode credentials.
+# Losing this key bricks all stored Stripe credentials.
 STRIPE_FIELD_ENCRYPTION_KEY = os.environ.get("STRIPE_FIELD_ENCRYPTION_KEY", "")
-
-if DEBUG and STRIPE_SECRET_KEY.startswith("sk_live"):
-    raise ValueError("DANGER: Live Stripe key detected in DEBUG mode. Use sk_test_ keys for development.")
 
 # Logging — ensure tracebacks reach stderr (captured by Render/Gunicorn)
 LOGGING = {

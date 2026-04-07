@@ -92,7 +92,7 @@ def describe_StripeAccount():
             account = DirectKeysStripeAccountFactory.build(platform_fee_percent=Decimal("0.00"))
             account.clean()  # should not raise
 
-        def it_returns_platform_client_in_oauth_mode():
+        def it_returns_platform_client_in_oauth_mode(configured_billing_stripe):
             import stripe
 
             account = StripeAccountFactory()

@@ -1,4 +1,12 @@
-"""Thin wrapper for all Stripe API calls. All Stripe interactions go through here."""
+"""Thin wrapper for all Stripe API calls. All Stripe interactions go through here.
+
+All platform-account Stripe credentials (used for Connect/OAuth-mode charges,
+the global webhook endpoint, and the platform payment-method setup flow) live
+in `BillingSettings` rows in the database — no environment variables. Direct-
+keys mode reads its credentials from the per-guild `StripeAccount` row instead.
+The only Stripe-related env var still in use is `STRIPE_FIELD_ENCRYPTION_KEY`,
+which is the Fernet key that encrypts secrets at rest.
+"""
 
 from __future__ import annotations
 
@@ -6,14 +14,51 @@ from typing import TYPE_CHECKING, Any
 
 import stripe
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 
 if TYPE_CHECKING:
-    from billing.models import StripeAccount
+    from billing.models import BillingSettings, StripeAccount
+
+
+def _billing_settings() -> BillingSettings:
+    """Lazy import to avoid circular dependency between models and stripe_utils."""
+    from billing.models import BillingSettings as _BS
+
+    return _BS.load()
+
+
+def _platform_secret_key() -> str:
+    bs = _billing_settings()
+    if not bs.connect_platform_secret_key:
+        raise ImproperlyConfigured(
+            "Stripe Connect platform secret key is not set. "
+            "Configure it in the admin Payments dashboard → Settings tab."
+        )
+    return bs.connect_platform_secret_key
+
+
+def _platform_webhook_secret() -> str:
+    bs = _billing_settings()
+    if not bs.connect_platform_webhook_secret:
+        raise ImproperlyConfigured(
+            "Stripe Connect platform webhook secret is not set. "
+            "Configure it in the admin Payments dashboard → Settings tab."
+        )
+    return bs.connect_platform_webhook_secret
+
+
+def _connect_client_id() -> str:
+    bs = _billing_settings()
+    if not bs.connect_client_id:
+        raise ImproperlyConfigured(
+            "Stripe Connect client ID is not set. Configure it in the admin Payments dashboard → Settings tab."
+        )
+    return bs.connect_client_id
 
 
 def _get_stripe_client() -> stripe.StripeClient:
-    """Get a Stripe client configured with the secret key."""
-    return stripe.StripeClient(settings.STRIPE_SECRET_KEY)
+    """Get a Stripe client configured with the platform secret key (from DB)."""
+    return stripe.StripeClient(_platform_secret_key())
 
 
 def create_customer(*, email: str, name: str, member_pk: int) -> str:
@@ -165,7 +210,7 @@ def create_destination_payment_intent(
 
 def get_connect_oauth_url(*, state: str) -> str:
     """Build the Stripe Connect OAuth URL for linking a Standard account."""
-    client_id = settings.STRIPE_CONNECT_CLIENT_ID
+    client_id = _connect_client_id()
     return (
         f"https://connect.stripe.com/oauth/authorize"
         f"?response_type=code&client_id={client_id}"
@@ -183,15 +228,17 @@ def complete_connect_oauth(*, code: str) -> str:
 def construct_webhook_event(*, payload: bytes, sig_header: str) -> stripe.Event:
     """Verify and construct a Stripe webhook event from the raw payload.
 
-    Uses the raw request body to verify the Stripe signature.
+    Uses the raw request body to verify the Stripe signature. The signing
+    secret is read from BillingSettings (the global Connect platform secret).
 
     Raises:
         stripe.SignatureVerificationError: If the signature is invalid.
+        ImproperlyConfigured: If the platform webhook secret is not set in BillingSettings.
     """
     return stripe.Webhook.construct_event(
         payload=payload,
         sig_header=sig_header,
-        secret=settings.STRIPE_WEBHOOK_SECRET,
+        secret=_platform_webhook_secret(),
     )
 
 

@@ -84,3 +84,48 @@ class BillingSettingsForm(forms.ModelForm):
         if value < Decimal("0.00"):
             raise forms.ValidationError("Tab limit must be zero or positive.")
         return value
+
+
+class ConnectPlatformSettingsForm(forms.ModelForm):
+    """Admin form for editing the Stripe Connect platform credentials on BillingSettings.
+
+    Lives separately from BillingSettingsForm so it can be POSTed independently
+    from a dedicated card on the Settings tab.
+    """
+
+    class Meta:
+        model = BillingSettings
+        fields = [
+            "connect_enabled",
+            "connect_client_id",
+            "connect_platform_publishable_key",
+            "connect_platform_secret_key",
+            "connect_platform_webhook_secret",
+        ]
+        widgets = {
+            "connect_client_id": forms.TextInput(attrs={"placeholder": "ca_…", "autocomplete": "off"}),
+            "connect_platform_publishable_key": forms.TextInput(attrs={"placeholder": "pk_…", "autocomplete": "off"}),
+            "connect_platform_secret_key": forms.PasswordInput(
+                render_value=True, attrs={"placeholder": "sk_…", "autocomplete": "off"}
+            ),
+            "connect_platform_webhook_secret": forms.PasswordInput(
+                render_value=True, attrs={"placeholder": "whsec_…", "autocomplete": "off"}
+            ),
+        }
+
+    def clean(self) -> dict:
+        cleaned = super().clean() or {}
+        if cleaned.get("connect_enabled"):
+            missing = [
+                field
+                for field in (
+                    "connect_client_id",
+                    "connect_platform_publishable_key",
+                    "connect_platform_secret_key",
+                    "connect_platform_webhook_secret",
+                )
+                if not cleaned.get(field)
+            ]
+            for field in missing:
+                self.add_error(field, "Required when Stripe Connect is enabled.")
+        return cleaned

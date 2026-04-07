@@ -371,6 +371,90 @@
     </form>
   </div>
 
+  {# ---- Stripe Connect Platform card ---- #}
+  <div class="pl-card" style="margin-top:1.5rem">
+    <div class="pl-section-label">Stripe Connect Platform</div>
+    <p style="color:#96ACBB;font-size:0.875rem;margin:0 0 1.25rem">
+      When enabled, guild admins can connect their Stripe account via OAuth (in addition to pasting API keys),
+      and Past Lives can collect a platform fee on charges. Use this for memberships and space leases.
+      Get the Client ID + keys from
+      <a href="https://dashboard.stripe.com/settings/connect" target="_blank" rel="noopener" style="color:#a0c0e0">dashboard.stripe.com/settings/connect</a>.
+    </p>
+
+    <form method="post" action="{% url 'billing_save_connect_platform' %}" id="connect-platform-form">
+      {% csrf_token %}
+
+      <div class="pl-form-row">
+        <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer">
+          {{ connect_platform_form.connect_enabled }}
+          <span>Enable Stripe Connect platform billing</span>
+        </label>
+        {% if connect_platform_form.connect_enabled.errors %}<div class="pl-form-errors">{{ connect_platform_form.connect_enabled.errors }}</div>{% endif %}
+      </div>
+
+      <div class="pl-form-row">
+        <label for="{{ connect_platform_form.connect_client_id.id_for_label }}">Connect Client ID</label>
+        {{ connect_platform_form.connect_client_id }}
+        <div class="pl-form-hint">From dashboard.stripe.com/settings/connect (Integration → OAuth settings)</div>
+        {% if connect_platform_form.connect_client_id.errors %}<div class="pl-form-errors">{{ connect_platform_form.connect_client_id.errors }}</div>{% endif %}
+      </div>
+
+      <div class="pl-form-row">
+        <label for="{{ connect_platform_form.connect_platform_publishable_key.id_for_label }}">Platform Publishable Key</label>
+        {{ connect_platform_form.connect_platform_publishable_key }}
+        {% if connect_platform_form.connect_platform_publishable_key.errors %}<div class="pl-form-errors">{{ connect_platform_form.connect_platform_publishable_key.errors }}</div>{% endif %}
+      </div>
+
+      <div class="pl-form-row">
+        <label for="{{ connect_platform_form.connect_platform_secret_key.id_for_label }}">Platform Secret Key</label>
+        {{ connect_platform_form.connect_platform_secret_key }}
+        <div class="pl-form-hint">Encrypted at rest. Click "Test connection" below before saving.</div>
+        {% if connect_platform_form.connect_platform_secret_key.errors %}<div class="pl-form-errors">{{ connect_platform_form.connect_platform_secret_key.errors }}</div>{% endif %}
+      </div>
+
+      <div class="pl-form-row">
+        <label for="{{ connect_platform_form.connect_platform_webhook_secret.id_for_label }}">Webhook Signing Secret</label>
+        {{ connect_platform_form.connect_platform_webhook_secret }}
+        <div class="pl-form-hint">From dashboard.stripe.com/webhooks for the endpoint pointed at /billing/webhooks/stripe/</div>
+        {% if connect_platform_form.connect_platform_webhook_secret.errors %}<div class="pl-form-errors">{{ connect_platform_form.connect_platform_webhook_secret.errors }}</div>{% endif %}
+      </div>
+
+      <div id="connect-platform-test-result" style="font-size:0.875rem;margin:0.5rem 0;min-height:1.2em"></div>
+
+      <div style="display:flex;gap:0.5rem">
+        <button type="button" class="pl-btn pl-btn--secondary" onclick="testConnectPlatform()">Test connection</button>
+        <button type="submit" class="pl-btn pl-btn--primary">Save Connect Settings</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+  function testConnectPlatform() {
+    var sk = document.getElementById('{{ connect_platform_form.connect_platform_secret_key.id_for_label }}').value;
+    var resultEl = document.getElementById('connect-platform-test-result');
+    resultEl.style.color = '#96ACBB';
+    resultEl.textContent = 'Testing…';
+    var fd = new FormData();
+    fd.append('secret_key', sk);
+    fd.append('csrfmiddlewaretoken', document.querySelector('#connect-platform-form [name=csrfmiddlewaretoken]').value);
+    fetch('{% url "billing_test_platform_connection" %}', {method:'POST', body:fd, credentials:'same-origin'})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if (d.ok) {
+          resultEl.style.color = '#a0e0c0';
+          resultEl.textContent = '✓ Connected to ' + d.stripe_account_id + ' — ' + d.display_name;
+        } else {
+          resultEl.style.color = '#e0a0a0';
+          resultEl.textContent = '✗ ' + d.error;
+        }
+      })
+      .catch(function(e){
+        resultEl.style.color = '#e0a0a0';
+        resultEl.textContent = '✗ ' + e;
+      });
+  }
+  </script>
+
   {% endif %}{# /settings #}
 
   {# ================================================================ #}
@@ -497,7 +581,9 @@
     <div class="pl-modal__body">
       <div style="display:flex;gap:0.5rem;border-bottom:1px solid #2a3340;margin-bottom:1rem">
         <button type="button" id="csm-tab-direct-btn" class="pl-btn pl-btn--sm pl-btn--primary" onclick="csmShowTab('direct')">Paste API Keys</button>
+        {% if billing_settings.connect_enabled %}
         <button type="button" id="csm-tab-oauth-btn" class="pl-btn pl-btn--sm pl-btn--secondary" onclick="csmShowTab('oauth')">Connect via OAuth</button>
+        {% endif %}
       </div>
 
       {# --- Direct keys tab (default) --- #}
@@ -542,11 +628,13 @@
         </p>
       </div>
 
-      {# --- OAuth tab --- #}
+      {# --- OAuth tab — only rendered when Stripe Connect is enabled in settings --- #}
+      {% if billing_settings.connect_enabled %}
       <div id="csm-tab-oauth" style="display:none">
         <p style="color:#96ACBB;font-size:0.875rem;margin:0 0 1.25rem">
-          Use Stripe Connect OAuth. Requires the platform's STRIPE_CONNECT_CLIENT_ID to be configured.
-          Use this when PL needs to collect a platform fee (membership, space leases).
+          Use Stripe Connect OAuth. The guild's existing Stripe account will be linked
+          to the Past Lives platform — money flows directly to them and PL can take a
+          platform fee. Use this for membership and space-lease billing.
         </p>
         <div class="pl-modal__field">
           <label for="connect-guild-select">Guild</label>
@@ -562,6 +650,7 @@
           <button type="button" class="pl-btn pl-btn--primary pl-btn--sm" onclick="initiateStripeConnect()">Connect via Stripe →</button>
         </div>
       </div>
+      {% endif %}
     </div>
   </div>
 </div>
@@ -569,9 +658,11 @@
 <script>
 function csmShowTab(which) {
   document.getElementById('csm-tab-direct').style.display = which === 'direct' ? 'block' : 'none';
-  document.getElementById('csm-tab-oauth').style.display = which === 'oauth' ? 'block' : 'none';
   document.getElementById('csm-tab-direct-btn').className = 'pl-btn pl-btn--sm ' + (which === 'direct' ? 'pl-btn--primary' : 'pl-btn--secondary');
-  document.getElementById('csm-tab-oauth-btn').className = 'pl-btn pl-btn--sm ' + (which === 'oauth' ? 'pl-btn--primary' : 'pl-btn--secondary');
+  var oauthTab = document.getElementById('csm-tab-oauth');
+  var oauthBtn = document.getElementById('csm-tab-oauth-btn');
+  if (oauthTab) oauthTab.style.display = which === 'oauth' ? 'block' : 'none';
+  if (oauthBtn) oauthBtn.className = 'pl-btn pl-btn--sm ' + (which === 'oauth' ? 'pl-btn--primary' : 'pl-btn--secondary');
 }
 function csmTestKeys() {
   var sk = document.getElementById('csm-sk').value;
