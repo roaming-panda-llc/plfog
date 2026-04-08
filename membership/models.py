@@ -133,7 +133,17 @@ class Member(models.Model):
     )
     full_legal_name = models.CharField(max_length=255)
     preferred_name = models.CharField(max_length=255, blank=True)
-    email = models.EmailField(blank=True, default="")
+    _pre_signup_email = models.EmailField(
+        blank=True,
+        default="",
+        db_column="email",  # keep existing DB column name to avoid an extra migration
+        help_text=(
+            "Stored email used ONLY when this Member has no linked User. "
+            "Once a User is linked, allauth.account.EmailAddress becomes the source of truth; "
+            "read `member.primary_email` instead. See "
+            "docs/superpowers/specs/2026-04-07-user-email-aliases-design.md for the full architecture."
+        ),
+    )
     phone = models.CharField(max_length=20, blank=True)
     discord_handle = models.CharField(
         max_length=100, blank=True, help_text="Discord username (e.g. user#1234 or @user)."

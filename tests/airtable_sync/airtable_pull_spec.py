@@ -19,7 +19,7 @@ def describe_upsert_member():
         cmd._upsert_member(
             model=Member,
             record_id="recNOEMAIL",
-            django_kwargs={"full_legal_name": "No Email Person", "email": ""},
+            django_kwargs={"full_legal_name": "No Email Person", "_pre_signup_email": ""},
             default_plan=plan,
             dry_run=False,
             results=results,
@@ -37,25 +37,25 @@ def describe_upsert_member():
         cmd._upsert_member(
             model=Member,
             record_id="recHASEMAIL",
-            django_kwargs={"full_legal_name": "Has Email", "email": "has@example.com", "status": "active"},
+            django_kwargs={"full_legal_name": "Has Email", "_pre_signup_email": "has@example.com", "status": "active"},
             default_plan=plan,
             dry_run=False,
             results=results,
         )
 
         assert results["created"] == 1
-        assert Member.objects.filter(email="has@example.com").exists()
+        assert Member.objects.filter(_pre_signup_email="has@example.com").exists()
 
     def it_updates_existing_member_by_email():
         plan = MembershipPlanFactory()
-        existing = MemberFactory(email="match@example.com", full_legal_name="Old Name")
+        existing = MemberFactory(_pre_signup_email="match@example.com", full_legal_name="Old Name")
         cmd = Command()
         results = {"created": 0, "updated": 0, "skipped": 0}
 
         cmd._upsert_member(
             model=Member,
             record_id="recMATCH",
-            django_kwargs={"full_legal_name": "New Name", "email": "match@example.com"},
+            django_kwargs={"full_legal_name": "New Name", "_pre_signup_email": "match@example.com"},
             default_plan=plan,
             dry_run=False,
             results=results,

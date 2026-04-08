@@ -31,7 +31,7 @@ class InviteMemberForm(forms.Form):
 
     def clean_email(self) -> str:
         email = self.cleaned_data["email"]
-        if Member.objects.filter(email__iexact=email).exclude(status=Member.Status.INVITED).exists():
+        if Member.objects.filter(_pre_signup_email__iexact=email).exclude(status=Member.Status.INVITED).exists():
             raise ValidationError("A member with this email already exists.")
         if Invite.objects.filter(email__iexact=email, accepted_at__isnull=True).exists():
             raise ValidationError("A pending invite for this email already exists.")

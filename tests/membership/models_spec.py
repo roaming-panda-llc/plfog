@@ -128,8 +128,8 @@ def describe_member_initials():
 @pytest.mark.django_db
 def describe_member_optional_fields():
     def it_allows_blank_email():
-        member = MemberFactory(email="")
-        assert member.email == ""
+        member = MemberFactory(_pre_signup_email="")
+        assert member._pre_signup_email == ""
 
     def it_allows_null_join_date():
         member = MemberFactory(join_date=None)
@@ -388,8 +388,8 @@ def describe_space_occupants_and_revenue():
     def describe_revenue():
         def it_calculates_actual_revenue_from_active_leases():
             plan = MembershipPlanFactory(name="Rev Plan")
-            member_a = MemberFactory(membership_plan=plan, full_legal_name="Alice", email="alice@example.com")
-            member_b = MemberFactory(membership_plan=plan, full_legal_name="Bob", email="bob@example.com")
+            member_a = MemberFactory(membership_plan=plan, full_legal_name="Alice", _pre_signup_email="alice@example.com")
+            member_b = MemberFactory(membership_plan=plan, full_legal_name="Bob", _pre_signup_email="bob@example.com")
             today = timezone.now().date()
             space = SpaceFactory(space_id="S-REV", manual_price=Decimal("600.00"))
 
@@ -418,7 +418,7 @@ def describe_space_occupants_and_revenue():
                 manual_price=Decimal("600.00"),
             )
             plan = MembershipPlanFactory(name="RL Plan")
-            member = MemberFactory(membership_plan=plan, email="rl@example.com")
+            member = MemberFactory(membership_plan=plan, _pre_signup_email="rl@example.com")
             today = timezone.now().date()
 
             LeaseFactory(
@@ -452,7 +452,7 @@ def describe_lease():
             membership_plan=plan,
             full_legal_name="Test User",
             preferred_name="TU",
-            email="tu@example.com",
+            _pre_signup_email="tu@example.com",
         )
         space = SpaceFactory(space_id="L-100", name="Main")
         lease = LeaseFactory(

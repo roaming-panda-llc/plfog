@@ -74,7 +74,7 @@ class MemberAdmin(ModelAdmin):
     inlines = [MemberEmailInline]
     list_display = [
         "display_name",
-        "email",
+        "_pre_signup_email",
         "status",
         "member_type",
         "fog_role",
@@ -83,7 +83,7 @@ class MemberAdmin(ModelAdmin):
     ]
     list_display_links = ["display_name"]
     list_filter = [ActiveStatusFilter, HasUserFilter, "member_type"]
-    search_fields = ["full_legal_name", "preferred_name", "email"]
+    search_fields = ["full_legal_name", "preferred_name", "_pre_signup_email"]
     list_per_page = 100
     ordering = ["full_legal_name"]
 
@@ -103,7 +103,7 @@ class MemberAdmin(ModelAdmin):
         personal_fields: list[str] = [
             "full_legal_name",
             "preferred_name",
-            "email",
+            "_pre_signup_email",
             "phone",
             "billing_name",
         ]
@@ -149,7 +149,7 @@ class MemberAdmin(ModelAdmin):
         """Optionally create a User account when adding a new member with 'Create login' checked."""
         create_user = form.cleaned_data["create_user"]
 
-        if not change and create_user and obj.email:
+        if not change and create_user and obj._pre_signup_email:
             from django.contrib.auth import get_user_model
 
             UserModel = get_user_model()
@@ -157,7 +157,9 @@ class MemberAdmin(ModelAdmin):
             # Save the member first (without a user)
             super().save_model(request, obj, form, change)
             # Create the user — the post_save signal will try to auto-link a member
-            user = UserModel.objects.create_user(username=obj.email, email=obj.email)
+            user = UserModel.objects.create_user(
+                username=obj._pre_signup_email, email=obj._pre_signup_email
+            )
             # Signal may have created a duplicate member or linked to wrong one.
             # Delete any signal-created member and link ours.
             Member.objects.filter(user=user).exclude(pk=obj.pk).delete()

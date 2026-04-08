@@ -66,7 +66,7 @@ def describe_MemberAdmin():
         member_admin = admin.site._registry[Member]
         assert member_admin.list_display == [
             "display_name",
-            "email",
+            "_pre_signup_email",
             "status",
             "member_type",
             "fog_role",
@@ -79,7 +79,7 @@ def describe_MemberAdmin():
         assert member_admin.search_fields == [
             "full_legal_name",
             "preferred_name",
-            "email",
+            "_pre_signup_email",
         ]
 
     def it_has_expected_list_filter():
@@ -462,7 +462,7 @@ def describe_admin_search_by_alias():
     def it_finds_member_by_alias_email(admin_client):
         from membership.models import MemberEmail
 
-        member = MemberFactory(full_legal_name="Alias Andy", email="primary@example.com")
+        member = MemberFactory(full_legal_name="Alias Andy", _pre_signup_email="primary@example.com")
         MemberEmail.objects.create(member=member, email="secret@alias.com")
         resp = admin_client.get("/admin/membership/member/?status=all&q=secret@alias.com")
         content = resp.content.decode()
@@ -477,7 +477,7 @@ def describe_admin_create_user_with_member():
             "/admin/membership/member/add/",
             {
                 "full_legal_name": "Test Person",
-                "email": "test@example.com",
+                "_pre_signup_email": "test@example.com",
                 "membership_plan": plan.pk,
                 "status": "active",
                 "member_type": "standard",
@@ -492,7 +492,7 @@ def describe_admin_create_user_with_member():
             },
         )
         assert resp.status_code == 302
-        member = Member.objects.get(email="test@example.com")
+        member = Member.objects.get(_pre_signup_email="test@example.com")
         assert member.user is None
 
     def it_creates_member_with_user_when_checked(admin_client):
@@ -501,7 +501,7 @@ def describe_admin_create_user_with_member():
             "/admin/membership/member/add/",
             {
                 "full_legal_name": "Login Person",
-                "email": "login@example.com",
+                "_pre_signup_email": "login@example.com",
                 "membership_plan": plan.pk,
                 "status": "active",
                 "member_type": "employee",
@@ -516,7 +516,7 @@ def describe_admin_create_user_with_member():
             },
         )
         assert resp.status_code == 302
-        member = Member.objects.get(email="login@example.com")
+        member = Member.objects.get(_pre_signup_email="login@example.com")
         assert member.user is not None
         assert member.user.email == "login@example.com"
         assert member.user.username == "login@example.com"

@@ -88,7 +88,7 @@ class Command(BaseCommand):
             if member.airtable_record_id:
                 results["skipped"] += 1
                 continue
-            email = member.email.strip().lower()
+            email = member._pre_signup_email.strip().lower()
             if email and email in at_by_email:
                 rec = at_by_email[email]
                 if not dry_run:
@@ -125,8 +125,8 @@ class Command(BaseCommand):
                 results["updated"] += 1
                 continue
 
-            email = django_kwargs.get("email", "").strip().lower()
-            existing_by_email = Member.objects.filter(email__iexact=email).first() if email else None
+            email = django_kwargs.get("_pre_signup_email", "").strip().lower()
+            existing_by_email = Member.objects.filter(_pre_signup_email__iexact=email).first() if email else None
             if existing_by_email:
                 if not dry_run:
                     _update_instance(existing_by_email, django_kwargs, dry_run=False)

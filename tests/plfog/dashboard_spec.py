@@ -201,12 +201,12 @@ def describe_invite_member_view():
             )
         assert resp.status_code == 302
         assert Invite.objects.filter(email="new@example.com").exists()
-        member = Member.objects.get(email="new@example.com")
+        member = Member.objects.get(_pre_signup_email="new@example.com")
         assert member.status == Member.Status.INVITED
 
     def it_shows_error_for_existing_member(admin_client):
         MembershipPlanFactory()
-        MemberFactory(email="exists@example.com", status=Member.Status.ACTIVE)
+        MemberFactory(_pre_signup_email="exists@example.com", status=Member.Status.ACTIVE)
         resp = admin_client.post(
             "/admin/membership/member/invite/",
             data={"email": "exists@example.com"},

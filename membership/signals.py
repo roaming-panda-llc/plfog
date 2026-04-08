@@ -30,7 +30,7 @@ def ensure_user_has_member(sender: type, instance: Any, **kwargs: Any) -> None:
     if email:
         # Check primary email on Member
         try:
-            member = Member.objects.get(email__iexact=email, user__isnull=True)
+            member = Member.objects.get(_pre_signup_email__iexact=email, user__isnull=True)
             member.user = instance
             member.full_legal_name = instance.get_full_name() or member.full_legal_name or instance.username
             member.status = Member.Status.ACTIVE
@@ -67,7 +67,7 @@ def ensure_user_has_member(sender: type, instance: Any, **kwargs: Any) -> None:
     Member.objects.create(
         user=instance,
         full_legal_name=name,
-        email=instance.email or "",
+        _pre_signup_email=instance.email or "",
         membership_plan=plan,
         status=Member.Status.ACTIVE,
     )

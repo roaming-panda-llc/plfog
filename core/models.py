@@ -115,7 +115,7 @@ class Invite(models.Model):
         """
         from membership.models import Member, MembershipPlan
 
-        if Member.objects.filter(email__iexact=email).exclude(status=Member.Status.INVITED).exists():
+        if Member.objects.filter(_pre_signup_email__iexact=email).exclude(status=Member.Status.INVITED).exists():
             raise ValueError(f"A member with email {email} already exists.")
 
         if cls.objects.filter(email__iexact=email, accepted_at__isnull=True).exists():
@@ -126,7 +126,7 @@ class Invite(models.Model):
             raise ValueError("Cannot invite: no membership plan exists yet.")
 
         member = Member.objects.create(
-            email=email,
+            _pre_signup_email=email,
             full_legal_name=email,
             membership_plan=plan,
             status=Member.Status.INVITED,

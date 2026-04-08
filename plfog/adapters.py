@@ -137,7 +137,7 @@ class AutoCreateUserLoginCodeForm(RequestLoginCodeForm):
         email: str = self.cleaned_data.get("email", "")
         if email and not User.objects.filter(email__iexact=email).exists():
             # Check primary email on Member
-            if Member.objects.filter(email__iexact=email, user__isnull=True).exists():
+            if Member.objects.filter(_pre_signup_email__iexact=email, user__isnull=True).exists():
                 User.objects.create_user(username=email, email=email)
                 logger.info("Auto-created User for existing Member (primary email): %s", email)
             else:

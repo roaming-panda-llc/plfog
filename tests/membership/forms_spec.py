@@ -18,18 +18,18 @@ def describe_InviteMemberForm():
         assert form.is_valid()
 
     def it_rejects_existing_active_member():
-        MemberFactory(email="taken@example.com", status=Member.Status.ACTIVE)
+        MemberFactory(_pre_signup_email="taken@example.com", status=Member.Status.ACTIVE)
         form = InviteMemberForm(data={"email": "taken@example.com"})
         assert not form.is_valid()
         assert "A member with this email already exists." in form.errors["email"]
 
     def it_rejects_existing_active_member_case_insensitive():
-        MemberFactory(email="taken@example.com", status=Member.Status.ACTIVE)
+        MemberFactory(_pre_signup_email="taken@example.com", status=Member.Status.ACTIVE)
         form = InviteMemberForm(data={"email": "TAKEN@example.com"})
         assert not form.is_valid()
 
     def it_allows_email_with_invited_status_member():
-        MemberFactory(email="invited@example.com", status=Member.Status.INVITED, user=None)
+        MemberFactory(_pre_signup_email="invited@example.com", status=Member.Status.INVITED, user=None)
         form = InviteMemberForm(data={"email": "invited@example.com"})
         # Still blocked by pending invite check if one exists, but not by member check
         assert form.is_valid()

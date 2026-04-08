@@ -52,17 +52,17 @@ def describe_member_queryset():
     def describe_active():
         def it_returns_only_active_members():
             plan = MembershipPlanFactory()
-            active = MemberFactory(membership_plan=plan, full_legal_name="Active One", email="a@x.com")
+            active = MemberFactory(membership_plan=plan, full_legal_name="Active One", _pre_signup_email="a@x.com")
             MemberFactory(
                 membership_plan=plan,
                 full_legal_name="Former One",
-                email="f@x.com",
+                _pre_signup_email="f@x.com",
                 status=Member.Status.FORMER,
             )
             MemberFactory(
                 membership_plan=plan,
                 full_legal_name="Suspended One",
-                email="s@x.com",
+                _pre_signup_email="s@x.com",
                 status=Member.Status.SUSPENDED,
             )
 
@@ -74,7 +74,7 @@ def describe_member_queryset():
             MemberFactory(
                 membership_plan=plan,
                 full_legal_name="Former",
-                email="f@x.com",
+                _pre_signup_email="f@x.com",
                 status=Member.Status.FORMER,
             )
 
@@ -85,7 +85,7 @@ def describe_member_queryset():
             MemberFactory(
                 membership_plan=plan,
                 full_legal_name="Suspended",
-                email="s@x.com",
+                _pre_signup_email="s@x.com",
                 status=Member.Status.SUSPENDED,
             )
 
@@ -94,7 +94,7 @@ def describe_member_queryset():
     def describe_with_lease_totals():
         def it_annotates_active_lease_count():
             plan = MembershipPlanFactory()
-            member = MemberFactory(membership_plan=plan, email="m@x.com")
+            member = MemberFactory(membership_plan=plan, _pre_signup_email="m@x.com")
             today = timezone.now().date()
 
             space1 = SpaceFactory(space_id="S-001")
@@ -129,7 +129,7 @@ def describe_member_queryset():
 
         def it_annotates_total_monthly_rent():
             plan = MembershipPlanFactory()
-            member = MemberFactory(membership_plan=plan, email="m@x.com")
+            member = MemberFactory(membership_plan=plan, _pre_signup_email="m@x.com")
             today = timezone.now().date()
 
             space1 = SpaceFactory(space_id="S-001")
@@ -153,7 +153,7 @@ def describe_member_queryset():
 
         def it_handles_members_with_no_leases():
             plan = MembershipPlanFactory()
-            member = MemberFactory(membership_plan=plan, email="m@x.com")
+            member = MemberFactory(membership_plan=plan, _pre_signup_email="m@x.com")
 
             annotated = Member.objects.with_lease_totals().get(pk=member.pk)
             assert annotated.active_lease_count == 0
@@ -184,7 +184,7 @@ def describe_space_queryset():
     def describe_with_revenue():
         def it_annotates_active_lease_revenue():
             plan = MembershipPlanFactory()
-            member = MemberFactory(membership_plan=plan, email="m@x.com")
+            member = MemberFactory(membership_plan=plan, _pre_signup_email="m@x.com")
             space = SpaceFactory(space_id="S-001", status=Space.Status.OCCUPIED)
             today = timezone.now().date()
 
@@ -210,7 +210,7 @@ def describe_lease_queryset():
     def describe_active():
         def it_returns_leases_active_today():
             plan = MembershipPlanFactory()
-            member = MemberFactory(membership_plan=plan, email="m@x.com")
+            member = MemberFactory(membership_plan=plan, _pre_signup_email="m@x.com")
             space = SpaceFactory(space_id="S-001")
             today = timezone.now().date()
 
@@ -226,7 +226,7 @@ def describe_lease_queryset():
 
         def it_returns_leases_active_as_of_specific_date():
             plan = MembershipPlanFactory()
-            member = MemberFactory(membership_plan=plan, email="m@x.com")
+            member = MemberFactory(membership_plan=plan, _pre_signup_email="m@x.com")
             space = SpaceFactory(space_id="S-001")
 
             lease = LeaseFactory(
@@ -246,7 +246,7 @@ def describe_lease_queryset():
 
         def it_excludes_ended_leases():
             plan = MembershipPlanFactory()
-            member = MemberFactory(membership_plan=plan, email="m@x.com")
+            member = MemberFactory(membership_plan=plan, _pre_signup_email="m@x.com")
             space = SpaceFactory(space_id="S-001")
             today = timezone.now().date()
 
@@ -261,7 +261,7 @@ def describe_lease_queryset():
 
         def it_excludes_future_leases():
             plan = MembershipPlanFactory()
-            member = MemberFactory(membership_plan=plan, email="m@x.com")
+            member = MemberFactory(membership_plan=plan, _pre_signup_email="m@x.com")
             space = SpaceFactory(space_id="S-001")
             today = timezone.now().date()
 
@@ -276,7 +276,7 @@ def describe_lease_queryset():
 
         def it_includes_ongoing_leases_with_no_end_date():
             plan = MembershipPlanFactory()
-            member = MemberFactory(membership_plan=plan, email="m@x.com")
+            member = MemberFactory(membership_plan=plan, _pre_signup_email="m@x.com")
             space = SpaceFactory(space_id="S-001")
             today = timezone.now().date()
 

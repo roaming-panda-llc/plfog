@@ -17,7 +17,7 @@ pytestmark = pytest.mark.django_db
 
 def describe_send_receipt():
     def it_sends_itemized_receipt_email():
-        member = MemberFactory(email="member@example.com")
+        member = MemberFactory(_pre_signup_email="member@example.com")
         tab = TabFactory(member=member)
         charge = TabChargeFactory(tab=tab, status=TabCharge.Status.SUCCEEDED, amount=Decimal("50.00"))
         TabEntryFactory(tab=tab, tab_charge=charge, description="Laser time", amount=Decimal("30.00"))
@@ -34,7 +34,7 @@ def describe_send_receipt():
         assert "member@example.com" in email.to
 
     def it_sets_receipt_sent_at():
-        member = MemberFactory(email="sent@example.com")
+        member = MemberFactory(_pre_signup_email="sent@example.com")
         tab = TabFactory(member=member)
         charge = TabChargeFactory(tab=tab, status=TabCharge.Status.SUCCEEDED, amount=Decimal("25.00"))
 
@@ -46,7 +46,7 @@ def describe_send_receipt():
         assert charge.receipt_sent_at is not None
 
     def it_skips_when_member_has_no_email():
-        member = MemberFactory(email="")
+        member = MemberFactory(_pre_signup_email="")
         tab = TabFactory(member=member)
         charge = TabChargeFactory(tab=tab, status=TabCharge.Status.SUCCEEDED, amount=Decimal("25.00"))
 
@@ -57,7 +57,7 @@ def describe_send_receipt():
 
 def describe_notify_admin_charge_failed():
     def it_sends_failure_notification():
-        member = MemberFactory(email="member@example.com", preferred_name="Jane")
+        member = MemberFactory(_pre_signup_email="member@example.com", preferred_name="Jane")
         tab = TabFactory(member=member)
         charge = TabChargeFactory(
             tab=tab,

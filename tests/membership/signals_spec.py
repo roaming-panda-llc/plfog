@@ -86,7 +86,7 @@ def describe_ensure_user_has_member():
         # Pre-create a Member placeholder (as invite flow does)
         placeholder = MemberFactory(
             user=None,
-            email="invited@example.com",
+            _pre_signup_email="invited@example.com",
             status=Member.Status.INVITED,
             membership_plan=plan,
         )
@@ -103,13 +103,13 @@ def describe_ensure_user_has_member():
         assert placeholder.status == Member.Status.ACTIVE
         assert placeholder.full_legal_name == "Jane Doe"
         # No duplicate Member created
-        assert Member.objects.filter(email__iexact="invited@example.com").count() == 1
+        assert Member.objects.filter(_pre_signup_email__iexact="invited@example.com").count() == 1
 
     def it_links_invite_member_case_insensitively():
         plan = MembershipPlanFactory()
         placeholder = MemberFactory(
             user=None,
-            email="UPPER@example.com",
+            _pre_signup_email="UPPER@example.com",
             status=Member.Status.INVITED,
             membership_plan=plan,
         )
@@ -128,7 +128,7 @@ def describe_ensure_user_has_member():
         plan = MembershipPlanFactory()
         member = MemberFactory(
             user=None,
-            email="primary@example.com",
+            _pre_signup_email="primary@example.com",
             full_legal_name="Alias Person",
             status=Member.Status.INVITED,
             membership_plan=plan,

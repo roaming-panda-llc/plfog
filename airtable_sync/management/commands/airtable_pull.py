@@ -89,8 +89,8 @@ class Command(BaseCommand):
             results["updated"] += 1
             return
 
-        email = django_kwargs.get("email", "").strip().lower()
-        existing_by_email = model.objects.filter(email__iexact=email).first() if email else None
+        email = django_kwargs.get("_pre_signup_email", "").strip().lower()
+        existing_by_email = model.objects.filter(_pre_signup_email__iexact=email).first() if email else None
         if existing_by_email:
             if not dry_run:
                 self._update_instance(
