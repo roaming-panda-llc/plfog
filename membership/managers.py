@@ -35,7 +35,7 @@ class MemberEmailManager(models.Manager):
         from .models import Member, MemberEmail
 
         try:
-            member = user.member
+            member = user.member  # type: ignore[attr-defined]
         except Member.DoesNotExist:
             return
 

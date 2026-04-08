@@ -236,7 +236,7 @@ class Member(models.Model):
         primary = EmailAddress.objects.filter(user=self.user, primary=True).first()
         if primary is not None:
             return primary.email
-        return self.user.email or ""
+        return (self.user.email if self.user else "") or ""
 
     @property
     def initials(self) -> str:

@@ -14,10 +14,12 @@ cannot distinguish rows that were originally staged from rows the user
 added later. Documented as acceptable for staging rollback only.
 """
 
+from typing import Any
+
 from django.db import migrations
 
 
-def forwards(apps, schema_editor):
+def forwards(apps: Any, schema_editor: Any) -> None:
     Member = apps.get_model("membership", "Member")
     MemberEmail = apps.get_model("membership", "MemberEmail")
     EmailAddress = apps.get_model("account", "EmailAddress")
@@ -45,7 +47,7 @@ def forwards(apps, schema_editor):
         MemberEmail.objects.filter(member=member).delete()
 
 
-def backwards(apps, schema_editor):
+def backwards(apps: Any, schema_editor: Any) -> None:
     """Lossy reverse: copy non-primary EmailAddress rows back into MemberEmail."""
     Member = apps.get_model("membership", "Member")
     MemberEmail = apps.get_model("membership", "MemberEmail")
