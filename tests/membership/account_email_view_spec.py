@@ -2,6 +2,7 @@
 
 See docs/superpowers/specs/2026-04-07-user-email-aliases-design.md.
 """
+
 from __future__ import annotations
 
 from allauth.account.models import EmailAddress
