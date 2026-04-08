@@ -20,9 +20,25 @@ from .models import FundingSnapshot, Guild, Member, MemberEmail, VotePreference
 
 
 class MemberEmailInline(TabularInline):
+    """Inline for the MemberEmail staging table.
+
+    MemberEmail is a pre-signup staging table for members imported from
+    Airtable who do not yet have a linked User account. Once a Member is
+    linked to a User, ``allauth.EmailAddress`` becomes the source of truth
+    for that member's emails, and the MemberEmail rows are dead data.
+
+    This inline is therefore hidden entirely for members with a linked
+    User — see ``MemberAdmin.get_inline_instances``. Showing it would
+    invite admins to edit rows that no longer drive any behavior.
+
+    See docs/superpowers/specs/2026-04-07-user-email-aliases-design.md.
+    """
+
     model = MemberEmail
     extra = 1
     fields = ["email"]
+    verbose_name = "Staged email (pre-signup)"
+    verbose_name_plural = "Staged emails (pre-signup)"
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +102,19 @@ class MemberAdmin(ModelAdmin):
     search_fields = ["full_legal_name", "preferred_name", "_pre_signup_email"]
     list_per_page = 100
     ordering = ["full_legal_name"]
+
+    def get_inline_instances(self, request: HttpRequest, obj: Member | None = None) -> list:
+        """Hide the MemberEmail staging inline once the member has a linked user.
+
+        THREE-EMAIL-STORE NOTE: Once user_id is set, allauth.EmailAddress is the
+        source of truth for emails. Showing the MemberEmail staging inline at that
+        point would be confusing and let admins edit dead data.
+        See docs/superpowers/specs/2026-04-07-user-email-aliases-design.md.
+        """
+        instances = super().get_inline_instances(request, obj)
+        if obj is not None and obj.user_id is not None:
+            instances = [i for i in instances if not isinstance(i, MemberEmailInline)]
+        return instances
 
     def get_fieldsets(self, request: HttpRequest, obj: object = None) -> list[tuple[str, dict]]:
         """Build fieldsets dynamically — fog_role only visible to superusers."""
