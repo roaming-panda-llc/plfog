@@ -12,6 +12,8 @@ from django.db.models import DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from membership.managers import MemberEmailManager
+
 DEFAULT_PRICE_PER_SQFT = Decimal("3.75")
 
 
@@ -380,6 +382,8 @@ class MemberEmail(models.Model):
         help_text="The unlinked member this staged email belongs to.",
     )
     email = models.EmailField(unique=True, help_text="A staged email address for this member.")
+
+    objects = MemberEmailManager()
 
     class Meta:
         ordering = ["email"]
