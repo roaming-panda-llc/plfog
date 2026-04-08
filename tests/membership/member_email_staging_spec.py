@@ -63,8 +63,9 @@ def describe_MemberEmail_migrate_to_user():
         assert primary.verified is True
 
     def it_does_nothing_when_member_has_no_staging_rows_and_primary_already_exists(db):
+        # Signal already created the primary EmailAddress when the user was created.
         user, _member = _user_with_member("u", "primary@example.com", "primary@example.com")
-        EmailAddress.objects.create(user=user, email="primary@example.com", verified=True, primary=True)
+        assert EmailAddress.objects.filter(user=user).count() == 1
 
         MemberEmail.objects.migrate_to_user(user)
 
@@ -74,14 +75,15 @@ def describe_MemberEmail_migrate_to_user():
         MembershipPlanFactory()
         user = User.objects.create_user(username="u", email="x@example.com")
         user.member.delete()
-        user.refresh_from_db()
+        # Re-fetch the user so the cached reverse-OneToOne is gone
+        user = User.objects.get(pk=user.pk)
         # Should not raise
         MemberEmail.objects.migrate_to_user(user)
-        assert not EmailAddress.objects.filter(user=user).exists()
 
     def it_promotes_existing_non_primary_primary_email_to_primary(db):
-        user, member = _user_with_member("u", "primary@example.com", "primary@example.com")
-        EmailAddress.objects.create(user=user, email="primary@example.com", verified=False, primary=False)
+        user, _member = _user_with_member("u", "primary@example.com", "primary@example.com")
+        # Signal auto-created the EmailAddress as primary+verified; flip it to non-primary, unverified
+        EmailAddress.objects.filter(user=user, email="primary@example.com").update(primary=False, verified=False)
 
         MemberEmail.objects.migrate_to_user(user)
 

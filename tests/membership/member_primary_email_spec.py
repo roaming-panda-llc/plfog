@@ -32,7 +32,7 @@ def describe_Member_primary_email():
 
     def it_returns_primary_EmailAddress_for_linked_user(db):
         user, member = _user_with_member("u1", "primary@example.com")
-        EmailAddress.objects.create(user=user, email="primary@example.com", verified=True, primary=True)
+        # Signal already created the primary EmailAddress; just add an alias.
         EmailAddress.objects.create(user=user, email="alias@example.com", verified=True, primary=False)
         member._pre_signup_email = "stale@example.com"
         member.save(update_fields=["_pre_signup_email"])
@@ -40,12 +40,15 @@ def describe_Member_primary_email():
 
     def it_falls_back_to_user_email_when_no_EmailAddress_rows(db):
         _user, member = _user_with_member("u2", "fallback@example.com")
+        # Remove the auto-created EmailAddress to exercise the fallback.
+        EmailAddress.objects.filter(user=_user).delete()
         member._pre_signup_email = "stale@example.com"
         member.save(update_fields=["_pre_signup_email"])
         assert member.primary_email == "fallback@example.com"
 
     def it_returns_empty_string_when_no_EmailAddress_and_user_email_blank(db):
         _user, member = _user_with_member("u3", "")
+        EmailAddress.objects.filter(user=_user).delete()
         member._pre_signup_email = "stale@example.com"
         member.save(update_fields=["_pre_signup_email"])
         assert member.primary_email == ""

@@ -14,7 +14,8 @@ from django.core.management import call_command
 def describe_fix_unverified_emails():
     def it_marks_unverified_records_as_verified():
         user = User.objects.create_user(username="u1", email="u1@example.com")
-        EmailAddress.objects.create(user=user, email="u1@example.com", verified=False, primary=True)
+        # Signal auto-creates a verified EmailAddress; flip it to unverified for the test.
+        EmailAddress.objects.filter(user=user).update(verified=False)
 
         call_command("fix_unverified_emails")
 
@@ -29,7 +30,7 @@ def describe_fix_unverified_emails():
 
     def it_does_not_modify_in_dry_run():
         user = User.objects.create_user(username="u2", email="u2@example.com")
-        EmailAddress.objects.create(user=user, email="u2@example.com", verified=False, primary=True)
+        EmailAddress.objects.filter(user=user).update(verified=False)
 
         out = StringIO()
         call_command("fix_unverified_emails", dry_run=True, stdout=out)
