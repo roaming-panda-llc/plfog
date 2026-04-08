@@ -488,7 +488,6 @@ def describe_admin_create_user_with_member():
                 "emails-MIN_NUM_FORMS": "0",
                 "emails-MAX_NUM_FORMS": "1000",
                 "emails-0-email": "",
-                "emails-0-is_primary": "",
             },
         )
         assert resp.status_code == 302
@@ -512,7 +511,6 @@ def describe_admin_create_user_with_member():
                 "emails-MIN_NUM_FORMS": "0",
                 "emails-MAX_NUM_FORMS": "1000",
                 "emails-0-email": "",
-                "emails-0-is_primary": "",
             },
         )
         assert resp.status_code == 302

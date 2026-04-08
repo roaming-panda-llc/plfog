@@ -44,7 +44,6 @@ class MemberEmailFactory(factory.django.DjangoModelFactory):
 
     member = factory.SubFactory(MemberFactory)
     email = factory.Sequence(lambda n: f"alias{n}@example.com")
-    is_primary = False
 
 
 class SpaceFactory(factory.django.DjangoModelFactory):

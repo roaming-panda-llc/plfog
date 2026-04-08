@@ -8,7 +8,7 @@ Core domain models for Past Lives Makerspace.
 |-------|-----------|-------|
 | `MembershipPlan` | name, monthly_price, deposit_required | Tiers (e.g. "Standard $50/mo") |
 | `Member` | email, status, member_type, fog_role, membership_plan | Primary actor; links 1:1 to User |
-| `MemberEmail` | member FK, email, is_primary | Extra email aliases per member |
+| `MemberEmail` | member FK, email | Pre-signup staging table; migrated to allauth EmailAddress on User link |
 | `Guild` | name, is_active, guild_lead FK, about | Interest guild; receives funding votes |
 | `VotePreference` | member 1:1, guild_1st/2nd/3rd FK | One per member; auto-syncs to Airtable |
 | `FundingSnapshot` | cycle_label, funding_pool, results JSON | Immutable calc; created via `FundingSnapshot.take()` |

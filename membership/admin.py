@@ -22,7 +22,7 @@ from .models import FundingSnapshot, Guild, Member, MemberEmail, VotePreference
 class MemberEmailInline(TabularInline):
     model = MemberEmail
     extra = 1
-    fields = ["email", "is_primary"]
+    fields = ["email"]
 
 
 # ---------------------------------------------------------------------------

@@ -355,18 +355,36 @@ class Member(models.Model):
 
 
 class MemberEmail(models.Model):
-    """Additional email aliases for a member. The primary email stays on Member.email."""
+    """Pre-signup staging table for member email addresses.
+
+    THREE-EMAIL-STORE NOTE (see
+    docs/superpowers/specs/2026-04-07-user-email-aliases-design.md):
+
+    This table holds known email addresses for Member records that do NOT
+    yet have a linked User (typically imported from Airtable). When a User
+    is linked to the Member, ``MemberEmail.objects.migrate_to_user(user)``
+    promotes every row into ``allauth.account.EmailAddress`` and deletes the
+    staging rows. After that, EmailAddress is the source of truth; do NOT
+    read MemberEmail for login lookups on linked members.
+
+    The ``is_primary`` field was removed in version 1.4.0 because Member
+    already has a dedicated stored email (``_pre_signup_email``); a second
+    primary flag on a staging row was meaningless and confusing in the
+    admin inline.
+    """
 
     member = models.ForeignKey(
-        Member, on_delete=models.CASCADE, related_name="emails", help_text="The member this email belongs to."
+        Member,
+        on_delete=models.CASCADE,
+        related_name="emails",
+        help_text="The unlinked member this staged email belongs to.",
     )
-    email = models.EmailField(unique=True, help_text="An email address for this member.")
-    is_primary = models.BooleanField(default=False, help_text="Primary email shown in lists.")
+    email = models.EmailField(unique=True, help_text="A staged email address for this member.")
 
     class Meta:
-        ordering = ["-is_primary", "email"]
-        verbose_name = "Email Alias"
-        verbose_name_plural = "Email Aliases"
+        ordering = ["email"]
+        verbose_name = "Staged Email (pre-signup)"
+        verbose_name_plural = "Staged Emails (pre-signup)"
 
     def __str__(self) -> str:
         return f"{self.email} ({self.member.display_name})"
