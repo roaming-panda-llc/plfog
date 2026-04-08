@@ -15,6 +15,28 @@ Core domain models for Past Lives Makerspace.
 | `Space` | space_id, space_type, status, size_sqft | Physical space; read from Airtable |
 | `Lease` | GenericFK tenant (Member or Guild), space FK | Active when start_date≤today and end_date null/≥today |
 
+## Email Model — Three Stores (IMPORTANT)
+
+Three places an email can live for a Member. Future agents MUST understand which is authoritative when. See `docs/superpowers/specs/2026-04-07-user-email-aliases-design.md` for the full rationale.
+
+| Store | Role |
+|---|---|
+| `Member._pre_signup_email` (DB column `email`, accessed via `db_column="email"`) | Source of truth ONLY when `Member.user` is None (Airtable-imported members who haven't signed up yet). |
+| `allauth.account.EmailAddress` | Source of truth for any Member with a linked User. Owns login, verification, and the primary flag. |
+| `User.email` | Mirror kept in sync by allauth. Never read or write directly from app code. |
+
+### Reading "the" email
+- Use `member.primary_email` (property). It returns the live value: primary `EmailAddress.email` for linked members, `_pre_signup_email` otherwise, with a final fallback to `user.email`.
+- **Exception:** `airtable_sync/` reads `_pre_signup_email` directly because Airtable is the external source of truth for unlinked members and we don't want sync to re-enter allauth.
+
+### Writing (user-facing)
+- Members manage their own emails at `/accounts/email/` (themed `templates/account/email.html` over allauth's built-in `account_email` view).
+- Admin: the `MemberEmailInline` is **only** shown for unlinked members. Once linked, it's hidden because allauth.EmailAddress is now the truth.
+
+### Login
+- Allauth login-by-code looks up any verified `EmailAddress` row, so any verified alias works automatically.
+- Pre-signup aliases imported into `MemberEmail` are promoted to `EmailAddress` when the user signs up — handled by `MemberEmail.objects.migrate_to_user(user)`, called from the `ensure_user_has_member` signal.
+
 ## Airtable Sync
 
 `Member`, `Space`, and `Lease` are **read from Airtable** via `airtable_pull` management command. They do NOT sync back — treat as read-only from Django's perspective. `airtable_record_id` fields link to Airtable rows.

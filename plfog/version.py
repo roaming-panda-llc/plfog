@@ -12,6 +12,7 @@ CHANGELOG: list[dict[str, str | list[str]]] = [
         "changes": [
             "New 'Manage email addresses' page in your profile menu — add, remove, verify, and set a primary email all in one place",
             "Sign in with any of your verified email addresses",
+            "Cleaner admin: removed the confusing 'is primary' toggle on member email aliases",
         ],
     },
     {
