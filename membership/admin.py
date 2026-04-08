@@ -157,9 +157,7 @@ class MemberAdmin(ModelAdmin):
             # Save the member first (without a user)
             super().save_model(request, obj, form, change)
             # Create the user — the post_save signal will try to auto-link a member
-            user = UserModel.objects.create_user(
-                username=obj._pre_signup_email, email=obj._pre_signup_email
-            )
+            user = UserModel.objects.create_user(username=obj._pre_signup_email, email=obj._pre_signup_email)
             # Signal may have created a duplicate member or linked to wrong one.
             # Delete any signal-created member and link ours.
             Member.objects.filter(user=user).exclude(pk=obj.pk).delete()

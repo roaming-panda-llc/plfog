@@ -213,6 +213,30 @@ class Member(models.Model):
         return self.preferred_name if self.preferred_name else self.full_legal_name
 
     @property
+    def primary_email(self) -> str:
+        """Return the live primary email for this member.
+
+        THREE-EMAIL-STORE NOTE: This project has three places an email can live
+        (see docs/superpowers/specs/2026-04-07-user-email-aliases-design.md):
+
+        1. ``self._pre_signup_email`` - stored field, used ONLY when self.user is None.
+        2. ``allauth.account.EmailAddress`` - source of truth for linked users.
+        3. ``User.email`` - mirrored from (2) by allauth; used as a fallback only.
+
+        Never read ``self._pre_signup_email`` directly outside of Airtable sync
+        and admin-for-unlinked-members flows. Use this property instead.
+        """
+        if self.user_id is None:
+            return self._pre_signup_email
+        # Lazy import to avoid a circular dep between membership and allauth at load time
+        from allauth.account.models import EmailAddress
+
+        primary = EmailAddress.objects.filter(user=self.user, primary=True).first()
+        if primary is not None:
+            return primary.email
+        return self.user.email or ""
+
+    @property
     def initials(self) -> str:
         """Compute display initials from the linked user's name or email."""
         if self.user is None:

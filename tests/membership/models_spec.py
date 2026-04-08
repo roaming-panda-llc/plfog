@@ -388,7 +388,9 @@ def describe_space_occupants_and_revenue():
     def describe_revenue():
         def it_calculates_actual_revenue_from_active_leases():
             plan = MembershipPlanFactory(name="Rev Plan")
-            member_a = MemberFactory(membership_plan=plan, full_legal_name="Alice", _pre_signup_email="alice@example.com")
+            member_a = MemberFactory(
+                membership_plan=plan, full_legal_name="Alice", _pre_signup_email="alice@example.com"
+            )
             member_b = MemberFactory(membership_plan=plan, full_legal_name="Bob", _pre_signup_email="bob@example.com")
             today = timezone.now().date()
             space = SpaceFactory(space_id="S-REV", manual_price=Decimal("600.00"))

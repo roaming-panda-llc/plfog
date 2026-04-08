@@ -27,7 +27,9 @@ def describe_find_account():
 
         @patch("core.forms.send_mail")
         def it_sends_email_when_member_found(mock_send_mail, client: Client):
-            MemberFactory(full_legal_name="Alice Smith", _pre_signup_email="alice@example.com", status=Member.Status.ACTIVE)
+            MemberFactory(
+                full_legal_name="Alice Smith", _pre_signup_email="alice@example.com", status=Member.Status.ACTIVE
+            )
 
             client.post("/accounts/find-account/", {"name": "Alice Smith"})
 
@@ -51,7 +53,9 @@ def describe_find_account():
 
         @patch("core.forms.send_mail")
         def it_is_case_insensitive(mock_send_mail, client: Client):
-            MemberFactory(full_legal_name="Alice Smith", _pre_signup_email="alice@example.com", status=Member.Status.ACTIVE)
+            MemberFactory(
+                full_legal_name="Alice Smith", _pre_signup_email="alice@example.com", status=Member.Status.ACTIVE
+            )
 
             client.post("/accounts/find-account/", {"name": "alice smith"})
 
@@ -65,7 +69,9 @@ def describe_find_account():
 
         @patch("core.forms.send_mail")
         def it_does_not_send_email_for_former_members(mock_send_mail, client: Client):
-            MemberFactory(full_legal_name="Former Guy", _pre_signup_email="former@example.com", status=Member.Status.FORMER)
+            MemberFactory(
+                full_legal_name="Former Guy", _pre_signup_email="former@example.com", status=Member.Status.FORMER
+            )
 
             client.post("/accounts/find-account/", {"name": "Former Guy"})
 

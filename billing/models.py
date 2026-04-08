@@ -555,7 +555,7 @@ class Tab(models.Model):
 
         if not self.stripe_customer_id:
             self.stripe_customer_id = _stripe_utils.create_customer(
-                email=self.member._pre_signup_email,
+                email=self.member.primary_email,
                 name=self.member.display_name,
                 member_pk=self.member.pk,
             )

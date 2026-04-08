@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 def send_receipt(charge: TabCharge) -> None:
     """Send an itemized receipt email to the member after a successful charge."""
     member = charge.tab.member
-    if not member._pre_signup_email:
+    if not member.primary_email:
         logger.warning("Cannot send receipt for charge %s: member has no email.", charge.pk)
         return
 
@@ -37,7 +37,7 @@ def send_receipt(charge: TabCharge) -> None:
         subject=f"Past Lives Makerspace — Receipt for ${charge.amount}",
         message=text_body,
         from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[member._pre_signup_email],
+        recipient_list=[member.primary_email],
     )
 
     charge.receipt_sent_at = timezone.now()

@@ -29,12 +29,12 @@
         {% if member.about_me %}
         <p class="directory-card__about">{{ member.about_me }}</p>
         {% endif %}
-        {% if member.email or member.phone or member.discord_handle or member.other_contact_info %}
+        {% if member.primary_email or member.phone or member.discord_handle or member.other_contact_info %}
         <div class="directory-card__contact">
-            {% if member.email %}
+            {% if member.primary_email %}
             <div class="directory-card__contact-row">
                 <span class="directory-card__contact-label">Email</span>
-                <a href="mailto:{{ member.email }}">{{ member.email }}</a>
+                <a href="mailto:{{ member.primary_email }}">{{ member.primary_email }}</a>
             </div>
             {% endif %}
             {% if member.phone %}
