@@ -29,8 +29,10 @@ def describe_login_via_alias():
         assert len(mail.outbox) >= 1
         sent = mail.outbox[-1]
         assert "alias@example.com" in sent.to
-        match = re.search(r"is:\s*\n\s*([A-Z0-9]{6})", sent.body)
-        assert match is not None, f"No 6-digit code in: {sent.body}"
+        # allauth >=65.15 formats codes as XXXX-XXXX; older versions used 6 alphanumerics.
+        # Match the token on its own line after "is:" to stay version-agnostic.
+        match = re.search(r"is:\s*\n\s*(\S+)", sent.body)
+        assert match is not None, f"No login code in: {sent.body}"
         code = match.group(1)
 
         response = client.post("/accounts/login/code/confirm/", {"code": code}, follow=True)
