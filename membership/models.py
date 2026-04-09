@@ -227,16 +227,28 @@ class Member(models.Model):
 
         Never read ``self._pre_signup_email`` directly outside of Airtable sync
         and admin-for-unlinked-members flows. Use this property instead.
+
+        List views rendering many members must prefetch the primary EmailAddress
+        rows with ``Prefetch("user__emailaddress_set", ..., to_attr="_primary_emailaddresses")``
+        to avoid an N+1; when present, this property uses the prefetched list
+        instead of hitting the database.
         """
         if self.user_id is None:
             return self._pre_signup_email
-        # Lazy import to avoid a circular dep between membership and allauth at load time
+        user = self.user
+        # Use the list populated by a view's Prefetch, if any.
+        prefetched = getattr(user, "_primary_emailaddresses", None)
+        if prefetched is not None:
+            if prefetched:
+                return prefetched[0].email
+            return (user.email if user else "") or ""
+        # No prefetch: single targeted query keyed on user_id (avoids a User fetch).
         from allauth.account.models import EmailAddress
 
-        primary = EmailAddress.objects.filter(user=self.user, primary=True).first()
+        primary = EmailAddress.objects.filter(user_id=self.user_id, primary=True).first()
         if primary is not None:
             return primary.email
-        return (self.user.email if self.user else "") or ""
+        return (user.email if user else "") or ""
 
     @property
     def initials(self) -> str:

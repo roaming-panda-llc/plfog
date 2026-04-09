@@ -52,3 +52,22 @@ def describe_Member_primary_email():
         member._pre_signup_email = "stale@example.com"
         member.save(update_fields=["_pre_signup_email"])
         assert member.primary_email == ""
+
+    def describe_with_prefetched_primary_emailaddresses():
+        """The fast path used by list views: ``Prefetch(..., to_attr="_primary_emailaddresses")``.
+
+        Exercises both branches — prefetched list populated vs empty — without firing
+        any extra EmailAddress queries.
+        """
+
+        def it_uses_the_prefetched_list_when_populated(db):
+            user, member = _user_with_member("u4", "primary@example.com")
+            # Simulate the Prefetch(..., to_attr=...) result without a queryset.
+            fake = EmailAddress(user=user, email="prefetched@example.com", verified=True, primary=True)
+            user._primary_emailaddresses = [fake]  # type: ignore[attr-defined]
+            assert member.primary_email == "prefetched@example.com"
+
+        def it_falls_back_to_user_email_when_prefetched_list_is_empty(db):
+            user, member = _user_with_member("u5", "fallback@example.com")
+            user._primary_emailaddresses = []  # type: ignore[attr-defined]
+            assert member.primary_email == "fallback@example.com"

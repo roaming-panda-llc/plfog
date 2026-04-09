@@ -135,6 +135,37 @@ def describe_member_directory():
 
         assert "prefer not to share" not in response.content.decode()
 
+    def it_does_not_trigger_n_plus_1_on_primary_email(client: Client):
+        """Regression guard for the member.primary_email N+1.
+
+        The template accesses ``member.primary_email`` several times per row. Without
+        a ``Prefetch`` of the primary allauth EmailAddress, this would fire N queries
+        per member. See ``hub.views.member_directory`` and
+        docs/superpowers/specs/2026-04-07-user-email-aliases-design.md.
+        """
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        # Five members with linked users → each has an auto-created primary EmailAddress.
+        for i in range(5):
+            user = User.objects.create_user(username=f"m{i}", email=f"m{i}@example.com")
+            member = user.member
+            member.show_in_directory = True
+            member.full_legal_name = f"Member {i}"
+            member.save(update_fields=["show_in_directory", "full_legal_name"])
+
+        viewer = User.objects.create_user(username="viewer-n1", password="pass")
+        client.force_login(viewer)
+
+        with CaptureQueriesContext(connection) as ctx:
+            response = client.get("/members/")
+
+        assert response.status_code == 200
+        # N+1 would show ~4 queries per member. Prefetch should give us 1 query total
+        # for the primary EmailAddress rows, regardless of member count.
+        email_q = [q for q in ctx.captured_queries if "account_emailaddress" in q["sql"].lower()]
+        assert len(email_q) <= 2, f"N+1 on EmailAddress: {len(email_q)} queries for 5 members"
+
 
 @pytest.mark.django_db
 def describe_guild_detail():

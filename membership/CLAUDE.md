@@ -7,7 +7,7 @@ Core domain models for Past Lives Makerspace.
 | Model | Key fields | Notes |
 |-------|-----------|-------|
 | `MembershipPlan` | name, monthly_price, deposit_required | Tiers (e.g. "Standard $50/mo") |
-| `Member` | email, status, member_type, fog_role, membership_plan | Primary actor; links 1:1 to User |
+| `Member` | `_pre_signup_email`, status, member_type, fog_role, membership_plan | Primary actor; links 1:1 to User. Read emails via `member.primary_email` — see the Email Model section below. |
 | `MemberEmail` | member FK, email | Pre-signup staging table; migrated to allauth EmailAddress on User link |
 | `Guild` | name, is_active, guild_lead FK, about | Interest guild; receives funding votes |
 | `VotePreference` | member 1:1, guild_1st/2nd/3rd FK | One per member; auto-syncs to Airtable |
