@@ -1,14 +1,17 @@
 """Guild funding calculation per the guild voting spec.
 
 Each voter distributes 10 points: 1st=5, 2nd=3, 3rd=2.
-Funding pool = number of paying voters × $10.
-Guild funding = (guild_points / total_points) × pool.
+Contributed pool = number of paying voters × $10.
+Total pool = max(contributed_pool, minimum_pool) — the floor covers cycles
+where paying-voter count is below the target (~100 voters).
+Guild funding = (guild_points / total_points) × total_pool.
 """
 
 from __future__ import annotations
 
 import json
 from collections import defaultdict
+from decimal import Decimal
 from typing import Any
 
 WEIGHTS = {
@@ -21,22 +24,24 @@ DOLLARS_PER_MEMBER = sum(WEIGHTS.values())  # $10
 
 def calculate_results(
     votes: list[dict[str, Any]],
+    *,
     paying_voter_count: int | None = None,
-    pool_override: int | None = None,
+    minimum_pool: Decimal | int = 0,
 ) -> dict[str, Any]:
     """Calculate proportional guild funding from ranked votes.
 
     Args:
-        votes: list of dicts with guild_1st, guild_2nd, guild_3rd (guild names)
+        votes: list of dicts with guild_1st, guild_2nd, guild_3rd (guild names).
         paying_voter_count: number of voters who contribute to the funding pool.
             Defaults to len(votes) if not provided (all voters are paying).
-        pool_override: if set, use this dollar amount as the total pool instead
-            of calculating from paying_voter_count × $10.
+        minimum_pool: dollar floor applied to the contributed pool. The total
+            pool is ``max(contributed_pool, minimum_pool)``. Defaults to 0.
 
     Returns:
-        dict with total_pool, results list, votes_cast.
+        dict with total_pool, contributed_pool, minimum_pool, total_points,
+        votes_cast, and a per-guild results list sorted by funding descending.
     """
-    guild_scores: dict[str, dict[str, float]] = defaultdict(
+    guild_scores: dict[str, dict[str, int]] = defaultdict(
         lambda: {"votes_1st": 0, "votes_2nd": 0, "votes_3rd": 0, "total_points": 0}
     )
 
@@ -55,14 +60,17 @@ def calculate_results(
 
     votes_cast = len(votes)
     pool_contributors = paying_voter_count if paying_voter_count is not None else votes_cast
-    total_pool = pool_override if pool_override is not None else DOLLARS_PER_MEMBER * pool_contributors
+    contributed_pool = Decimal(DOLLARS_PER_MEMBER * pool_contributors)
+    floor = Decimal(minimum_pool)
+    total_pool = max(contributed_pool, floor)
     total_points = sum(s["total_points"] for s in guild_scores.values())
 
     results: list[dict[str, Any]] = []
     for guild_name, scores in guild_scores.items():
         points = scores["total_points"]
-        share = points / total_points
-        funding = round(share * total_pool, 2)
+        share = Decimal(points) / Decimal(total_points)
+        funding = (share * total_pool).quantize(Decimal("0.01"))
+        share_pct = float((share * Decimal(100)).quantize(Decimal("0.1")))
         results.append(
             {
                 "guild_name": guild_name,
@@ -70,7 +78,7 @@ def calculate_results(
                 "votes_2nd": scores["votes_2nd"],
                 "votes_3rd": scores["votes_3rd"],
                 "total_points": points,
-                "share_pct": round(share * 100, 1),
+                "share_pct": share_pct,
                 "funding": funding,
             }
         )
@@ -79,6 +87,8 @@ def calculate_results(
 
     return {
         "total_pool": total_pool,
+        "contributed_pool": contributed_pool,
+        "minimum_pool": floor,
         "total_points": total_points,
         "votes_cast": votes_cast,
         "results": results,
@@ -86,5 +96,5 @@ def calculate_results(
 
 
 def results_to_json(results_data: dict[str, Any]) -> str:
-    """Serialize results for storage."""
-    return json.dumps(results_data)
+    """Serialize results for storage. Decimals are rendered as strings."""
+    return json.dumps(results_data, default=str)

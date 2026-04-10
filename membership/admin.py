@@ -317,8 +317,17 @@ class VotePreferenceAdmin(ModelAdmin):
 
 @admin.register(FundingSnapshot)
 class FundingSnapshotAdmin(ModelAdmin):
-    list_display = ["cycle_label", "snapshot_at", "contributor_count", "funding_pool"]
-    readonly_fields = ["snapshot_at", "results"]
+    list_display = ["cycle_label", "snapshot_at", "contributor_count", "funding_pool", "analyzer_link"]
+    readonly_fields = ["snapshot_at", "results", "raw_votes", "contributor_count", "funding_pool", "minimum_pool"]
+
+    @admin.display(description="Analyzer")
+    def analyzer_link(self, obj: FundingSnapshot) -> str:
+        """Render a link to the admin snapshot analyzer for this row."""
+        from django.urls import reverse
+        from django.utils.html import format_html
+
+        url = reverse("admin_snapshot_detail", args=[obj.pk])
+        return format_html('<a href="{}">Open analyzer →</a>', url)
 
 
 # ---------------------------------------------------------------------------

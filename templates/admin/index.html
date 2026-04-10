@@ -143,91 +143,6 @@
         .pl-stats { grid-template-columns: 1fr; }
         .pl-card { padding: 1.25rem; }
     }
-    /* Snapshot modal */
-    .pl-modal-overlay {
-        position: fixed;
-        inset: 0;
-        z-index: 9999;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background-color: rgba(0, 0, 0, 0.6);
-        padding: 1rem;
-    }
-    .pl-modal {
-        background-color: #092E4C;
-        border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-        max-width: 480px;
-        width: 100%;
-    }
-    .pl-modal__header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 1.25rem 1.5rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    }
-    .pl-modal__title {
-        font-family: 'Lato', system-ui, sans-serif;
-        font-size: 1.1rem;
-        font-weight: 700;
-        color: #F4EFDD;
-        margin: 0;
-    }
-    .pl-modal__close {
-        background: none;
-        border: none;
-        font-size: 1.5rem;
-        cursor: pointer;
-        color: #96ACBB;
-        padding: 0;
-        line-height: 1;
-    }
-    .pl-modal__close:hover { color: #F4EFDD; }
-    .pl-modal__body { padding: 1.5rem; }
-    .pl-modal__field { margin-bottom: 1.25rem; }
-    .pl-modal__field:last-child { margin-bottom: 0; }
-    .pl-modal__field label {
-        display: block;
-        font-size: 0.85rem;
-        font-weight: 500;
-        color: #96ACBB;
-        margin-bottom: 0.375rem;
-        letter-spacing: 0.02em;
-    }
-    .pl-modal__field input,
-    .pl-modal__field select {
-        width: 100%;
-        padding: 0.625rem 0.875rem;
-        font-family: 'Inter', system-ui, sans-serif;
-        font-size: 0.9375rem;
-        color: #F4EFDD;
-        background-color: #0a1929;
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        border-radius: 6px;
-    }
-    .pl-modal__field input:focus,
-    .pl-modal__field select:focus {
-        outline: none;
-        border-color: #EEB44B;
-        box-shadow: 0 0 0 3px rgba(238, 180, 75, 0.15);
-    }
-    .pl-modal__field input::placeholder { color: rgba(150, 172, 187, 0.5); }
-    .pl-modal__hint {
-        display: block;
-        font-size: 0.75rem;
-        color: #96ACBB;
-        margin-top: 0.25rem;
-    }
-    .pl-modal__footer {
-        display: flex;
-        justify-content: flex-end;
-        gap: 0.75rem;
-        padding: 1rem 1.5rem;
-        border-top: 1px solid rgba(255, 255, 255, 0.08);
-    }
 </style>
 
 <div class="pl-dashboard">
@@ -264,7 +179,10 @@
         </a>
         <div class="pl-stat">
             <div class="pl-stat__value">${{ stats.projected_pool }}</div>
-            <div class="pl-stat__label">Projected funding pool</div>
+            <div class="pl-stat__label">
+                Projected funding pool
+                {% if stats.floor_applied %}<span style="display:block;font-size:0.6875rem;color:#EEB44B;margin-top:0.15rem;">(${{ stats.minimum_pool_floor }} floor applied)</span>{% endif %}
+            </div>
         </div>
     </div>
 
@@ -301,10 +219,9 @@
 
     {# --- Actions --- #}
     <div class="pl-actions">
-        <button type="button" class="pl-btn pl-btn--primary"
-                onclick="document.getElementById('snapshot-modal').style.display='flex'">
+        <a href="{% url 'admin_snapshot_draft' %}" class="pl-btn pl-btn--primary">
             Take Snapshot
-        </button>
+        </a>
         <a href="{% url 'hub_snapshot_history' %}" class="pl-btn pl-btn--secondary">
             View Funding History
         </a>
@@ -315,59 +232,12 @@
 
     {% if stats.last_snapshot %}
     <p class="pl-meta">
-        Last snapshot: {{ stats.last_snapshot.cycle_label }} &mdash;
-        ${{ stats.last_snapshot.funding_pool }} &mdash;
+        Last snapshot:
+        <a href="{% url 'admin_snapshot_detail' stats.last_snapshot.pk %}" style="color:#EEB44B;">{{ stats.last_snapshot.cycle_label }}</a>
+        &mdash; ${{ stats.last_snapshot.funding_pool }} &mdash;
         {{ stats.last_snapshot.snapshot_at|date:"N j, Y g:i a" }}
     </p>
     {% endif %}
-
-    {# --- Snapshot Configuration Modal --- #}
-    <div id="snapshot-modal" class="pl-modal-overlay" style="display:none;"
-         onclick="if(event.target===this)this.style.display='none'">
-        <div class="pl-modal">
-            <div class="pl-modal__header">
-                <h2 class="pl-modal__title">Configure Snapshot</h2>
-                <button class="pl-modal__close"
-                        onclick="document.getElementById('snapshot-modal').style.display='none'"
-                        aria-label="Close">&times;</button>
-            </div>
-            <form method="post" action="{% url 'admin_take_snapshot' %}">
-                {% csrf_token %}
-                <div class="pl-modal__body">
-                    <div class="pl-modal__field">
-                        <label for="snap-title">Snapshot Title</label>
-                        <input type="text" id="snap-title" name="title"
-                               placeholder="e.g. Beta Test Funding March 2026"
-                               autocomplete="off">
-                        <span class="pl-modal__hint">Leave blank to use the current month ({{ stats.current_month }})</span>
-                    </div>
-                    <div class="pl-modal__field">
-                        <label for="snap-filter">Who can vote?</label>
-                        <select id="snap-filter" name="voter_filter">
-                            <option value="">All Members</option>
-                            <option value="officers_only">Officers Only (Admins + Guild Officers)</option>
-                        </select>
-                    </div>
-                    <div class="pl-modal__field">
-                        <label for="snap-pool">Funding Pool ($)</label>
-                        <input type="number" id="snap-pool" name="pool_override"
-                               min="0" step="1"
-                               placeholder="Auto-calculate from voters">
-                        <span class="pl-modal__hint">Leave blank to calculate automatically ($10 per paying voter)</span>
-                    </div>
-                </div>
-                <div class="pl-modal__footer">
-                    <button type="button" class="pl-btn pl-btn--secondary"
-                            onclick="document.getElementById('snapshot-modal').style.display='none'">
-                        Cancel
-                    </button>
-                    <button type="submit" class="pl-btn pl-btn--primary">
-                        Take Snapshot
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
 
 </div>
 {% endblock %}

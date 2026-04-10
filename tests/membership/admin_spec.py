@@ -389,11 +389,38 @@ def describe_paying_member_filter():
 def describe_FundingSnapshotAdmin():
     def it_has_expected_list_display():
         snap_admin = admin.site._registry[FundingSnapshot]
-        assert snap_admin.list_display == ["cycle_label", "snapshot_at", "contributor_count", "funding_pool"]
+        assert snap_admin.list_display == [
+            "cycle_label",
+            "snapshot_at",
+            "contributor_count",
+            "funding_pool",
+            "analyzer_link",
+        ]
 
     def it_has_snapshot_at_in_readonly_fields():
         snap_admin = admin.site._registry[FundingSnapshot]
         assert "snapshot_at" in snap_admin.readonly_fields
+
+    def it_marks_raw_votes_and_minimum_pool_readonly():
+        snap_admin = admin.site._registry[FundingSnapshot]
+        assert "raw_votes" in snap_admin.readonly_fields
+        assert "minimum_pool" in snap_admin.readonly_fields
+
+    def it_renders_analyzer_link(db):
+        from membership.models import FundingSnapshot as FS
+
+        snap = FS.objects.create(
+            cycle_label="Test Cycle",
+            contributor_count=0,
+            funding_pool=Decimal("1000.00"),
+            minimum_pool=Decimal("1000.00"),
+            raw_votes=[],
+            results={},
+        )
+        snap_admin = admin.site._registry[FS]
+        html = snap_admin.analyzer_link(snap)
+        assert f"/admin/snapshots/{snap.pk}/" in html
+        assert "Open analyzer" in html
 
 
 # ---------------------------------------------------------------------------
