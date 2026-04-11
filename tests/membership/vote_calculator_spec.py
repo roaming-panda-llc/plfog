@@ -160,9 +160,7 @@ def describe_calculate_results():
 
         def it_accepts_decimal_minimum_pool():
             votes = [{"guild_1st": "Ceramics", "guild_2nd": "Glass", "guild_3rd": "Wood"}]
-            result = calculate_results(
-                votes=votes, paying_voter_count=1, minimum_pool=Decimal("250.50")
-            )
+            result = calculate_results(votes=votes, paying_voter_count=1, minimum_pool=Decimal("250.50"))
             assert result["total_pool"] == Decimal("250.50")
 
         def it_defaults_minimum_pool_to_zero():
