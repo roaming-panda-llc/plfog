@@ -15,7 +15,6 @@ from membership.models import FundingSnapshot, Member
 from tests.membership.factories import (
     GuildFactory,
     MemberFactory,
-    MembershipPlanFactory,
     VotePreferenceFactory,
 )
 

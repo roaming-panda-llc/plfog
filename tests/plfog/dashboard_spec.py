@@ -10,7 +10,7 @@ from django.contrib.auth import get_user_model
 from django.test import Client
 
 from core.models import Invite
-from membership.models import FundingSnapshot, Member
+from membership.models import Member
 from tests.membership.factories import (
     GuildFactory,
     MemberFactory,
