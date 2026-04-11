@@ -33,7 +33,7 @@ class MemberFactory(factory.django.DjangoModelFactory):
 
     membership_plan = factory.SubFactory(MembershipPlanFactory)
     full_legal_name = factory.Faker("name")
-    email = factory.Sequence(lambda n: f"member{n}@example.com")
+    _pre_signup_email = factory.Sequence(lambda n: f"member{n}@example.com")
     status = Member.Status.ACTIVE
     join_date = date(2024, 1, 1)
 
@@ -44,7 +44,6 @@ class MemberEmailFactory(factory.django.DjangoModelFactory):
 
     member = factory.SubFactory(MemberFactory)
     email = factory.Sequence(lambda n: f"alias{n}@example.com")
-    is_primary = False
 
 
 class SpaceFactory(factory.django.DjangoModelFactory):

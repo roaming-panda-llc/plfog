@@ -30,7 +30,7 @@ class Command(BaseCommand):
         role: str = options["role"]
 
         try:
-            member = Member.objects.get(email=email)
+            member = Member.objects.get(_pre_signup_email=email)
         except Member.DoesNotExist:
             raise CommandError(f"No member found with email '{email}'.")
 

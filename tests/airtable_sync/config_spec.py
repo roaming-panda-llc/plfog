@@ -49,7 +49,7 @@ def describe_member_to_airtable():
         member = MagicMock()
         member.preferred_name = "JD"
         member.full_legal_name = "John Doe"
-        member.email = "jd@example.com"
+        member._pre_signup_email = "jd@example.com"
         member.phone = "555-1234"
         member.status = "active"
         member.member_type = "standard"
@@ -78,7 +78,7 @@ def describe_member_to_airtable():
         member = MagicMock()
         member.preferred_name = ""
         member.full_legal_name = "John Doe"
-        member.email = "jd@example.com"
+        member._pre_signup_email = "jd@example.com"
         member.phone = ""
         member.status = "invited"
         member.member_type = "guild_lead"
@@ -120,7 +120,7 @@ def describe_member_from_airtable():
 
         assert result["full_legal_name"] == "John Doe"
         assert result["preferred_name"] == "JD"
-        assert result["email"] == "jd@example.com"
+        assert result["_pre_signup_email"] == "jd@example.com"
         assert result["status"] == "active"
         assert result["member_type"] == "standard"
         assert result["join_date"] == date(2024, 1, 15)
@@ -168,7 +168,7 @@ def describe_member_to_airtable_without_plan():
         member = MagicMock(spec=[])  # no attributes by default
         member.preferred_name = "Test"
         member.full_legal_name = "Test User"
-        member.email = "test@example.com"
+        member._pre_signup_email = "test@example.com"
         member.phone = ""
         member.status = "active"
         member.member_type = "standard"

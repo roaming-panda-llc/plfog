@@ -12,7 +12,6 @@ def describe_MemberEmail():
         alias = MemberEmail.objects.create(member=member, email="alias@example.com")
         assert alias.member == member
         assert alias.email == "alias@example.com"
-        assert alias.is_primary is False
 
     def it_enforces_unique_email():
         member = MemberFactory()

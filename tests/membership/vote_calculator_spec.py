@@ -1,5 +1,7 @@
 """Tests for vote_calculator module."""
 
+from decimal import Decimal
+
 import pytest
 
 from membership.vote_calculator import DOLLARS_PER_MEMBER, WEIGHTS, calculate_results, results_to_json
@@ -130,17 +132,47 @@ def describe_calculate_results():
         # Funding is $0 since pool is $0
         assert all(r["funding"] == 0 for r in result["results"])
 
-    def it_uses_pool_override_instead_of_calculating():
-        votes = [{"guild_1st": "Ceramics", "guild_2nd": "Glass", "guild_3rd": "Wood"}]
-        result = calculate_results(votes=votes, pool_override=1000)
-        assert result["total_pool"] == 1000
-        total_funding = sum(r["funding"] for r in result["results"])
-        assert total_funding == 1000
+    def describe_minimum_pool_floor():
+        def it_applies_minimum_when_contribution_is_below_floor():
+            """3 paying voters contribute $30, but floor lifts the pool to $1000."""
+            votes = [
+                {"guild_1st": "Ceramics", "guild_2nd": "Glass", "guild_3rd": "Wood"},
+                {"guild_1st": "Ceramics", "guild_2nd": "Glass", "guild_3rd": "Wood"},
+                {"guild_1st": "Ceramics", "guild_2nd": "Glass", "guild_3rd": "Wood"},
+            ]
+            result = calculate_results(votes=votes, paying_voter_count=3, minimum_pool=1000)
+            assert result["contributed_pool"] == 30
+            assert result["minimum_pool"] == 1000
+            assert result["total_pool"] == 1000
 
-    def it_ignores_paying_count_when_pool_override_set():
-        votes = [{"guild_1st": "Ceramics", "guild_2nd": "Glass", "guild_3rd": "Wood"}]
-        result = calculate_results(votes=votes, paying_voter_count=5, pool_override=500)
-        assert result["total_pool"] == 500
+        def it_keeps_contribution_when_it_exceeds_floor():
+            """200 paying voters contribute $2000; floor is $1000 → pool stays at $2000."""
+            votes = [{"guild_1st": "A", "guild_2nd": "B", "guild_3rd": "C"}]
+            result = calculate_results(votes=votes, paying_voter_count=200, minimum_pool=1000)
+            assert result["contributed_pool"] == 2000
+            assert result["total_pool"] == 2000
+
+        def it_applies_minimum_when_no_paying_voters():
+            votes = [{"guild_1st": "Ceramics", "guild_2nd": "Glass", "guild_3rd": "Wood"}]
+            result = calculate_results(votes=votes, paying_voter_count=0, minimum_pool=1000)
+            assert result["total_pool"] == 1000
+            assert result["contributed_pool"] == 0
+
+        def it_accepts_decimal_minimum_pool():
+            votes = [{"guild_1st": "Ceramics", "guild_2nd": "Glass", "guild_3rd": "Wood"}]
+            result = calculate_results(votes=votes, paying_voter_count=1, minimum_pool=Decimal("250.50"))
+            assert result["total_pool"] == Decimal("250.50")
+
+        def it_defaults_minimum_pool_to_zero():
+            votes = [{"guild_1st": "A", "guild_2nd": "B", "guild_3rd": "C"}]
+            result = calculate_results(votes=votes, paying_voter_count=1)
+            assert result["total_pool"] == 10
+            assert result["minimum_pool"] == 0
+
+    def it_returns_contributed_pool_key():
+        votes = [{"guild_1st": "A", "guild_2nd": "B", "guild_3rd": "C"}]
+        result = calculate_results(votes=votes, paying_voter_count=5)
+        assert result["contributed_pool"] == 50
 
     def it_ensures_funding_sums_to_pool():
         """Funding invariant: sum of all guild funding must equal pool."""

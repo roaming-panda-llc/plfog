@@ -66,7 +66,7 @@ def describe_MemberAdmin():
         member_admin = admin.site._registry[Member]
         assert member_admin.list_display == [
             "display_name",
-            "email",
+            "_pre_signup_email",
             "status",
             "member_type",
             "fog_role",
@@ -79,7 +79,7 @@ def describe_MemberAdmin():
         assert member_admin.search_fields == [
             "full_legal_name",
             "preferred_name",
-            "email",
+            "_pre_signup_email",
         ]
 
     def it_has_expected_list_filter():
@@ -389,11 +389,38 @@ def describe_paying_member_filter():
 def describe_FundingSnapshotAdmin():
     def it_has_expected_list_display():
         snap_admin = admin.site._registry[FundingSnapshot]
-        assert snap_admin.list_display == ["cycle_label", "snapshot_at", "contributor_count", "funding_pool"]
+        assert snap_admin.list_display == [
+            "cycle_label",
+            "snapshot_at",
+            "contributor_count",
+            "funding_pool",
+            "analyzer_link",
+        ]
 
     def it_has_snapshot_at_in_readonly_fields():
         snap_admin = admin.site._registry[FundingSnapshot]
         assert "snapshot_at" in snap_admin.readonly_fields
+
+    def it_marks_raw_votes_and_minimum_pool_readonly():
+        snap_admin = admin.site._registry[FundingSnapshot]
+        assert "raw_votes" in snap_admin.readonly_fields
+        assert "minimum_pool" in snap_admin.readonly_fields
+
+    def it_renders_analyzer_link(db):
+        from membership.models import FundingSnapshot as FS
+
+        snap = FS.objects.create(
+            cycle_label="Test Cycle",
+            contributor_count=0,
+            funding_pool=Decimal("1000.00"),
+            minimum_pool=Decimal("1000.00"),
+            raw_votes=[],
+            results={},
+        )
+        snap_admin = admin.site._registry[FS]
+        html = snap_admin.analyzer_link(snap)
+        assert f"/admin/snapshots/{snap.pk}/" in html
+        assert "Open analyzer" in html
 
 
 # ---------------------------------------------------------------------------
@@ -462,7 +489,7 @@ def describe_admin_search_by_alias():
     def it_finds_member_by_alias_email(admin_client):
         from membership.models import MemberEmail
 
-        member = MemberFactory(full_legal_name="Alias Andy", email="primary@example.com")
+        member = MemberFactory(full_legal_name="Alias Andy", _pre_signup_email="primary@example.com")
         MemberEmail.objects.create(member=member, email="secret@alias.com")
         resp = admin_client.get("/admin/membership/member/?status=all&q=secret@alias.com")
         content = resp.content.decode()
@@ -477,7 +504,7 @@ def describe_admin_create_user_with_member():
             "/admin/membership/member/add/",
             {
                 "full_legal_name": "Test Person",
-                "email": "test@example.com",
+                "_pre_signup_email": "test@example.com",
                 "membership_plan": plan.pk,
                 "status": "active",
                 "member_type": "standard",
@@ -488,11 +515,10 @@ def describe_admin_create_user_with_member():
                 "emails-MIN_NUM_FORMS": "0",
                 "emails-MAX_NUM_FORMS": "1000",
                 "emails-0-email": "",
-                "emails-0-is_primary": "",
             },
         )
         assert resp.status_code == 302
-        member = Member.objects.get(email="test@example.com")
+        member = Member.objects.get(_pre_signup_email="test@example.com")
         assert member.user is None
 
     def it_creates_member_with_user_when_checked(admin_client):
@@ -501,7 +527,7 @@ def describe_admin_create_user_with_member():
             "/admin/membership/member/add/",
             {
                 "full_legal_name": "Login Person",
-                "email": "login@example.com",
+                "_pre_signup_email": "login@example.com",
                 "membership_plan": plan.pk,
                 "status": "active",
                 "member_type": "employee",
@@ -512,11 +538,10 @@ def describe_admin_create_user_with_member():
                 "emails-MIN_NUM_FORMS": "0",
                 "emails-MAX_NUM_FORMS": "1000",
                 "emails-0-email": "",
-                "emails-0-is_primary": "",
             },
         )
         assert resp.status_code == 302
-        member = Member.objects.get(email="login@example.com")
+        member = Member.objects.get(_pre_signup_email="login@example.com")
         assert member.user is not None
         assert member.user.email == "login@example.com"
         assert member.user.username == "login@example.com"

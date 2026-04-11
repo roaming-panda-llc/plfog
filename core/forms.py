@@ -30,7 +30,7 @@ class FindAccountForm(forms.Form):
             )
             .first()
         )
-        if member is None or not member.email:
+        if member is None or not member.primary_email:
             return
 
         current_site = Site.objects.get_current()
@@ -41,10 +41,10 @@ class FindAccountForm(forms.Form):
             subject="Your Past Lives Account",
             message=(
                 f"Hi {member.preferred_name or member.full_legal_name},\n\n"
-                f"Your account email is: {member.email}\n\n"
+                f"Your account email is: {member.primary_email}\n\n"
                 f"You can log in here:\n{login_url}\n\n"
                 f"If you didn't request this, you can safely ignore this email."
             ),
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[member.email],
+            recipient_list=[member.primary_email],
         )

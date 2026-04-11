@@ -7,10 +7,13 @@ from typing import Any
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.db.models import DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
+
+from membership.managers import MemberEmailManager
 
 DEFAULT_PRICE_PER_SQFT = Decimal("3.75")
 
@@ -133,7 +136,17 @@ class Member(models.Model):
     )
     full_legal_name = models.CharField(max_length=255)
     preferred_name = models.CharField(max_length=255, blank=True)
-    email = models.EmailField(blank=True, default="")
+    _pre_signup_email = models.EmailField(
+        blank=True,
+        default="",
+        db_column="email",  # keep existing DB column name to avoid an extra migration
+        help_text=(
+            "Stored email used ONLY when this Member has no linked User. "
+            "Once a User is linked, allauth.account.EmailAddress becomes the source of truth; "
+            "read `member.primary_email` instead. See "
+            "docs/superpowers/specs/2026-04-07-user-email-aliases-design.md for the full architecture."
+        ),
+    )
     phone = models.CharField(max_length=20, blank=True)
     discord_handle = models.CharField(
         max_length=100, blank=True, help_text="Discord username (e.g. user#1234 or @user)."
@@ -201,6 +214,42 @@ class Member(models.Model):
     @property
     def display_name(self) -> str:
         return self.preferred_name if self.preferred_name else self.full_legal_name
+
+    @property
+    def primary_email(self) -> str:
+        """Return the live primary email for this member.
+
+        THREE-EMAIL-STORE NOTE: This project has three places an email can live
+        (see docs/superpowers/specs/2026-04-07-user-email-aliases-design.md):
+
+        1. ``self._pre_signup_email`` - stored field, used ONLY when self.user is None.
+        2. ``allauth.account.EmailAddress`` - source of truth for linked users.
+        3. ``User.email`` - mirrored from (2) by allauth; used as a fallback only.
+
+        Never read ``self._pre_signup_email`` directly outside of Airtable sync
+        and admin-for-unlinked-members flows. Use this property instead.
+
+        List views rendering many members must prefetch the primary EmailAddress
+        rows with ``Prefetch("user__emailaddress_set", ..., to_attr="_primary_emailaddresses")``
+        to avoid an N+1; when present, this property uses the prefetched list
+        instead of hitting the database.
+        """
+        if self.user_id is None:
+            return self._pre_signup_email
+        user = self.user
+        # Use the list populated by a view's Prefetch, if any.
+        prefetched = getattr(user, "_primary_emailaddresses", None)
+        if prefetched is not None:
+            if prefetched:
+                return prefetched[0].email
+            return (user.email if user else "") or ""
+        # No prefetch: single targeted query keyed on user_id (avoids a User fetch).
+        from allauth.account.models import EmailAddress
+
+        primary = EmailAddress.objects.filter(user_id=self.user_id, primary=True).first()
+        if primary is not None:
+            return primary.email
+        return (user.email if user else "") or ""
 
     @property
     def initials(self) -> str:
@@ -321,18 +370,38 @@ class Member(models.Model):
 
 
 class MemberEmail(models.Model):
-    """Additional email aliases for a member. The primary email stays on Member.email."""
+    """Pre-signup staging table for member email addresses.
+
+    THREE-EMAIL-STORE NOTE (see
+    docs/superpowers/specs/2026-04-07-user-email-aliases-design.md):
+
+    This table holds known email addresses for Member records that do NOT
+    yet have a linked User (typically imported from Airtable). When a User
+    is linked to the Member, ``MemberEmail.objects.migrate_to_user(user)``
+    promotes every row into ``allauth.account.EmailAddress`` and deletes the
+    staging rows. After that, EmailAddress is the source of truth; do NOT
+    read MemberEmail for login lookups on linked members.
+
+    The ``is_primary`` field was removed in version 1.4.0 because Member
+    already has a dedicated stored email (``_pre_signup_email``); a second
+    primary flag on a staging row was meaningless and confusing in the
+    admin inline.
+    """
 
     member = models.ForeignKey(
-        Member, on_delete=models.CASCADE, related_name="emails", help_text="The member this email belongs to."
+        Member,
+        on_delete=models.CASCADE,
+        related_name="emails",
+        help_text="The unlinked member this staged email belongs to.",
     )
-    email = models.EmailField(unique=True, help_text="An email address for this member.")
-    is_primary = models.BooleanField(default=False, help_text="Primary email shown in lists.")
+    email = models.EmailField(unique=True, help_text="A staged email address for this member.")
+
+    objects = MemberEmailManager()
 
     class Meta:
-        ordering = ["-is_primary", "email"]
-        verbose_name = "Email Alias"
-        verbose_name_plural = "Email Aliases"
+        ordering = ["email"]
+        verbose_name = "Staged Email (pre-signup)"
+        verbose_name_plural = "Staged Emails (pre-signup)"
 
     def __str__(self) -> str:
         return f"{self.email} ({self.member.display_name})"
@@ -477,9 +546,34 @@ class FundingSnapshot(models.Model):
         help_text="Number of paying members who contributed to the funding pool."
     )
     funding_pool = models.DecimalField(
-        max_digits=10, decimal_places=2, help_text="Total dollar pool (contributor_count × $10)."
+        max_digits=10,
+        decimal_places=2,
+        help_text="Total dollar pool (max of paying_voters × $10 and minimum_pool).",
     )
-    results = models.JSONField(default=dict, help_text="Full calculation results including per-guild breakdowns.")
+    minimum_pool = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text=(
+            "Minimum dollar floor applied to the funding pool at snapshot time. "
+            "New snapshots default to $1,000; historical snapshots default to 0 so "
+            "their original numbers are preserved."
+        ),
+    )
+    raw_votes = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "Frozen list of individual votes at snapshot time. Each entry has "
+            "member_id, member_name, member_type, fog_role, is_paying, and the "
+            "three guild picks (id + name). Drives the admin analyzer view."
+        ),
+    )
+    results = models.JSONField(
+        default=dict,
+        encoder=DjangoJSONEncoder,
+        help_text="Full calculation results including per-guild breakdowns. Decimals are serialized as strings.",
+    )
 
     class Meta:
         ordering = ["-snapshot_at"]
@@ -489,26 +583,19 @@ class FundingSnapshot(models.Model):
     def __str__(self) -> str:
         return f"{self.cycle_label} — ${self.funding_pool}"
 
-    class VoterFilter(models.TextChoices):
-        ALL_MEMBERS = "all", "All Members"
-        OFFICERS_ONLY = "officers_only", "Officers Only (Admins + Guild Officers)"
-
     @classmethod
     def take(
         cls,
         *,
         title: str = "",
-        voter_filter: str = "",
-        pool_override: int | None = None,
+        minimum_pool: Decimal | int = 1000,
     ) -> FundingSnapshot | None:
         """Create a snapshot from current vote preferences.
 
         Args:
             title: Custom label for the snapshot. Defaults to current month/year.
-            voter_filter: One of VoterFilter values. 'officers_only' limits votes
-                to admin + guild_officer roles. Default includes all members.
-            pool_override: Custom dollar amount for the funding pool. If None,
-                calculates from paying_voter_count × $10.
+            minimum_pool: Dollar floor applied to the funding pool. Pool is
+                ``max(paying_voters × $10, minimum_pool)``. Defaults to $1,000.
 
         Returns:
             The created FundingSnapshot, or None if no votes exist.
@@ -516,32 +603,48 @@ class FundingSnapshot(models.Model):
         from membership.vote_calculator import calculate_results
 
         preferences = VotePreference.objects.select_related(
-            "member__membership_plan",
+            "member",
             "guild_1st",
             "guild_2nd",
             "guild_3rd",
         ).all()
 
-        if voter_filter == cls.VoterFilter.OFFICERS_ONLY:
-            preferences = preferences.filter(
-                member__fog_role__in=[Member.FogRole.ADMIN, Member.FogRole.GUILD_OFFICER],
-            )
-
         if not preferences.exists():
             return None
 
-        paying_count = preferences.filter(member__member_type=Member.MemberType.STANDARD).count()
-
-        votes = [
+        raw_votes = [
             {
-                "guild_1st": pref.guild_1st.name,
-                "guild_2nd": pref.guild_2nd.name,
-                "guild_3rd": pref.guild_3rd.name,
+                "member_id": pref.member_id,
+                "member_name": pref.member.display_name,
+                "member_type": pref.member.member_type,
+                "fog_role": pref.member.fog_role,
+                "is_paying": pref.member.is_paying,
+                "guild_1st_id": pref.guild_1st_id,
+                "guild_1st_name": pref.guild_1st.name,
+                "guild_2nd_id": pref.guild_2nd_id,
+                "guild_2nd_name": pref.guild_2nd.name,
+                "guild_3rd_id": pref.guild_3rd_id,
+                "guild_3rd_name": pref.guild_3rd.name,
             }
             for pref in preferences
         ]
 
-        calc = calculate_results(votes, paying_voter_count=paying_count, pool_override=pool_override)
+        paying_count = sum(1 for v in raw_votes if v["is_paying"])
+        votes_for_calc = [
+            {
+                "guild_1st": v["guild_1st_name"],
+                "guild_2nd": v["guild_2nd_name"],
+                "guild_3rd": v["guild_3rd_name"],
+            }
+            for v in raw_votes
+        ]
+
+        minimum_pool_value = Decimal(minimum_pool)
+        calc = calculate_results(
+            votes_for_calc,
+            paying_voter_count=paying_count,
+            minimum_pool=minimum_pool_value,
+        )
 
         cycle_label = title.strip() if title.strip() else timezone.now().strftime("%B %Y")
 
@@ -549,6 +652,8 @@ class FundingSnapshot(models.Model):
             cycle_label=cycle_label,
             contributor_count=paying_count,
             funding_pool=calc["total_pool"],
+            minimum_pool=minimum_pool_value,
+            raw_votes=raw_votes,
             results=calc,
         )
 

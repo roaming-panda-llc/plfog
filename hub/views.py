@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Any, TypedDict
 
+from allauth.account.models import EmailAddress
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.db.models import Count
+from django.db.models import Count, Prefetch
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -148,12 +149,25 @@ def _compute_live_standings() -> list[VoteStanding]:
 
 @login_required
 def member_directory(request: HttpRequest) -> HttpResponse:
-    """Member directory page — lists all active members."""
+    """Member directory page — lists all active members.
+
+    Prefetches each member's primary allauth ``EmailAddress`` so
+    ``Member.primary_email`` stays O(1) per member instead of firing a query
+    on every template access. See the three-email-store note on
+    ``Member.primary_email`` and docs/superpowers/specs/2026-04-07-user-email-aliases-design.md.
+    """
     ctx = _get_hub_context(request)
     current_member = _get_member(request)
     members = (
         Member.objects.filter(status=Member.Status.ACTIVE, show_in_directory=True)
-        .select_related("membership_plan")
+        .select_related("membership_plan", "user")
+        .prefetch_related(
+            Prefetch(
+                "user__emailaddress_set",
+                queryset=EmailAddress.objects.filter(primary=True),
+                to_attr="_primary_emailaddresses",
+            )
+        )
         .order_by("full_legal_name")
     )
     return render(

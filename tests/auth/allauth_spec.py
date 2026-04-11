@@ -107,7 +107,7 @@ def describe_signup_gating():
 
 def describe_auto_create_user_on_login():
     def it_creates_user_when_member_exists_without_user(client):
-        MemberFactory(email="synced@example.com", user=None)
+        MemberFactory(_pre_signup_email="synced@example.com", user=None)
 
         assert not User.objects.filter(email__iexact="synced@example.com").exists()
 
@@ -115,7 +115,7 @@ def describe_auto_create_user_on_login():
 
         assert User.objects.filter(email__iexact="synced@example.com").exists()
         user = User.objects.get(email__iexact="synced@example.com")
-        member = Member.objects.get(email="synced@example.com")
+        member = Member.objects.get(_pre_signup_email="synced@example.com")
         assert member.user == user
 
     def it_does_not_create_user_when_no_member_exists(client):
@@ -128,7 +128,7 @@ def describe_auto_create_user_on_login():
         assert resp.status_code == 200  # re-renders form with errors
 
     def it_does_not_duplicate_user_when_user_already_exists(client):
-        MemberFactory(email="existing@example.com")
+        MemberFactory(_pre_signup_email="existing@example.com")
         User.objects.create_user(username="existing@example.com", email="existing@example.com")
 
         client.post("/accounts/login/code/", {"email": "existing@example.com"})

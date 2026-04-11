@@ -93,7 +93,11 @@ def member_to_airtable(member: Any) -> dict[str, Any]:
     """Convert a Member instance to Airtable writable fields."""
     fields: dict[str, Any] = {
         "Member Name": member.preferred_name or member.full_legal_name,
-        "Email": member.email,
+        # NOTE: We read the stored _pre_signup_email field here, not member.primary_email,
+        # because Airtable is the source of truth for unlinked members. The primary_email
+        # property would re-enter allauth for linked members and we don't want to change
+        # what we push upstream. See specs/2026-04-07-user-email-aliases-design.md.
+        "Email": member._pre_signup_email,
         "Phone": member.phone,
         "Status": MEMBER_STATUS_TO_AT[member.status],
         "Role": MEMBER_TYPE_TO_AT[member.member_type],
@@ -127,7 +131,7 @@ def member_from_airtable(fields: dict[str, Any]) -> dict[str, Any]:
     legal_name = fields.get("Legal name (if different)", "")
 
     result: dict[str, Any] = {
-        "email": fields.get("Email", ""),
+        "_pre_signup_email": fields.get("Email", ""),
         "phone": fields.get("Phone", ""),
         "notes": fields.get("Notes", ""),
         "emergency_contact_name": fields.get("Emergency Contact", ""),

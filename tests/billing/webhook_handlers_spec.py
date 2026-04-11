@@ -59,7 +59,7 @@ def describe_handle_payment_intent_succeeded():
             amount=Decimal("50.00"),
         )
         member = tab.member
-        member.email = "test@example.com"
+        member._pre_signup_email = "test@example.com"
         member.save()
 
         handle_payment_intent_succeeded(
@@ -80,7 +80,7 @@ def describe_handle_payment_intent_succeeded():
         assert charge.charged_at is not None
 
     def it_handles_empty_charges_data():
-        member = MemberFactory(email="nocharge@example.com")
+        member = MemberFactory(_pre_signup_email="nocharge@example.com")
         tab = TabFactory(member=member)
         charge = TabChargeFactory(
             tab=tab,

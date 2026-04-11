@@ -128,7 +128,7 @@ def describe_Invite():
             assert invite.invited_by == admin_user
             assert invite.member is not None
             assert invite.member.status == Member.Status.INVITED
-            assert invite.member.email == "fresh@example.com"
+            assert invite.member._pre_signup_email == "fresh@example.com"
 
         def it_sends_invite_email(admin_user):
             MembershipPlanFactory()
@@ -140,7 +140,7 @@ def describe_Invite():
         def it_raises_when_active_member_exists(admin_user):
             from tests.membership.factories import MemberFactory
 
-            MemberFactory(email="exists@example.com", status=Member.Status.ACTIVE)
+            MemberFactory(_pre_signup_email="exists@example.com", status=Member.Status.ACTIVE)
             with pytest.raises(ValueError, match="already exists"):
                 Invite.create_and_send(email="exists@example.com", invited_by=admin_user)
 

@@ -17,11 +17,19 @@ User = get_user_model()
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def ensure_user_has_member(sender: type, instance: Any, **kwargs: Any) -> None:
-    """Auto-create or link a Member record for any user who doesn't have one."""
+    """Auto-create or link a Member record for any user who doesn't have one.
+
+    After linking (or creating) a Member, also promotes any pre-signup
+    ``MemberEmail`` staging rows for that member into
+    ``allauth.account.EmailAddress`` so the user can log in via any of them.
+    See ``docs/superpowers/specs/2026-04-07-user-email-aliases-design.md``.
+    """
     from .models import Member, MemberEmail, MembershipPlan
 
     try:
         instance.member
+        # Idempotent safety net: ensure allauth EmailAddress reflects current state.
+        MemberEmail.objects.migrate_to_user(instance)
         return
     except Member.DoesNotExist:
         pass
@@ -30,17 +38,18 @@ def ensure_user_has_member(sender: type, instance: Any, **kwargs: Any) -> None:
     if email:
         # Check primary email on Member
         try:
-            member = Member.objects.get(email__iexact=email, user__isnull=True)
+            member = Member.objects.get(_pre_signup_email__iexact=email, user__isnull=True)
             member.user = instance
             member.full_legal_name = instance.get_full_name() or member.full_legal_name or instance.username
             member.status = Member.Status.ACTIVE
             member.save(update_fields=["user", "full_legal_name", "status"])
             logger.info("Linked existing Member (primary email) to user %s.", instance.username)
+            MemberEmail.objects.migrate_to_user(instance)
             return
         except Member.DoesNotExist:
             pass
 
-        # Check email aliases
+        # Check email aliases (pre-signup staging table)
         try:
             alias = MemberEmail.objects.select_related("member").get(email__iexact=email, member__user__isnull=True)
             member = alias.member
@@ -49,6 +58,7 @@ def ensure_user_has_member(sender: type, instance: Any, **kwargs: Any) -> None:
             member.status = Member.Status.ACTIVE
             member.save(update_fields=["user", "full_legal_name", "status"])
             logger.info("Linked existing Member (alias email %s) to user %s.", email, instance.username)
+            MemberEmail.objects.migrate_to_user(instance)
             return
         except MemberEmail.DoesNotExist:
             pass
@@ -67,8 +77,9 @@ def ensure_user_has_member(sender: type, instance: Any, **kwargs: Any) -> None:
     Member.objects.create(
         user=instance,
         full_legal_name=name,
-        email=instance.email or "",
+        _pre_signup_email=instance.email or "",
         membership_plan=plan,
         status=Member.Status.ACTIVE,
     )
+    MemberEmail.objects.migrate_to_user(instance)
     logger.info("Auto-created Member for user %s with plan '%s'.", instance.username, plan.name)

@@ -86,7 +86,7 @@ class TabEntryInline(TabularInline):
 class TabAdmin(ModelAdmin):
     list_display = ["member", "current_balance_display", "is_locked", "has_payment_method_display", "created_at"]
     list_filter = ["is_locked"]
-    search_fields = ["member__full_legal_name", "member__preferred_name", "member__email"]
+    search_fields = ["member__full_legal_name", "member__preferred_name", "member___pre_signup_email"]
     readonly_fields = ["stripe_customer_id", "stripe_payment_method_id", "payment_method_last4", "payment_method_brand"]
     inlines = [TabEntryInline]
 

@@ -20,9 +20,25 @@ from .models import FundingSnapshot, Guild, Member, MemberEmail, VotePreference
 
 
 class MemberEmailInline(TabularInline):
+    """Inline for the MemberEmail staging table.
+
+    MemberEmail is a pre-signup staging table for members imported from
+    Airtable who do not yet have a linked User account. Once a Member is
+    linked to a User, ``allauth.EmailAddress`` becomes the source of truth
+    for that member's emails, and the MemberEmail rows are dead data.
+
+    This inline is therefore hidden entirely for members with a linked
+    User — see ``MemberAdmin.get_inline_instances``. Showing it would
+    invite admins to edit rows that no longer drive any behavior.
+
+    See docs/superpowers/specs/2026-04-07-user-email-aliases-design.md.
+    """
+
     model = MemberEmail
     extra = 1
-    fields = ["email", "is_primary"]
+    fields = ["email"]
+    verbose_name = "Staged email (pre-signup)"
+    verbose_name_plural = "Staged emails (pre-signup)"
 
 
 # ---------------------------------------------------------------------------
@@ -74,7 +90,7 @@ class MemberAdmin(ModelAdmin):
     inlines = [MemberEmailInline]
     list_display = [
         "display_name",
-        "email",
+        "_pre_signup_email",
         "status",
         "member_type",
         "fog_role",
@@ -83,9 +99,22 @@ class MemberAdmin(ModelAdmin):
     ]
     list_display_links = ["display_name"]
     list_filter = [ActiveStatusFilter, HasUserFilter, "member_type"]
-    search_fields = ["full_legal_name", "preferred_name", "email"]
+    search_fields = ["full_legal_name", "preferred_name", "_pre_signup_email"]
     list_per_page = 100
     ordering = ["full_legal_name"]
+
+    def get_inline_instances(self, request: HttpRequest, obj: Member | None = None) -> list:
+        """Hide the MemberEmail staging inline once the member has a linked user.
+
+        THREE-EMAIL-STORE NOTE: Once user_id is set, allauth.EmailAddress is the
+        source of truth for emails. Showing the MemberEmail staging inline at that
+        point would be confusing and let admins edit dead data.
+        See docs/superpowers/specs/2026-04-07-user-email-aliases-design.md.
+        """
+        instances = super().get_inline_instances(request, obj)
+        if obj is not None and obj.user_id is not None:
+            instances = [i for i in instances if not isinstance(i, MemberEmailInline)]
+        return instances
 
     def get_fieldsets(self, request: HttpRequest, obj: object = None) -> list[tuple[str, dict]]:
         """Build fieldsets dynamically — fog_role only visible to superusers."""
@@ -103,7 +132,7 @@ class MemberAdmin(ModelAdmin):
         personal_fields: list[str] = [
             "full_legal_name",
             "preferred_name",
-            "email",
+            "_pre_signup_email",
             "phone",
             "billing_name",
         ]
@@ -149,7 +178,7 @@ class MemberAdmin(ModelAdmin):
         """Optionally create a User account when adding a new member with 'Create login' checked."""
         create_user = form.cleaned_data["create_user"]
 
-        if not change and create_user and obj.email:
+        if not change and create_user and obj._pre_signup_email:
             from django.contrib.auth import get_user_model
 
             UserModel = get_user_model()
@@ -157,7 +186,7 @@ class MemberAdmin(ModelAdmin):
             # Save the member first (without a user)
             super().save_model(request, obj, form, change)
             # Create the user — the post_save signal will try to auto-link a member
-            user = UserModel.objects.create_user(username=obj.email, email=obj.email)
+            user = UserModel.objects.create_user(username=obj._pre_signup_email, email=obj._pre_signup_email)
             # Signal may have created a duplicate member or linked to wrong one.
             # Delete any signal-created member and link ours.
             Member.objects.filter(user=user).exclude(pk=obj.pk).delete()
@@ -288,8 +317,17 @@ class VotePreferenceAdmin(ModelAdmin):
 
 @admin.register(FundingSnapshot)
 class FundingSnapshotAdmin(ModelAdmin):
-    list_display = ["cycle_label", "snapshot_at", "contributor_count", "funding_pool"]
-    readonly_fields = ["snapshot_at", "results"]
+    list_display = ["cycle_label", "snapshot_at", "contributor_count", "funding_pool", "analyzer_link"]
+    readonly_fields = ["snapshot_at", "results", "raw_votes", "contributor_count", "funding_pool", "minimum_pool"]
+
+    @admin.display(description="Analyzer")
+    def analyzer_link(self, obj: FundingSnapshot) -> str:
+        """Render a link to the admin snapshot analyzer for this row."""
+        from django.urls import reverse
+        from django.utils.html import format_html
+
+        url = reverse("admin_snapshot_detail", args=[obj.pk])
+        return format_html('<a href="{}">Open analyzer →</a>', url)
 
 
 # ---------------------------------------------------------------------------

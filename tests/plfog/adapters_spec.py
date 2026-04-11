@@ -663,7 +663,7 @@ def describe_AutoCreateUserLoginCodeForm():
             from plfog.adapters import AutoCreateUserLoginCodeForm
             from tests.membership.factories import MemberFactory
 
-            member = MemberFactory(user=None, email="primary@example.com")
+            member = MemberFactory(user=None, _pre_signup_email="primary@example.com")
             MemberEmail.objects.create(member=member, email="alias@example.com")
 
             form = AutoCreateUserLoginCodeForm(data={"email": "alias@example.com"})
