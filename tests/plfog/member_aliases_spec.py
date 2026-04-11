@@ -441,3 +441,56 @@ def describe_email_aliases_link_on_member_admin():
         resp = admin_client.get(f"/admin/membership/member/{unlinked_member.pk}/change/")
         assert resp.status_code == 200
         assert b"No linked user yet" in resp.content
+
+
+# ---------------------------------------------------------------------------
+# describe_member_aliases_template
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def describe_member_aliases_template():
+    def it_renders_each_alias_row_with_action_buttons(admin_client, linked_member):
+        second = EmailAddress.objects.create(
+            user=linked_member.user,
+            email="second@example.com",
+            verified=True,
+            primary=False,
+        )
+        resp = admin_client.get(f"/admin/members/{linked_member.pk}/aliases/")
+        assert b"penina@example.com" in resp.content
+        assert b"second@example.com" in resp.content
+        assert f"/aliases/{second.pk}/remove/".encode() in resp.content
+        assert f"/aliases/{second.pk}/set-primary/".encode() in resp.content
+        assert f"/aliases/{second.pk}/toggle-verified/".encode() in resp.content
+
+    def it_hides_set_primary_button_on_the_current_primary(admin_client, linked_member):
+        primary = EmailAddress.objects.get(user=linked_member.user, primary=True)
+        resp = admin_client.get(f"/admin/members/{linked_member.pk}/aliases/")
+        primary_set_primary = f"/aliases/{primary.pk}/set-primary/".encode()
+        assert primary_set_primary not in resp.content
+
+    def it_hides_set_primary_button_on_unverified_rows(admin_client, linked_member):
+        unverified = EmailAddress.objects.create(
+            user=linked_member.user,
+            email="unv@example.com",
+            verified=False,
+            primary=False,
+        )
+        resp = admin_client.get(f"/admin/members/{linked_member.pk}/aliases/")
+        unverified_set_primary = f"/aliases/{unverified.pk}/set-primary/".encode()
+        assert unverified_set_primary not in resp.content
+
+    def it_renders_the_add_form(admin_client, linked_member):
+        resp = admin_client.get(f"/admin/members/{linked_member.pk}/aliases/")
+        assert b'name="email"' in resp.content
+        assert f"/admin/members/{linked_member.pk}/aliases/add/".encode() in resp.content
+        assert b"csrfmiddlewaretoken" in resp.content
+
+    def it_renders_form_errors_when_add_fails(admin_client, linked_member):
+        resp = admin_client.post(
+            f"/admin/members/{linked_member.pk}/aliases/add/",
+            data={"email": "penina@example.com"},
+        )
+        assert resp.status_code == 200
+        assert b"already on this member" in resp.content
