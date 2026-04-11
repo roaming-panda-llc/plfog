@@ -4,6 +4,7 @@ from django.urls import include, path
 from plfog.admin_views import (
     invite_member,
     member_aliases,
+    member_aliases_add,
     snapshot_delete,
     snapshot_detail,
     snapshot_draft,
@@ -21,6 +22,11 @@ admin_custom_urls = [
         "admin/members/<int:pk>/aliases/",
         member_aliases,
         name="admin_member_aliases",
+    ),
+    path(
+        "admin/members/<int:pk>/aliases/add/",
+        member_aliases_add,
+        name="admin_member_aliases_add",
     ),
 ]
 

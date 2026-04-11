@@ -163,3 +163,73 @@ def describe_member_aliases_page():
         assert aliases[0].primary is True
         assert aliases[0].email == "penina@example.com"
         assert aliases[1].email == "aaa@example.com"
+
+
+# ---------------------------------------------------------------------------
+# describe_member_aliases_add (POST)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def describe_member_aliases_add():
+    def it_requires_staff(client, linked_member):
+        resp = client.post(
+            f"/admin/members/{linked_member.pk}/aliases/add/",
+            data={"email": "new@example.com"},
+        )
+        assert resp.status_code == 302
+        assert "login" in resp.url
+
+    def it_rejects_get(admin_client, linked_member):
+        resp = admin_client.get(f"/admin/members/{linked_member.pk}/aliases/add/")
+        assert resp.status_code == 405
+
+    def it_404s_for_nonexistent_member(admin_client):
+        resp = admin_client.post(
+            "/admin/members/999999/aliases/add/",
+            data={"email": "new@example.com"},
+        )
+        assert resp.status_code == 404
+
+    def it_creates_verified_non_primary_email(admin_client, linked_member):
+        resp = admin_client.post(
+            f"/admin/members/{linked_member.pk}/aliases/add/",
+            data={"email": "writersguild@pastlives.space"},
+        )
+        assert resp.status_code == 302
+        assert resp.url == f"/admin/members/{linked_member.pk}/aliases/"
+        created = EmailAddress.objects.get(
+            user=linked_member.user,
+            email="writersguild@pastlives.space",
+        )
+        assert created.verified is True
+        assert created.primary is False
+
+    def it_leaves_existing_primary_untouched(admin_client, linked_member):
+        admin_client.post(
+            f"/admin/members/{linked_member.pk}/aliases/add/",
+            data={"email": "new@example.com"},
+        )
+        primary = EmailAddress.objects.get(user=linked_member.user, primary=True)
+        assert primary.email == "penina@example.com"
+
+    def it_rejects_duplicate_on_same_user(admin_client, linked_member):
+        resp = admin_client.post(
+            f"/admin/members/{linked_member.pk}/aliases/add/",
+            data={"email": "penina@example.com"},
+        )
+        assert resp.status_code == 200  # re-renders page with form errors
+        assert EmailAddress.objects.filter(user=linked_member.user).count() == 1
+
+    def it_rejects_duplicate_on_other_user(admin_client, linked_member):
+        other = User.objects.create_user(username="other", email="other@example.com", password="pass")
+        EmailAddress.objects.create(user=other, email="shared@example.com", verified=True, primary=False)
+        resp = admin_client.post(
+            f"/admin/members/{linked_member.pk}/aliases/add/",
+            data={"email": "shared@example.com"},
+        )
+        assert resp.status_code == 200
+        assert not EmailAddress.objects.filter(
+            user=linked_member.user,
+            email__iexact="shared@example.com",
+        ).exists()
