@@ -494,3 +494,65 @@ def describe_member_aliases_template():
         )
         assert resp.status_code == 200
         assert b"already on this member" in resp.content
+
+
+# ---------------------------------------------------------------------------
+# describe_end_to_end_login_via_admin_added_alias
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def describe_end_to_end_login_via_admin_added_alias():
+    def it_allows_login_via_an_alias_added_by_admin(
+        admin_client: Client,
+        linked_member: Member,
+    ) -> None:
+        """Admin adds writersguild@pastlives.space, member logs in via that address."""
+        import re
+
+        from django.core import mail
+
+        # 1. Admin adds the alias via the POST endpoint.
+        resp = admin_client.post(
+            f"/admin/members/{linked_member.pk}/aliases/add/",
+            data={"email": "writersguild@pastlives.space"},
+        )
+        assert resp.status_code == 302
+        created = EmailAddress.objects.get(
+            user=linked_member.user,
+            email="writersguild@pastlives.space",
+        )
+        assert created.verified is True
+
+        # 2. Fresh client (Penina) requests a login code at the shared address.
+        mail.outbox = []
+        member_client = Client()
+
+        resp = member_client.post(
+            "/accounts/login/code/",
+            {"email": "writersguild@pastlives.space"},
+            follow=True,
+        )
+        assert resp.status_code == 200
+        assert len(mail.outbox) >= 1
+        sent = mail.outbox[-1]
+        assert sent.to == ["writersguild@pastlives.space"]
+
+        # 3. Extract the code (matches login_via_alias_spec.py exactly).
+        match = re.search(r"is:\s*\n\s*(\S+)", sent.body)
+        assert match is not None, f"No login code in: {sent.body}"
+        code = match.group(1)
+
+        # 4. Submit the code.
+        resp = member_client.post(
+            "/accounts/login/code/confirm/",
+            {"code": code},
+            follow=True,
+        )
+        assert resp.status_code == 200
+        assert resp.wsgi_request.user.is_authenticated
+        assert resp.wsgi_request.user.pk == linked_member.user_id
+
+        # 5. Session is authenticated as Penina's user.
+        session_user_id = int(member_client.session["_auth_user_id"])
+        assert session_user_id == linked_member.user_id
