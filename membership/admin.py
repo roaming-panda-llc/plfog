@@ -88,6 +88,7 @@ class MemberAdmin(ModelAdmin):
     change_list_template = "admin/membership/member/change_list.html"
     form = MemberAdminForm
     inlines = [MemberEmailInline]
+    readonly_fields = ["email_aliases_link"]
     list_display = [
         "display_name",
         "_pre_signup_email",
@@ -140,6 +141,7 @@ class MemberAdmin(ModelAdmin):
         # Show "user" link on edit, "create_user" checkbox on add
         if obj is not None:
             personal_fields.insert(0, "user")
+            personal_fields.insert(1, "email_aliases_link")
         else:
             personal_fields.append("create_user")
 
@@ -195,6 +197,25 @@ class MemberAdmin(ModelAdmin):
             obj.sync_user_permissions()
         else:
             super().save_model(request, obj, form, change)
+
+    @admin.display(description="Email aliases")
+    def email_aliases_link(self, obj: Member) -> str:
+        """Render the Manage Aliases link for linked members only.
+
+        THREE-EMAIL-STORE NOTE: This link appears only for members with a
+        linked User. Unlinked members manage pre-signup emails via the
+        MemberEmailInline below. See the aliases page spec at
+        docs/superpowers/specs/2026-04-11-admin-email-aliases-design.md.
+        """
+        from django.urls import reverse
+        from django.utils.html import format_html
+
+        if obj.user_id is None:
+            return mark_safe(  # noqa: S308
+                '<span style="color: #888;">No linked user yet — use Staged Emails below.</span>'
+            )
+        url = reverse("admin_member_aliases", args=[obj.pk])
+        return format_html('<a href="{}">Manage email aliases →</a>', url)
 
     def get_search_results(
         self, request: HttpRequest, queryset: QuerySet[Member], search_term: str

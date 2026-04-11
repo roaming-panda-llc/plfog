@@ -421,3 +421,23 @@ def describe_member_aliases_toggle_verified():
         assert resp.status_code == 404
         other_alias.refresh_from_db()
         assert other_alias.verified == original_verified
+
+
+# ---------------------------------------------------------------------------
+# describe_email_aliases_link_on_member_admin
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def describe_email_aliases_link_on_member_admin():
+    def it_renders_link_for_linked_member(admin_client, linked_member):
+        resp = admin_client.get(f"/admin/membership/member/{linked_member.pk}/change/")
+        assert resp.status_code == 200
+        url = f"/admin/members/{linked_member.pk}/aliases/"
+        assert url.encode() in resp.content
+        assert b"Manage email aliases" in resp.content
+
+    def it_renders_hint_for_unlinked_member(admin_client, unlinked_member):
+        resp = admin_client.get(f"/admin/membership/member/{unlinked_member.pk}/change/")
+        assert resp.status_code == 200
+        assert b"No linked user yet" in resp.content
