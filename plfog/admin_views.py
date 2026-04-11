@@ -149,6 +149,9 @@ def _render_analyzer(
         minimum_pool = _parse_minimum_pool(request.GET.get("minimum_pool"))
         title_default = request.GET.get("title", "").strip() or timezone.now().strftime("%B %Y")
 
+    paying_count = 0
+    non_paying_count = 0
+
     if is_legacy:
         assert snapshot is not None
         calc: dict[str, Any] = snapshot.results or {}
@@ -161,6 +164,7 @@ def _render_analyzer(
             is_paying=is_paying,
         )
         paying_count = sum(1 for v in filtered_votes if v["is_paying"])
+        non_paying_count = sum(1 for v in filtered_votes if not v["is_paying"])
         votes_for_calc = [
             {
                 "guild_1st": v["guild_1st_name"],
@@ -174,11 +178,6 @@ def _render_analyzer(
             paying_voter_count=paying_count,
             minimum_pool=minimum_pool,
         )
-
-    non_paying_count = (
-        sum(1 for v in filtered_votes if not v["is_paying"]) if not is_legacy else 0
-    )
-    paying_count = sum(1 for v in filtered_votes if v["is_paying"]) if not is_legacy else 0
 
     context = {
         **admin.site.each_context(request),

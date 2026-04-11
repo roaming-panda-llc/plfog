@@ -2,17 +2,22 @@
 
 from __future__ import annotations
 
-VERSION = "1.3.3"
+VERSION = "1.4.0"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
     {
-        "version": "1.3.3",
-        "date": "2026-04-07",
-        "title": "Manage Your Own Email Addresses",
+        "version": "1.4.0",
+        "date": "2026-04-11",
+        "title": "Email Aliases & Smarter Funding Snapshots",
         "changes": [
             "New 'Manage email addresses' page in your profile menu — add, remove, verify, and set a primary email all in one place",
-            "Sign in with any of your verified email addresses",
+            "Sign in with any of your verified email addresses, not just the one you signed up with",
             "Cleaner admin: removed the confusing 'is primary' toggle on member email aliases",
+            "Funding snapshots now have a $1,000 minimum pool so small-turnout months still allocate meaningful amounts to guilds",
+            "New Snapshot Analyzer admin page — preview live vote results with filters by member type, role, and paying status before taking a snapshot",
+            "Stored snapshots can be re-sliced with the same filters to see exactly who voted for what",
+            "Admins can now delete a snapshot from the analyzer page",
+            "Fixed: non-paying guild officers' votes are no longer silently zeroed out when the funding pool is calculated",
         ],
     },
     {
