@@ -12,8 +12,10 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from allauth.account.models import EmailAddress
+
 from core.models import Invite
-from membership.forms import InviteMemberForm
+from membership.forms import AddEmailAliasForm, InviteMemberForm
 from membership.models import FundingSnapshot, Member, VotePreference
 from membership.vote_calculator import calculate_results
 
@@ -248,3 +250,37 @@ def snapshot_delete(request: HttpRequest, pk: int) -> HttpResponse:
     snapshot.delete()
     messages.success(request, f"Deleted snapshot '{cycle_label}'.")
     return redirect("admin:membership_fundingsnapshot_changelist")
+
+
+# ---------------------------------------------------------------------------
+# Member email aliases — admin management page
+# ---------------------------------------------------------------------------
+#
+# Dedicated page at /admin/members/<pk>/aliases/ that lets staff manage
+# allauth.EmailAddress rows for a linked Member's User. Mirrors the Snapshot
+# Analyzer pattern (GET page + POST action endpoints, all redirecting back).
+#
+# See docs/superpowers/specs/2026-04-11-admin-email-aliases-design.md.
+
+
+@staff_member_required
+def member_aliases(request: HttpRequest, pk: int) -> HttpResponse:
+    """GET — render the aliases management page for a linked member."""
+    member = get_object_or_404(Member, pk=pk)
+    if member.user_id is None:
+        messages.info(
+            request,
+            "This member hasn't signed up yet. Use the Staged Emails section "
+            "on the member page to manage their pre-signup addresses.",
+        )
+        return redirect("admin:membership_member_change", member.pk)
+
+    aliases = EmailAddress.objects.filter(user=member.user).order_by("-primary", "email")
+    add_form = AddEmailAliasForm(user=member.user)
+    context = {
+        **admin.site.each_context(request),
+        "member": member,
+        "aliases": aliases,
+        "add_form": add_form,
+    }
+    return render(request, "admin/membership/member/aliases.html", context)
