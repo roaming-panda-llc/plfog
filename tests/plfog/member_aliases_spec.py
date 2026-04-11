@@ -358,3 +358,61 @@ def describe_member_aliases_set_primary():
         other_alias = EmailAddress.objects.get(user=other, email="other@example.com")
         resp = admin_client.post(f"/admin/members/{linked_member.pk}/aliases/{other_alias.pk}/set-primary/")
         assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# describe_member_aliases_toggle_verified (POST)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def describe_member_aliases_toggle_verified():
+    def it_requires_staff(client, linked_member):
+        alias = EmailAddress.objects.create(
+            user=linked_member.user, email="new@example.com", verified=False, primary=False
+        )
+        resp = client.post(f"/admin/members/{linked_member.pk}/aliases/{alias.pk}/toggle-verified/")
+        assert resp.status_code == 302
+        assert "login" in resp.url
+        alias.refresh_from_db()
+        assert alias.verified is False
+
+    def it_rejects_get(admin_client, linked_member):
+        alias = EmailAddress.objects.create(
+            user=linked_member.user, email="new@example.com", verified=False, primary=False
+        )
+        resp = admin_client.get(f"/admin/members/{linked_member.pk}/aliases/{alias.pk}/toggle-verified/")
+        assert resp.status_code == 405
+
+    def it_flips_verified_from_false_to_true(admin_client, linked_member):
+        alias = EmailAddress.objects.create(
+            user=linked_member.user, email="new@example.com", verified=False, primary=False
+        )
+        admin_client.post(f"/admin/members/{linked_member.pk}/aliases/{alias.pk}/toggle-verified/")
+        alias.refresh_from_db()
+        assert alias.verified is True
+
+    def it_flips_verified_from_true_to_false(admin_client, linked_member):
+        alias = EmailAddress.objects.create(
+            user=linked_member.user, email="new@example.com", verified=True, primary=False
+        )
+        admin_client.post(f"/admin/members/{linked_member.pk}/aliases/{alias.pk}/toggle-verified/")
+        alias.refresh_from_db()
+        assert alias.verified is False
+
+    def it_allows_unverifying_primary_with_warning(admin_client, linked_member):
+        primary = EmailAddress.objects.get(user=linked_member.user, primary=True)
+        resp = admin_client.post(f"/admin/members/{linked_member.pk}/aliases/{primary.pk}/toggle-verified/")
+        assert resp.status_code == 302
+        primary.refresh_from_db()
+        assert primary.verified is False
+
+    def it_404s_for_email_belonging_to_another_user(admin_client, linked_member):
+        other = User.objects.create_user(username="other", email="other@example.com", password="pass")
+        # Signal auto-creates the primary EmailAddress — use it directly.
+        other_alias = EmailAddress.objects.get(user=other, email="other@example.com")
+        original_verified = other_alias.verified
+        resp = admin_client.post(f"/admin/members/{linked_member.pk}/aliases/{other_alias.pk}/toggle-verified/")
+        assert resp.status_code == 404
+        other_alias.refresh_from_db()
+        assert other_alias.verified == original_verified

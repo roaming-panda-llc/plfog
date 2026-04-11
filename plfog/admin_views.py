@@ -392,3 +392,33 @@ def member_aliases_set_primary(request: HttpRequest, pk: int, email_pk: int) -> 
     alias.set_as_primary(conditional=False)
     messages.success(request, f"'{alias.email}' is now the primary email.")
     return redirect("admin_member_aliases", pk=member.pk)
+
+
+@require_POST
+@staff_member_required
+def member_aliases_toggle_verified(request: HttpRequest, pk: int, email_pk: int) -> HttpResponse:
+    """POST — flip the verified flag on an alias.
+
+    Warns loudly if the admin just un-verified the primary email (login
+    still works until another email is promoted, but it's fragile).
+    """
+    member = get_object_or_404(Member, pk=pk)
+    if member.user_id is None:
+        messages.error(request, "This member has no linked user.")
+        return redirect("admin:membership_member_change", member.pk)
+
+    alias = get_object_or_404(EmailAddress, pk=email_pk, user=member.user)
+    alias.verified = not alias.verified
+    alias.save(update_fields=["verified"])
+
+    if not alias.verified and alias.primary:
+        messages.warning(
+            request,
+            f"'{alias.email}' is the primary email and is now un-verified. "
+            "Login will still work until another email is promoted, but this is fragile.",
+        )
+    else:
+        state = "verified" if alias.verified else "un-verified"
+        messages.success(request, f"'{alias.email}' is now {state}.")
+
+    return redirect("admin_member_aliases", pk=member.pk)
