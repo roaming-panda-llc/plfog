@@ -363,3 +363,32 @@ def member_aliases_remove(request: HttpRequest, pk: int, email_pk: int) -> HttpR
 
     messages.success(request, f"Removed alias '{alias_email}'.")
     return redirect("admin_member_aliases", pk=member.pk)
+
+
+@require_POST
+@staff_member_required
+def member_aliases_set_primary(request: HttpRequest, pk: int, email_pk: int) -> HttpResponse:
+    """POST — promote a verified alias to primary.
+
+    Uses allauth's EmailAddress.set_as_primary(conditional=False), which
+    demotes the current primary and updates User.email in one call.
+    Unverified emails are rejected (allauth's own guard is version-dependent;
+    we gate here to be sure).
+    """
+    member = get_object_or_404(Member, pk=pk)
+    if member.user_id is None:
+        messages.error(request, "This member has no linked user.")
+        return redirect("admin:membership_member_change", member.pk)
+
+    alias = get_object_or_404(EmailAddress, pk=email_pk, user=member.user)
+
+    if not alias.verified:
+        messages.error(
+            request,
+            f"Cannot set '{alias.email}' as primary — it isn't verified yet.",
+        )
+        return redirect("admin_member_aliases", pk=member.pk)
+
+    alias.set_as_primary(conditional=False)
+    messages.success(request, f"'{alias.email}' is now the primary email.")
+    return redirect("admin_member_aliases", pk=member.pk)

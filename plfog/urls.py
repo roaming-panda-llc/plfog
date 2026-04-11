@@ -6,6 +6,7 @@ from plfog.admin_views import (
     member_aliases,
     member_aliases_add,
     member_aliases_remove,
+    member_aliases_set_primary,
     snapshot_delete,
     snapshot_detail,
     snapshot_draft,
@@ -33,6 +34,11 @@ admin_custom_urls = [
         "admin/members/<int:pk>/aliases/<int:email_pk>/remove/",
         member_aliases_remove,
         name="admin_member_aliases_remove",
+    ),
+    path(
+        "admin/members/<int:pk>/aliases/<int:email_pk>/set-primary/",
+        member_aliases_set_primary,
+        name="admin_member_aliases_set_primary",
     ),
 ]
 

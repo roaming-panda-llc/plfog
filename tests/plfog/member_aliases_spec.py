@@ -293,3 +293,68 @@ def describe_member_aliases_remove():
         resp = admin_client.post(f"/admin/members/{linked_member.pk}/aliases/{other_alias.pk}/remove/")
         assert resp.status_code == 404
         assert EmailAddress.objects.filter(pk=other_alias.pk).exists()
+
+
+# ---------------------------------------------------------------------------
+# describe_member_aliases_set_primary (POST)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def describe_member_aliases_set_primary():
+    def it_requires_staff(client, linked_member):
+        alias = EmailAddress.objects.create(
+            user=linked_member.user, email="new@example.com", verified=True, primary=False
+        )
+        resp = client.post(f"/admin/members/{linked_member.pk}/aliases/{alias.pk}/set-primary/")
+        assert resp.status_code == 302
+        assert "login" in resp.url
+        alias.refresh_from_db()
+        assert alias.primary is False
+
+    def it_rejects_get(admin_client, linked_member):
+        alias = EmailAddress.objects.create(
+            user=linked_member.user, email="new@example.com", verified=True, primary=False
+        )
+        resp = admin_client.get(f"/admin/members/{linked_member.pk}/aliases/{alias.pk}/set-primary/")
+        assert resp.status_code == 405
+
+    def it_demotes_old_primary_and_promotes_target(admin_client, linked_member):
+        alias = EmailAddress.objects.create(
+            user=linked_member.user, email="new@example.com", verified=True, primary=False
+        )
+        resp = admin_client.post(f"/admin/members/{linked_member.pk}/aliases/{alias.pk}/set-primary/")
+        assert resp.status_code == 302
+        alias.refresh_from_db()
+        old = EmailAddress.objects.get(email="penina@example.com")
+        assert alias.primary is True
+        assert old.primary is False
+
+    def it_syncs_user_email_to_new_primary(admin_client, linked_member):
+        alias = EmailAddress.objects.create(
+            user=linked_member.user, email="new@example.com", verified=True, primary=False
+        )
+        admin_client.post(f"/admin/members/{linked_member.pk}/aliases/{alias.pk}/set-primary/")
+        linked_member.user.refresh_from_db()
+        assert linked_member.user.email == "new@example.com"
+
+    def it_refuses_unverified_email(admin_client, linked_member):
+        alias = EmailAddress.objects.create(
+            user=linked_member.user,
+            email="unverified@example.com",
+            verified=False,
+            primary=False,
+        )
+        resp = admin_client.post(f"/admin/members/{linked_member.pk}/aliases/{alias.pk}/set-primary/")
+        assert resp.status_code == 302
+        alias.refresh_from_db()
+        assert alias.primary is False
+        original = EmailAddress.objects.get(email="penina@example.com")
+        assert original.primary is True
+
+    def it_404s_for_email_belonging_to_another_user(admin_client, linked_member):
+        other = User.objects.create_user(username="other", email="other@example.com", password="pass")
+        # Signal auto-creates the primary EmailAddress for other@example.com — use it directly.
+        other_alias = EmailAddress.objects.get(user=other, email="other@example.com")
+        resp = admin_client.post(f"/admin/members/{linked_member.pk}/aliases/{other_alias.pk}/set-primary/")
+        assert resp.status_code == 404
