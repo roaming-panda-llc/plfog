@@ -1,0 +1,40 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Email aliases — {{ member }}{% endblock %}
+
+{% block content %}
+<div style="padding: 1.5rem 2rem;">
+    <p style="margin-bottom: 1rem;">
+        <a href="{% url 'admin:membership_member_change' member.pk %}">&larr; Back to {{ member }}</a>
+    </p>
+
+    <h1>Email aliases for {{ member }}</h1>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Primary</th>
+                <th>Verified</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for alias in aliases %}
+            <tr>
+                <td>{{ alias.email }}</td>
+                <td>{% if alias.primary %}&#10003;{% endif %}</td>
+                <td>{% if alias.verified %}&#10003;{% endif %}</td>
+                <td>{# action buttons added in Task 9 #}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4"><em>No emails.</em></td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Add email alias</h2>
+    {# full add form wired in Task 3 #}
+</div>
+{% endblock %}

@@ -124,3 +124,42 @@ def describe_AddEmailAliasForm():
     def it_rejects_malformed_email(linked_member):
         form = AddEmailAliasForm(data={"email": "not-an-email"}, user=linked_member.user)
         assert not form.is_valid()
+
+
+# ---------------------------------------------------------------------------
+# describe_member_aliases_page (GET)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def describe_member_aliases_page():
+    def it_requires_staff(client, linked_member):
+        resp = client.get(f"/admin/members/{linked_member.pk}/aliases/")
+        assert resp.status_code == 302
+        assert "login" in resp.url
+
+    def it_returns_404_for_nonexistent_member(admin_client):
+        resp = admin_client.get("/admin/members/999999/aliases/")
+        assert resp.status_code == 404
+
+    def it_renders_the_page_for_a_linked_member(admin_client, linked_member):
+        resp = admin_client.get(f"/admin/members/{linked_member.pk}/aliases/")
+        assert resp.status_code == 200
+        assert resp.context["member"] == linked_member
+        assert list(resp.context["aliases"]) == list(
+            EmailAddress.objects.filter(user=linked_member.user).order_by("-primary", "email")
+        )
+        assert resp.context["add_form"].__class__.__name__ == "AddEmailAliasForm"
+
+    def it_lists_aliases_with_primary_first(admin_client, linked_member):
+        EmailAddress.objects.create(
+            user=linked_member.user,
+            email="aaa@example.com",
+            verified=True,
+            primary=False,
+        )
+        resp = admin_client.get(f"/admin/members/{linked_member.pk}/aliases/")
+        aliases = list(resp.context["aliases"])
+        assert aliases[0].primary is True
+        assert aliases[0].email == "penina@example.com"
+        assert aliases[1].email == "aaa@example.com"
