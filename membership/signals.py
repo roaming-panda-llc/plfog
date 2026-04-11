@@ -16,19 +16,31 @@ User = get_user_model()
 
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
-def ensure_user_has_member(sender: type, instance: Any, **kwargs: Any) -> None:
+def ensure_user_has_member(sender: type, instance: Any, created: bool, **kwargs: Any) -> None:
     """Auto-create or link a Member record for any user who doesn't have one.
 
     After linking (or creating) a Member, also promotes any pre-signup
     ``MemberEmail`` staging rows for that member into
     ``allauth.account.EmailAddress`` so the user can log in via any of them.
     See ``docs/superpowers/specs/2026-04-07-user-email-aliases-design.md``.
+
+    Gated on ``created=True``: every branch of this signal is only meaningful
+    on the first save of a User. Re-running ``migrate_to_user`` on subsequent
+    saves was a 1.4.0 bug — it would force-re-promote ``Member._pre_signup_email``
+    to primary and silently revert any other primary the member or admin had
+    set via allauth, because allauth's ``set_as_primary`` calls ``user.save()``
+    internally. Skipping non-creation saves keeps allauth's primary stable.
     """
+    if not created:
+        return
+
     from .models import Member, MemberEmail, MembershipPlan
 
     try:
         instance.member
-        # Idempotent safety net: ensure allauth EmailAddress reflects current state.
+        # Edge case: a Member was created with user=instance just before this
+        # signal fired (unusual but possible from explicit code). Seed allauth
+        # state from staging rows then bail.
         MemberEmail.objects.migrate_to_user(instance)
         return
     except Member.DoesNotExist:
