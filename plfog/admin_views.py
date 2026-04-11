@@ -317,3 +317,49 @@ def member_aliases_add(request: HttpRequest, pk: int) -> HttpResponse:
         f"Added alias '{form.cleaned_data['email']}' to {member}.",
     )
     return redirect("admin_member_aliases", pk=member.pk)
+
+
+@require_POST
+@staff_member_required
+def member_aliases_remove(request: HttpRequest, pk: int, email_pk: int) -> HttpResponse:
+    """POST — delete an EmailAddress unless it's the member's only one.
+
+    Safety rules (from spec):
+    1. Cannot remove the only EmailAddress — refuse with error flash.
+    2. If removing the primary and >=1 verified remains, promote the
+       lowest-pk verified row via set_as_primary(conditional=False).
+    3. If removing would leave the user with zero verified emails, proceed
+       but flash a loud warning.
+    """
+    member = get_object_or_404(Member, pk=pk)
+    if member.user_id is None:
+        messages.error(request, "This member has no linked user.")
+        return redirect("admin:membership_member_change", member.pk)
+
+    alias = get_object_or_404(EmailAddress, pk=email_pk, user=member.user)
+
+    total = EmailAddress.objects.filter(user=member.user).count()
+    if total == 1:
+        messages.error(
+            request,
+            f"Cannot remove '{alias.email}' — it's the only email on this account. "
+            "Removing it would lock the member out.",
+        )
+        return redirect("admin_member_aliases", pk=member.pk)
+
+    was_primary = alias.primary
+    alias_email = alias.email
+    alias.delete()
+
+    if was_primary:
+        next_verified = EmailAddress.objects.filter(user=member.user, verified=True).order_by("pk").first()
+        if next_verified is not None:
+            next_verified.set_as_primary(conditional=False)
+        else:
+            messages.warning(
+                request,
+                "This member has no verified emails left and cannot log in. Add and verify one immediately.",
+            )
+
+    messages.success(request, f"Removed alias '{alias_email}'.")
+    return redirect("admin_member_aliases", pk=member.pk)
