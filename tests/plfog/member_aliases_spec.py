@@ -164,6 +164,11 @@ def describe_member_aliases_page():
         assert aliases[0].email == "penina@example.com"
         assert aliases[1].email == "aaa@example.com"
 
+    def it_redirects_unlinked_members_to_the_member_change_page(admin_client, unlinked_member):
+        resp = admin_client.get(f"/admin/members/{unlinked_member.pk}/aliases/")
+        assert resp.status_code == 302
+        assert f"/admin/membership/member/{unlinked_member.pk}/change/" in resp.url
+
 
 # ---------------------------------------------------------------------------
 # describe_member_aliases_add (POST)
