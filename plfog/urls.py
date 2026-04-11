@@ -3,6 +3,11 @@ from django.urls import include, path
 
 from plfog.admin_views import (
     invite_member,
+    member_aliases,
+    member_aliases_add,
+    member_aliases_remove,
+    member_aliases_set_primary,
+    member_aliases_toggle_verified,
     snapshot_delete,
     snapshot_detail,
     snapshot_draft,
@@ -16,6 +21,31 @@ admin_custom_urls = [
     path("admin/snapshots/take/", snapshot_take, name="admin_snapshot_take"),
     path("admin/snapshots/<int:pk>/", snapshot_detail, name="admin_snapshot_detail"),
     path("admin/snapshots/<int:pk>/delete/", snapshot_delete, name="admin_snapshot_delete"),
+    path(
+        "admin/members/<int:pk>/aliases/",
+        member_aliases,
+        name="admin_member_aliases",
+    ),
+    path(
+        "admin/members/<int:pk>/aliases/add/",
+        member_aliases_add,
+        name="admin_member_aliases_add",
+    ),
+    path(
+        "admin/members/<int:pk>/aliases/<int:email_pk>/remove/",
+        member_aliases_remove,
+        name="admin_member_aliases_remove",
+    ),
+    path(
+        "admin/members/<int:pk>/aliases/<int:email_pk>/set-primary/",
+        member_aliases_set_primary,
+        name="admin_member_aliases_set_primary",
+    ),
+    path(
+        "admin/members/<int:pk>/aliases/<int:email_pk>/toggle-verified/",
+        member_aliases_toggle_verified,
+        name="admin_member_aliases_toggle_verified",
+    ),
 ]
 
 urlpatterns = admin_custom_urls + [

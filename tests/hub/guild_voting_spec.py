@@ -191,6 +191,22 @@ def describe_guild_voting_view():
         assert response.status_code == 200
         assert response.context["latest_snapshot"] == snap
 
+    def it_does_not_render_contributor_count_on_results_section(client: Client):
+        """Privacy: contributor count is admin-only and must not leak to members."""
+        User.objects.create_user(username="results_privacy", password="pass")
+        FundingSnapshotFactory(
+            cycle_label="March 2026",
+            funding_pool=Decimal("100.00"),
+            contributor_count=7,
+            results={"total_pool": 100, "results": []},
+        )
+        client.login(username="results_privacy", password="pass")
+
+        response = client.get("/guilds/voting/")
+
+        assert response.status_code == 200
+        assert b"contributing member" not in response.content
+
     def it_includes_cycle_info_in_context(client: Client):
         User.objects.create_user(username="cycleuser", password="pass")
         client.login(username="cycleuser", password="pass")
@@ -248,6 +264,21 @@ def describe_snapshot_history_view():
 
         assert response.status_code == 200
 
+    def it_does_not_render_contributor_count_column(client: Client):
+        """Privacy: the history table must not expose contributor counts."""
+        User.objects.create_user(username="hist_privacy", password="pass")
+        FundingSnapshotFactory(
+            cycle_label="January 2026",
+            funding_pool=Decimal("100.00"),
+            contributor_count=7,
+        )
+        client.login(username="hist_privacy", password="pass")
+
+        response = client.get("/guilds/voting/history/")
+
+        assert response.status_code == 200
+        assert b"Contributors" not in response.content
+
 
 # ---------------------------------------------------------------------------
 # describe_snapshot_detail_view
@@ -276,6 +307,22 @@ def describe_snapshot_detail_view():
 
         assert response.status_code == 200
         assert response.context["snapshot"] == snap
+
+    def it_does_not_render_contributor_count(client: Client):
+        """Privacy: snapshot detail must not expose contributor counts to members."""
+        User.objects.create_user(username="detail_privacy", password="pass")
+        snap = FundingSnapshotFactory(
+            cycle_label="March 2026",
+            funding_pool=Decimal("200.00"),
+            contributor_count=7,
+            results={"total_pool": 200, "results": []},
+        )
+        client.login(username="detail_privacy", password="pass")
+
+        response = client.get(f"/guilds/voting/history/{snap.pk}/")
+
+        assert response.status_code == 200
+        assert b"Contributors:" not in response.content
 
     def it_returns_404_for_invalid_pk(client: Client):
         User.objects.create_user(username="notfounduser", password="pass")

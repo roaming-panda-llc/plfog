@@ -1,0 +1,102 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Email aliases — {{ member }} | {{ site_title }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Home</a>
+    &rsaquo; <a href="{% url 'admin:app_list' app_label='membership' %}">Membership</a>
+    &rsaquo; <a href="{% url 'admin:membership_member_changelist' %}">Members</a>
+    &rsaquo; <a href="{% url 'admin:membership_member_change' member.pk %}">{{ member }}</a>
+    &rsaquo; Email aliases
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="plfog-aliases" style="padding: 1.5rem 2rem; max-width: 960px;">
+    <h1 style="margin-bottom: 0.25rem;">Email aliases</h1>
+    <p style="color: #888; margin-top: 0;">for {{ member }}</p>
+
+    {% if messages %}
+    <ul class="messagelist">
+        {% for message in messages %}
+        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+        {% endfor %}
+    </ul>
+    {% endif %}
+
+    <table class="plfog-aliases__table" style="width: 100%; border-collapse: collapse; margin-bottom: 2rem;">
+        <thead>
+            <tr>
+                <th style="text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #ddd;">Email</th>
+                <th style="text-align: center; padding: 0.5rem 0.75rem; border-bottom: 1px solid #ddd;">Primary</th>
+                <th style="text-align: center; padding: 0.5rem 0.75rem; border-bottom: 1px solid #ddd;">Verified</th>
+                <th style="text-align: right; padding: 0.5rem 0.75rem; border-bottom: 1px solid #ddd;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for alias in aliases %}
+            <tr>
+                <td style="padding: 0.5rem 0.75rem; border-bottom: 1px solid #f0f0f0;">{{ alias.email }}</td>
+                <td style="text-align: center; padding: 0.5rem 0.75rem; border-bottom: 1px solid #f0f0f0;">
+                    {% if alias.primary %}&#10003;{% endif %}
+                </td>
+                <td style="text-align: center; padding: 0.5rem 0.75rem; border-bottom: 1px solid #f0f0f0;">
+                    {% if alias.verified %}&#10003;{% endif %}
+                </td>
+                <td style="text-align: right; padding: 0.5rem 0.75rem; border-bottom: 1px solid #f0f0f0;">
+                    {% if alias.verified and not alias.primary %}
+                    <form method="post"
+                          action="{% url 'admin_member_aliases_set_primary' member.pk alias.pk %}"
+                          style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="button">Set primary</button>
+                    </form>
+                    {% endif %}
+
+                    <form method="post"
+                          action="{% url 'admin_member_aliases_toggle_verified' member.pk alias.pk %}"
+                          style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="button">
+                            {% if alias.verified %}Unmark verified{% else %}Mark verified{% endif %}
+                        </button>
+                    </form>
+
+                    <form method="post"
+                          action="{% url 'admin_member_aliases_remove' member.pk alias.pk %}"
+                          style="display: inline;"
+                          onsubmit="return confirm('Remove {{ alias.email|escapejs }}? This cannot be undone.');">
+                        {% csrf_token %}
+                        <button type="submit" class="button" style="color: #c0392b;">Remove</button>
+                    </form>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4" style="padding: 0.75rem; color: #888;"><em>No emails on this account yet.</em></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2 style="margin-bottom: 0.5rem;">Add email alias</h2>
+    <form method="post"
+          action="{% url 'admin_member_aliases_add' member.pk %}"
+          style="display: flex; gap: 0.5rem; align-items: flex-start; flex-wrap: wrap;">
+        {% csrf_token %}
+        <div>
+            {{ add_form.email }}
+            {% if add_form.email.errors %}
+            <ul class="errorlist" style="color: #c0392b; margin: 0.25rem 0 0; padding-left: 1rem;">
+                {% for error in add_form.email.errors %}
+                <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        <button type="submit" class="default">Add</button>
+    </form>
+</div>
+{% endblock %}

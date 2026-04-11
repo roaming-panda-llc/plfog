@@ -12,8 +12,10 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from allauth.account.models import EmailAddress
+
 from core.models import Invite
-from membership.forms import InviteMemberForm
+from membership.forms import AddEmailAliasForm, InviteMemberForm
 from membership.models import FundingSnapshot, Member, VotePreference
 from membership.vote_calculator import calculate_results
 
@@ -248,3 +250,175 @@ def snapshot_delete(request: HttpRequest, pk: int) -> HttpResponse:
     snapshot.delete()
     messages.success(request, f"Deleted snapshot '{cycle_label}'.")
     return redirect("admin:membership_fundingsnapshot_changelist")
+
+
+# ---------------------------------------------------------------------------
+# Member email aliases — admin management page
+# ---------------------------------------------------------------------------
+#
+# Dedicated page at /admin/members/<pk>/aliases/ that lets staff manage
+# allauth.EmailAddress rows for a linked Member's User. Mirrors the Snapshot
+# Analyzer pattern (GET page + POST action endpoints, all redirecting back).
+#
+# See docs/superpowers/specs/2026-04-11-admin-email-aliases-design.md.
+
+
+@staff_member_required
+def member_aliases(request: HttpRequest, pk: int) -> HttpResponse:
+    """GET — render the aliases management page for a linked member."""
+    member = get_object_or_404(Member, pk=pk)
+    if member.user_id is None:
+        messages.info(
+            request,
+            "This member hasn't signed up yet. Use the Staged Emails section "
+            "on the member page to manage their pre-signup addresses.",
+        )
+        return redirect("admin:membership_member_change", member.pk)
+
+    aliases = EmailAddress.objects.filter(user=member.user).order_by("-primary", "email")
+    add_form = AddEmailAliasForm(user=member.user)
+    context = {
+        **admin.site.each_context(request),
+        "member": member,
+        "aliases": aliases,
+        "add_form": add_form,
+    }
+    return render(request, "admin/membership/member/aliases.html", context)
+
+
+@require_POST
+@staff_member_required
+def member_aliases_add(request: HttpRequest, pk: int) -> HttpResponse:
+    """POST — create a verified, non-primary EmailAddress for the member's User."""
+    member = get_object_or_404(Member, pk=pk)
+    if member.user_id is None:
+        messages.error(request, "This member has no linked user.")
+        return redirect("admin:membership_member_change", member.pk)
+
+    form = AddEmailAliasForm(request.POST, user=member.user)
+    if not form.is_valid():
+        aliases = EmailAddress.objects.filter(user=member.user).order_by("-primary", "email")
+        context = {
+            **admin.site.each_context(request),
+            "member": member,
+            "aliases": aliases,
+            "add_form": form,
+        }
+        return render(request, "admin/membership/member/aliases.html", context)
+
+    EmailAddress.objects.create(
+        user=member.user,
+        email=form.cleaned_data["email"],
+        verified=True,
+        primary=False,
+    )
+    messages.success(
+        request,
+        f"Added alias '{form.cleaned_data['email']}' to {member}.",
+    )
+    return redirect("admin_member_aliases", pk=member.pk)
+
+
+@require_POST
+@staff_member_required
+def member_aliases_remove(request: HttpRequest, pk: int, email_pk: int) -> HttpResponse:
+    """POST — delete an EmailAddress unless it's the member's only one.
+
+    Safety rules (from spec):
+    1. Cannot remove the only EmailAddress — refuse with error flash.
+    2. If removing the primary and >=1 verified remains, promote the
+       lowest-pk verified row via set_as_primary(conditional=False).
+    3. If removing would leave the user with zero verified emails, proceed
+       but flash a loud warning.
+    """
+    member = get_object_or_404(Member, pk=pk)
+    if member.user_id is None:
+        messages.error(request, "This member has no linked user.")
+        return redirect("admin:membership_member_change", member.pk)
+
+    alias = get_object_or_404(EmailAddress, pk=email_pk, user=member.user)
+
+    total = EmailAddress.objects.filter(user=member.user).count()
+    if total == 1:
+        messages.error(
+            request,
+            f"Cannot remove '{alias.email}' — it's the only email on this account. "
+            "Removing it would lock the member out.",
+        )
+        return redirect("admin_member_aliases", pk=member.pk)
+
+    was_primary = alias.primary
+    alias_email = alias.email
+    alias.delete()
+
+    if was_primary:
+        next_verified = EmailAddress.objects.filter(user=member.user, verified=True).order_by("pk").first()
+        if next_verified is not None:
+            next_verified.set_as_primary(conditional=False)
+        else:
+            messages.warning(
+                request,
+                "This member has no verified emails left and cannot log in. Add and verify one immediately.",
+            )
+
+    messages.success(request, f"Removed alias '{alias_email}'.")
+    return redirect("admin_member_aliases", pk=member.pk)
+
+
+@require_POST
+@staff_member_required
+def member_aliases_set_primary(request: HttpRequest, pk: int, email_pk: int) -> HttpResponse:
+    """POST — promote a verified alias to primary.
+
+    Uses allauth's EmailAddress.set_as_primary(conditional=False), which
+    demotes the current primary and updates User.email in one call.
+    Unverified emails are rejected (allauth's own guard is version-dependent;
+    we gate here to be sure).
+    """
+    member = get_object_or_404(Member, pk=pk)
+    if member.user_id is None:
+        messages.error(request, "This member has no linked user.")
+        return redirect("admin:membership_member_change", member.pk)
+
+    alias = get_object_or_404(EmailAddress, pk=email_pk, user=member.user)
+
+    if not alias.verified:
+        messages.error(
+            request,
+            f"Cannot set '{alias.email}' as primary — it isn't verified yet.",
+        )
+        return redirect("admin_member_aliases", pk=member.pk)
+
+    alias.set_as_primary(conditional=False)
+    messages.success(request, f"'{alias.email}' is now the primary email.")
+    return redirect("admin_member_aliases", pk=member.pk)
+
+
+@require_POST
+@staff_member_required
+def member_aliases_toggle_verified(request: HttpRequest, pk: int, email_pk: int) -> HttpResponse:
+    """POST — flip the verified flag on an alias.
+
+    Warns loudly if the admin just un-verified the primary email (login
+    still works until another email is promoted, but it's fragile).
+    """
+    member = get_object_or_404(Member, pk=pk)
+    if member.user_id is None:
+        messages.error(request, "This member has no linked user.")
+        return redirect("admin:membership_member_change", member.pk)
+
+    alias = get_object_or_404(EmailAddress, pk=email_pk, user=member.user)
+    alias.verified = not alias.verified
+    alias.save(update_fields=["verified"])
+
+    if not alias.verified and alias.primary:
+        messages.warning(
+            request,
+            f"'{alias.email}' is the primary email and is now un-verified. "
+            "Login will still work until another email is promoted, but this is fragile.",
+        )
+    else:
+        state = "verified" if alias.verified else "un-verified"
+        messages.success(request, f"'{alias.email}' is now {state}.")
+
+    return redirect("admin_member_aliases", pk=member.pk)

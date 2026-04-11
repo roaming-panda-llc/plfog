@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
-VERSION = "1.4.0"
+VERSION = "1.4.1"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.4.1",
+        "date": "2026-04-11",
+        "title": "Funding Results — Quieter Display & Admin Email Aliases",
+        "changes": [
+            "The funding results section no longer shows how many members contributed to each snapshot — keeping that detail private for now",
+            "Admins can now add email aliases directly from the member page — handy for shared addresses like guild mailboxes where the member can't easily receive a verification code themselves",
+            "Admins can also remove aliases, change which one is primary, and toggle whether an alias is marked verified",
+            "Fixed a quiet bug where changing your primary email could silently revert on the next save — primary changes now stick",
+        ],
+    },
     {
         "version": "1.4.0",
         "date": "2026-04-11",
