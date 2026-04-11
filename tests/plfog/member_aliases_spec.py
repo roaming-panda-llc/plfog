@@ -556,3 +556,42 @@ def describe_end_to_end_login_via_admin_added_alias():
         # 5. Session is authenticated as Penina's user.
         session_user_id = int(member_client.session["_auth_user_id"])
         assert session_user_id == linked_member.user_id
+
+
+# ---------------------------------------------------------------------------
+# describe_unlinked_member_post_guards
+# ---------------------------------------------------------------------------
+#
+# Defensive coverage: each POST endpoint has an "if member.user_id is None"
+# guard that fires before it touches user-scoped data. The GET page redirects
+# unlinked members away from the UI, but these guards catch hand-crafted URLs.
+
+
+@pytest.mark.django_db
+def describe_unlinked_member_post_guards():
+    def _expected_redirect(member):
+        return f"/admin/membership/member/{member.pk}/change/"
+
+    def it_blocks_add_for_unlinked_member(admin_client, unlinked_member):
+        resp = admin_client.post(
+            f"/admin/members/{unlinked_member.pk}/aliases/add/",
+            data={"email": "new@example.com"},
+        )
+        assert resp.status_code == 302
+        assert _expected_redirect(unlinked_member) in resp.url
+        assert not EmailAddress.objects.filter(email="new@example.com").exists()
+
+    def it_blocks_remove_for_unlinked_member(admin_client, unlinked_member):
+        resp = admin_client.post(f"/admin/members/{unlinked_member.pk}/aliases/1/remove/")
+        assert resp.status_code == 302
+        assert _expected_redirect(unlinked_member) in resp.url
+
+    def it_blocks_set_primary_for_unlinked_member(admin_client, unlinked_member):
+        resp = admin_client.post(f"/admin/members/{unlinked_member.pk}/aliases/1/set-primary/")
+        assert resp.status_code == 302
+        assert _expected_redirect(unlinked_member) in resp.url
+
+    def it_blocks_toggle_verified_for_unlinked_member(admin_client, unlinked_member):
+        resp = admin_client.post(f"/admin/members/{unlinked_member.pk}/aliases/1/toggle-verified/")
+        assert resp.status_code == 302
+        assert _expected_redirect(unlinked_member) in resp.url

@@ -36,15 +36,9 @@ def ensure_user_has_member(sender: type, instance: Any, created: bool, **kwargs:
 
     from .models import Member, MemberEmail, MembershipPlan
 
-    try:
-        instance.member
-        # Edge case: a Member was created with user=instance just before this
-        # signal fired (unusual but possible from explicit code). Seed allauth
-        # state from staging rows then bail.
-        MemberEmail.objects.migrate_to_user(instance)
-        return
-    except Member.DoesNotExist:
-        pass
+    # On created=True the user was just saved; no Member can yet reference it
+    # via the OneToOne (admin save_model and test fixtures both link the Member
+    # AFTER this signal has returned). Skip the "already has member" branch.
 
     email = getattr(instance, "email", "") or ""
     if email:
