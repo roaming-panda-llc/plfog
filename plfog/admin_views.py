@@ -284,3 +284,36 @@ def member_aliases(request: HttpRequest, pk: int) -> HttpResponse:
         "add_form": add_form,
     }
     return render(request, "admin/membership/member/aliases.html", context)
+
+
+@require_POST
+@staff_member_required
+def member_aliases_add(request: HttpRequest, pk: int) -> HttpResponse:
+    """POST — create a verified, non-primary EmailAddress for the member's User."""
+    member = get_object_or_404(Member, pk=pk)
+    if member.user_id is None:
+        messages.error(request, "This member has no linked user.")
+        return redirect("admin:membership_member_change", member.pk)
+
+    form = AddEmailAliasForm(request.POST, user=member.user)
+    if not form.is_valid():
+        aliases = EmailAddress.objects.filter(user=member.user).order_by("-primary", "email")
+        context = {
+            **admin.site.each_context(request),
+            "member": member,
+            "aliases": aliases,
+            "add_form": form,
+        }
+        return render(request, "admin/membership/member/aliases.html", context)
+
+    EmailAddress.objects.create(
+        user=member.user,
+        email=form.cleaned_data["email"],
+        verified=True,
+        primary=False,
+    )
+    messages.success(
+        request,
+        f"Added alias '{form.cleaned_data['email']}' to {member}.",
+    )
+    return redirect("admin_member_aliases", pk=member.pk)
