@@ -150,7 +150,6 @@
     <p class="hub-text-muted" style="margin-bottom: 1rem; font-size: 0.85rem;">
         {{ latest_snapshot.cycle_label }} snapshot &mdash;
         pool: <strong>${{ latest_snapshot.funding_pool }}</strong> &mdash;
-        {{ latest_snapshot.contributor_count }} contributing member{{ latest_snapshot.contributor_count|pluralize }} &mdash;
         taken {{ latest_snapshot.snapshot_at|date:"N j, Y" }} &mdash;
         <a href="{% url 'hub_snapshot_detail' latest_snapshot.pk %}">View Details</a>
     </p>

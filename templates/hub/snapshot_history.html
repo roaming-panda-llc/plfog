@@ -14,7 +14,6 @@
             <tr>
                 <th style="text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--hub-border); font-weight: 500;">Cycle</th>
                 <th style="text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--hub-border); font-weight: 500;">Date</th>
-                <th style="text-align: right; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--hub-border); font-weight: 500;">Contributors</th>
                 <th style="text-align: right; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--hub-border); font-weight: 500;">Funding Pool</th>
             </tr>
         </thead>
@@ -25,7 +24,6 @@
                     <a href="{% url 'hub_snapshot_detail' snapshot.pk %}">{{ snapshot.cycle_label }}</a>
                 </td>
                 <td style="padding: 0.5rem 0.75rem; font-size: 0.85rem;">{{ snapshot.snapshot_at|date:"N j, Y" }}</td>
-                <td style="padding: 0.5rem 0.75rem; text-align: right;">{{ snapshot.contributor_count }}</td>
                 <td style="padding: 0.5rem 0.75rem; text-align: right;">${{ snapshot.funding_pool }}</td>
             </tr>
             {% endfor %}
