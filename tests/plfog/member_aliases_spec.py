@@ -233,3 +233,63 @@ def describe_member_aliases_add():
             user=linked_member.user,
             email__iexact="shared@example.com",
         ).exists()
+
+
+# ---------------------------------------------------------------------------
+# describe_member_aliases_remove (POST)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def describe_member_aliases_remove():
+    def _alias(user, email, *, verified=True, primary=False):
+        return EmailAddress.objects.create(user=user, email=email, verified=verified, primary=primary)
+
+    def it_requires_staff(client, linked_member):
+        alias = _alias(linked_member.user, "gone@example.com")
+        resp = client.post(f"/admin/members/{linked_member.pk}/aliases/{alias.pk}/remove/")
+        assert resp.status_code == 302
+        assert "login" in resp.url
+        assert EmailAddress.objects.filter(pk=alias.pk).exists()
+
+    def it_rejects_get(admin_client, linked_member):
+        alias = _alias(linked_member.user, "gone@example.com")
+        resp = admin_client.get(f"/admin/members/{linked_member.pk}/aliases/{alias.pk}/remove/")
+        assert resp.status_code == 405
+
+    def it_deletes_non_primary_email(admin_client, linked_member):
+        alias = _alias(linked_member.user, "gone@example.com")
+        resp = admin_client.post(f"/admin/members/{linked_member.pk}/aliases/{alias.pk}/remove/")
+        assert resp.status_code == 302
+        assert resp.url == f"/admin/members/{linked_member.pk}/aliases/"
+        assert not EmailAddress.objects.filter(pk=alias.pk).exists()
+
+    def it_refuses_when_it_is_the_only_email(admin_client, linked_member):
+        only = EmailAddress.objects.get(user=linked_member.user)
+        resp = admin_client.post(f"/admin/members/{linked_member.pk}/aliases/{only.pk}/remove/")
+        assert resp.status_code == 302
+        assert EmailAddress.objects.filter(pk=only.pk).exists()
+
+    def it_promotes_lowest_pk_verified_to_primary_when_removing_primary(admin_client, linked_member):
+        beta = _alias(linked_member.user, "beta@example.com", verified=True, primary=False)
+        _alias(linked_member.user, "gamma@example.com", verified=True, primary=False)
+        original_primary = EmailAddress.objects.get(user=linked_member.user, primary=True)
+        admin_client.post(f"/admin/members/{linked_member.pk}/aliases/{original_primary.pk}/remove/")
+        beta.refresh_from_db()
+        assert beta.primary is True
+
+    def it_proceeds_and_warns_when_removing_last_verified_email(admin_client, linked_member):
+        unverified = _alias(linked_member.user, "unverified@example.com", verified=False, primary=False)
+        primary = EmailAddress.objects.get(user=linked_member.user, primary=True)
+        resp = admin_client.post(f"/admin/members/{linked_member.pk}/aliases/{primary.pk}/remove/")
+        assert resp.status_code == 302
+        assert not EmailAddress.objects.filter(pk=primary.pk).exists()
+        assert EmailAddress.objects.filter(pk=unverified.pk).exists()
+
+    def it_404s_for_email_belonging_to_another_user(admin_client, linked_member):
+        other = User.objects.create_user(username="other", email="other@example.com", password="pass")
+        # Signal auto-creates the primary EmailAddress for other@example.com — use it directly.
+        other_alias = EmailAddress.objects.get(user=other, email="other@example.com")
+        resp = admin_client.post(f"/admin/members/{linked_member.pk}/aliases/{other_alias.pk}/remove/")
+        assert resp.status_code == 404
+        assert EmailAddress.objects.filter(pk=other_alias.pk).exists()
