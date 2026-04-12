@@ -6,27 +6,30 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 
 from billing.fields import EncryptedCharField, _fernet
-from billing.models import StripeAccount
-from tests.billing.factories import DirectKeysStripeAccountFactory
+from billing.models import BillingSettings
 
 pytestmark = pytest.mark.django_db
 
 
 def describe_EncryptedCharField():
     def it_round_trips_a_value_through_the_db():
-        account = DirectKeysStripeAccountFactory(direct_secret_key="sk_test_roundtrip")
-        account.refresh_from_db()
-        assert account.direct_secret_key == "sk_test_roundtrip"
+        bs = BillingSettings.load()
+        bs.connect_platform_secret_key = "sk_test_roundtrip"
+        bs.save()
+        bs.refresh_from_db()
+        assert bs.connect_platform_secret_key == "sk_test_roundtrip"
 
     def it_stores_ciphertext_not_plaintext_in_db():
         from django.db import connection
 
-        account = DirectKeysStripeAccountFactory(direct_secret_key="sk_test_supersecret")
+        bs = BillingSettings.load()
+        bs.connect_platform_secret_key = "sk_test_supersecret"
+        bs.save()
         # Read the raw column with a SQL query to bypass from_db_value.
         with connection.cursor() as cursor:
             cursor.execute(
-                f"SELECT direct_secret_key FROM {StripeAccount._meta.db_table} WHERE id = %s",
-                [account.pk],
+                f"SELECT connect_platform_secret_key FROM {BillingSettings._meta.db_table} WHERE id = %s",
+                [bs.pk],
             )
             (raw,) = cursor.fetchone()
         assert raw is not None
@@ -34,9 +37,11 @@ def describe_EncryptedCharField():
         assert raw.startswith("gAAAAA")  # Fernet token prefix
 
     def it_returns_blank_unchanged():
-        account = DirectKeysStripeAccountFactory(direct_webhook_secret="")
-        account.refresh_from_db()
-        assert account.direct_webhook_secret == ""
+        bs = BillingSettings.load()
+        bs.connect_platform_webhook_secret = ""
+        bs.save()
+        bs.refresh_from_db()
+        assert bs.connect_platform_webhook_secret == ""
 
     def describe_fernet_key_validation():
         def it_raises_when_key_is_missing(settings):
@@ -50,4 +55,6 @@ def describe_EncryptedCharField():
                 _fernet()
 
     def it_is_a_charfield_subclass():
-        assert issubclass(EncryptedCharField, __import__("django.db.models", fromlist=["CharField"]).CharField)
+        from django.db.models import CharField
+
+        assert issubclass(EncryptedCharField, CharField)

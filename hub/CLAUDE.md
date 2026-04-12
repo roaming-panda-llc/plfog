@@ -27,7 +27,7 @@ All views call `_get_hub_context(request)` for sidebar data (guild list, user in
 - `ProfileSettingsForm` — edits Member fields (pronouns, about_me, discord_handle, etc.)
 - `EmailPreferencesForm` — email notification toggles
 - `BetaFeedbackForm` — bug/feature/general feedback; calls `form.send(user=user)`
-- `AddTabEntryForm` — description, amount, optional product; used for self-service tab entries
+- Self-service tab-entry form: `billing.forms.TabItemForm` with `context="member_tab_page"` (replaces the old `AddTabEntryForm` removed in v1.5.0)
 
 ## Templates
 

@@ -5,7 +5,7 @@ from decimal import Decimal
 import factory
 from django.contrib.auth import get_user_model
 
-from billing.models import BillingSettings, Product, StripeAccount, Tab, TabCharge, TabEntry
+from billing.models import BillingSettings, Product, Tab, TabCharge, TabEntry
 from tests.membership.factories import GuildFactory, MemberFactory
 
 User = get_user_model()
@@ -27,26 +27,7 @@ class BillingSettingsFactory(factory.django.DjangoModelFactory):
     pk = 1
     charge_frequency = BillingSettings.ChargeFrequency.MONTHLY
     default_tab_limit = Decimal("200.00")
-
-
-class StripeAccountFactory(factory.django.DjangoModelFactory):
-    class Meta:
-        model = StripeAccount
-
-    guild = factory.SubFactory(GuildFactory)
-    auth_mode = StripeAccount.AuthMode.OAUTH
-    stripe_account_id = factory.Sequence(lambda n: f"acct_test_{n:04d}")
-    display_name = factory.LazyAttribute(lambda o: f"{o.guild.name} Account" if o.guild else "Platform Account")
-    is_active = True
-    platform_fee_percent = Decimal("0.00")
-
-
-class DirectKeysStripeAccountFactory(StripeAccountFactory):
-    auth_mode = StripeAccount.AuthMode.DIRECT_KEYS
-    direct_secret_key = "sk_test_directkeysfactory"
-    direct_publishable_key = "pk_test_directkeysfactory"
-    direct_webhook_secret = "whsec_directkeysfactory"
-    platform_fee_percent = Decimal("0.00")
+    default_admin_percent = Decimal("20.00")
 
 
 class ProductFactory(factory.django.DjangoModelFactory):
@@ -57,6 +38,8 @@ class ProductFactory(factory.django.DjangoModelFactory):
     price = Decimal("10.00")
     guild = factory.SubFactory(GuildFactory)
     is_active = True
+    admin_percent_override = None
+    split_mode = Product.SplitMode.SINGLE_GUILD
 
 
 class TabFactory(factory.django.DjangoModelFactory):
@@ -74,9 +57,14 @@ class TabEntryFactory(factory.django.DjangoModelFactory):
         model = TabEntry
 
     tab = factory.SubFactory(TabFactory)
+    product = None
     description = factory.Faker("sentence", nb_words=4)
     amount = Decimal("25.00")
     entry_type = TabEntry.EntryType.MANUAL
+    admin_percent = Decimal("20.00")
+    split_mode = Product.SplitMode.SINGLE_GUILD
+    split_guild_ids: list = []
+    guild = factory.LazyAttribute(lambda o: o.product.guild if o.product else None)
 
 
 class TabChargeFactory(factory.django.DjangoModelFactory):

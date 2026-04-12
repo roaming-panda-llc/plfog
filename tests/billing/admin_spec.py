@@ -8,13 +8,12 @@ from django.test import Client
 from billing.admin import (
     BillingSettingsAdmin,
     ProductAdmin,
-    StripeAccountAdmin,
     TabAdmin,
     TabChargeAdmin,
     TabEntryAdmin,
     TabEntryInline,
 )
-from billing.models import BillingSettings, Product, StripeAccount, Tab, TabCharge, TabEntry
+from billing.models import BillingSettings, Product, Tab, TabCharge, TabEntry
 from tests.billing.factories import ProductFactory, TabChargeFactory, TabEntryFactory, TabFactory
 
 User = get_user_model()
@@ -178,21 +177,6 @@ def describe_TabChargeAdmin():
     def it_never_allows_delete_for_object(admin_instance, superuser_request):
         charge = TabChargeFactory()
         assert admin_instance.has_delete_permission(superuser_request, obj=charge) is False
-
-
-def describe_StripeAccountAdmin():
-    @pytest.fixture()
-    def admin_instance():
-        return StripeAccountAdmin(StripeAccount, AdminSite())
-
-    @pytest.fixture()
-    def superuser_request(rf):
-        request = rf.get("/admin/")
-        request.user = User(is_staff=True, is_superuser=True)
-        return request
-
-    def it_never_allows_delete(admin_instance, superuser_request):
-        assert admin_instance.has_delete_permission(superuser_request) is False
 
 
 def describe_ProductAdmin():

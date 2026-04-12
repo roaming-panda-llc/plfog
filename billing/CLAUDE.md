@@ -6,20 +6,37 @@ Stripe tab billing system. Members accumulate charges on a tab; a management com
 
 | Model | Key fields | Notes |
 |-------|-----------|-------|
-| `BillingSettings` | charge_frequency, charge_time, default_tab_limit, max_retry_attempts | Singleton (pk=1); load via `BillingSettings.load()` |
-| `StripeAccount` | guild 1:1, auth_mode, stripe_account_id, direct_secret_key, direct_webhook_secret, platform_fee_percent | Two modes: `oauth` (Stripe Connect) or `direct_keys` (pasted API keys, encrypted at rest) |
-| `Product` | name, price, guild FK, is_active | Purchasable item offered by a guild |
+| `BillingSettings` | charge_frequency, charge_time, default_tab_limit, default_admin_percent, max_retry_attempts, connect_platform_* | Singleton (pk=1); load via `BillingSettings.load()` |
+| `Product` | name, price, guild FK, admin_percent_override, split_mode, is_active | Purchasable item offered by a guild |
 | `Tab` | member 1:1, stripe_customer_id, stripe_payment_method_id, is_locked | One per member; accumulates entries |
-| `TabEntry` | tab FK, tab_charge FK (null=pending), amount, voided_at | Single line item |
-| `TabCharge` | tab FK, stripe_account FK, status, amount, stripe_payment_intent_id | Batched charge; links to entries |
+| `TabEntry` | tab FK, tab_charge FK (null=pending), amount, voided_at, **admin_percent, split_mode, guild, split_guild_ids** | Single line item with a frozen split snapshot |
+| `TabCharge` | tab FK, status, amount, stripe_payment_intent_id | Batched charge — one per tab per billing cycle |
+
+**Snapshot fields on TabEntry** (`admin_percent`, `split_mode`, `guild`, `split_guild_ids`) are frozen at creation time in `Tab.add_entry()`. Never recomputed at read time — reports stay stable when `Product.admin_percent_override` or guild activation changes later.
+
+## Revenue split
+
+Every line item is split between admin and guild based on `TabEntry.admin_percent` (default 20%). `TabEntry.compute_splits()` returns the per-guild breakdown as a list of `EntrySplit` tuples:
+
+- `SINGLE_GUILD` → one row for the owning guild with `(admin_share, guild_total)`
+- `SPLIT_EQUALLY` → one row per guild in `split_guild_ids`; `floor(guild_total_cents / n)` each, with the remainder distributed one cent at a time to the first R sorted guild IDs. Admin share sits on the first row only.
+- No guild + SINGLE_GUILD → admin-only row (everything goes to admin)
+
+Guild payouts are reconciled manually via the admin Reports page; no automated Stripe Connect payouts (yet).
 
 ## Tab Flow
 
 1. Member adds payment method → `Tab.set_payment_method()` attaches to Stripe customer
-2. Entries accumulate via `Tab.add_entry()` (race-safe with `select_for_update`)
-3. `bill_tabs` management command: groups pending entries by guild → creates `TabCharge` records → calls `TabCharge.execute_stripe_charge()`
+2. Entries accumulate via `Tab.add_entry()` (race-safe with `select_for_update`). Snapshots split fields onto each entry.
+3. `bill_tabs` management command: for each tab with pending entries, creates ONE `TabCharge` with the sum of all pending amounts → calls `TabCharge.execute_stripe_charge()`
 4. Webhook handlers update charge status on Stripe events
 5. On failure: `BillingSettings.max_retry_attempts` retries, then `Tab.lock()`
+
+## Single Stripe Account
+
+All charges route through one platform Stripe account — credentials live on `BillingSettings` (encrypted). No per-guild Stripe accounts, no destination charges, no direct-keys Checkout. This was simplified in v1.5.0.
+
+**Prereq**: `Tab.can_add_entry` requires a saved payment method on file. Off-session PaymentIntents don't work without one.
 
 ## Exceptions (billing/exceptions.py)
 
@@ -29,71 +46,42 @@ Stripe tab billing system. Members accumulate charges on a tab; a management com
 
 ## Stripe Utils (billing/stripe_utils.py)
 
-Thin wrapper around stripe SDK. Key functions:
+Thin wrapper around stripe SDK. All functions use the single platform Stripe client (`_get_stripe_client()`).
+
 - `create_customer()` — creates Stripe customer
 - `attach_payment_method()` / `detach_payment_method()`
 - `retrieve_payment_method()` → `{id, last4, brand}`
-- `create_payment_intent()` — standard charge (no Connect)
-- `create_destination_payment_intent()` — Connect destination charge with application fee
+- `create_payment_intent()` — standard off-session PaymentIntent (the only charge path)
 - `create_setup_intent()` — for collecting payment method without charging
-
-## Multi-Stripe Connect
-
-Entries for products under different guilds are grouped by `StripeAccount`. If a guild has no `StripeAccount`, charge falls back to platform (no Connect).
-
-`StripeAccount.compute_fee(amount)` calculates platform fee. `TabCharge.execute_stripe_charge()` passes `application_fee_cents` when charging to a destination account.
-
-### Two auth modes
-
-`StripeAccount.auth_mode` selects how charges are routed:
-
-1. **`oauth`** — Stripe Connect destination charges. Customer + payment method live on the
-   PL platform account. `application_fee_amount` skims `platform_fee_percent` to PL.
-   Requires `STRIPE_CONNECT_CLIENT_ID` to be set on a registered Connect platform.
-2. **`direct_keys`** — Each guild's own Stripe secret/publishable/webhook keys are pasted
-   into the admin (encrypted at rest via `EncryptedCharField`/Fernet). Charges create
-   hosted **Checkout sessions** on the guild's account directly. The member opens the
-   returned `stripe_checkout_url` to pay; the per-guild webhook flips the charge to
-   SUCCEEDED on `checkout.session.completed`. **No platform fee** — `clean()` enforces
-   `platform_fee_percent == 0` in this mode. Use for consumables.
+- `construct_webhook_event()` — verify incoming Stripe webhook
+- `verify_platform_credentials()` — test a pasted platform secret key from the Settings tab
 
 ### Encryption key
 
-The Fernet encryption key (`STRIPE_FIELD_ENCRYPTION_KEY`) is the **only** Stripe-related env var the app still uses. It encrypts every secret stored in the DB — guild secret keys, guild webhook secrets, the platform secret key, and the platform webhook secret. Generate with:
+The Fernet encryption key (`STRIPE_FIELD_ENCRYPTION_KEY`) encrypts `BillingSettings.connect_platform_secret_key` and `connect_platform_webhook_secret`. Generate with:
 
 ```bash
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-Set on local, Hetzner, and Render. **Losing this key bricks all stored Stripe credentials.** Back it up to 1Password.
-
-### Stripe configuration lives in BillingSettings
-
-All other Stripe config — platform secret key, publishable key, webhook signing secret, Connect client ID, and the on/off toggle for Connect — lives in the `BillingSettings` singleton row in the database, configured via the admin Payments dashboard → **Settings** tab. No env vars. The `stripe_utils._platform_secret_key()` / `_platform_webhook_secret()` / `_connect_client_id()` helpers raise `ImproperlyConfigured` if a value is needed and unset, with a message pointing the admin to the Settings page.
-
-### Webhook URLs
-
-- `/billing/webhooks/stripe/` — global, uses `STRIPE_WEBHOOK_SECRET`. Used for OAuth/platform events.
-- `/billing/webhooks/stripe/guild/<guild_id>/` — per-guild, uses `StripeAccount.direct_webhook_secret`. Each direct-keys guild configures their own webhook in their Stripe dashboard pointing here.
+Set on local, Hetzner, and Render. **Losing this key bricks the stored Stripe credentials.**
 
 ## URLs (prefix: /billing/)
 
-- `payment-method/setup/` → `setup_payment_method` — renders Stripe Payment Element iframe
-- `api/setup-intent/` → `create_setup_intent_api` — AJAX endpoint returns client_secret
-- `payment-method/confirm/` → `confirm_setup` — confirms SetupIntent, saves PM to Tab
-- `payment-method/remove/` → `remove_payment_method`
-- `webhooks/stripe/` → `stripe_webhook` — handles payment_intent.succeeded/.payment_failed
-- `admin/dashboard/` → `admin_tab_dashboard`
-- `admin/add-entry/` → `admin_add_tab_entry`
-- `connect/initiate/<guild_id>/` / `connect/callback/` — Stripe Connect OAuth
-- `admin/direct-keys/test/` — AJAX: verify a pasted secret key (`verify_account_credentials`)
-- `admin/direct-keys/save/` — POST: persist a guild's direct-mode credentials (`upsert_direct_keys`)
-- `webhooks/stripe/guild/<guild_id>/` — per-guild webhook for direct-keys mode
+- `payment-method/setup/` → renders Stripe Payment Element iframe
+- `api/setup-intent/` → AJAX endpoint returns client_secret
+- `payment-method/confirm/` → saves PM to Tab
+- `payment-method/remove/` → detaches PM
+- `webhooks/stripe/` → handles payment_intent.succeeded/.payment_failed
+- `admin/dashboard/` → multi-tab admin payments page
+- `admin/add-entry/` → admin add-charge-to-tab
+- `admin/connect-platform/test/` → AJAX verify pasted platform secret
+- `admin/connect-platform/save/` → persist platform credentials
 
 ## Management Command
 
-`billing/management/commands/bill_tabs.py` — groups pending `TabEntry` records by guild, creates `TabCharge` per group, executes Stripe charges. Run on schedule per `BillingSettings.charge_frequency`.
+`billing/management/commands/bill_tabs.py` — creates one `TabCharge` per tab with pending entries and executes the Stripe charge. Run on schedule per `BillingSettings.charge_frequency`.
 
 ## Factories
 
-`tests/billing/factories.py` — `TabFactory`, `TabEntryFactory`, `TabChargeFactory`, `ProductFactory`, `StripeAccountFactory`, `BillingSettingsFactory`.
+`tests/billing/factories.py` — `TabFactory`, `TabEntryFactory`, `TabChargeFactory`, `ProductFactory`, `BillingSettingsFactory`.

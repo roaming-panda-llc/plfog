@@ -36,37 +36,6 @@
     </div>
 </div>
 
-{# Pending checkout — direct-keys charges awaiting member payment #}
-{% if pending_checkout_charges %}
-<div class="hub-card">
-    <h2 class="tab-section-title">Action Required — Pay Now</h2>
-    <p class="hub-text-muted" style="margin: 0 0 1rem">
-        These charges are ready to pay. Click <strong>Pay Now</strong> to open Stripe's secure checkout — money goes
-        directly to the guild that owns the items.
-    </p>
-    <div class="tab-checkout-list">
-        {% for charge in pending_checkout_charges %}
-        <div class="tab-checkout-item">
-            <div class="tab-checkout-item__info">
-                <div class="tab-checkout-item__title">
-                    {% if charge.stripe_account %}{{ charge.stripe_account.display_name }}{% else %}Past Lives{% endif %}
-                    — ${{ charge.amount }}
-                </div>
-                <div class="tab-checkout-item__meta">
-                    {{ charge.entry_count }} item{{ charge.entry_count|pluralize }} · created {{ charge.created_at|date:"M j, Y" }}
-                </div>
-            </div>
-            {% if charge.stripe_checkout_url %}
-            <a href="{{ charge.stripe_checkout_url }}" target="_blank" rel="noopener" class="tab-checkout-item__btn">
-                Pay Now →
-            </a>
-            {% endif %}
-        </div>
-        {% endfor %}
-    </div>
-</div>
-{% endif %}
-
 {# Pending entries #}
 <div class="hub-card">
     <h2 class="tab-section-title">Pending Charges</h2>

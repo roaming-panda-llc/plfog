@@ -12,9 +12,10 @@ from django.db.models import Count, Prefetch
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
-from billing.exceptions import TabLimitExceededError, TabLockedError
+from billing.exceptions import NoPaymentMethodError, TabLimitExceededError, TabLockedError
+from billing.forms import CONTEXT_MEMBER_TAB_PAGE, TabItemForm
 from billing.models import Product, Tab, TabCharge
-from hub.forms import AddTabEntryForm, BetaFeedbackForm, EmailPreferencesForm, ProfileSettingsForm, VotePreferenceForm
+from hub.forms import BetaFeedbackForm, EmailPreferencesForm, ProfileSettingsForm, VotePreferenceForm
 from membership.cycle import get_cycle_context
 from membership.models import FundingSnapshot, Guild, Member, VotePreference
 
@@ -193,13 +194,92 @@ def snapshot_detail(request: HttpRequest, pk: int) -> HttpResponse:
     return render(request, "hub/snapshot_detail.html", {**ctx, "snapshot": snapshot})
 
 
+def _handle_guild_product_add(request: HttpRequest, guild: Guild, tab: Tab) -> HttpResponse:
+    """Handle the product-card "Add to tab" button POST from /guilds/<pk>/."""
+    try:
+        if not tab.can_add_entry:
+            raise NoPaymentMethodError("You need a payment method on file before adding charges.")
+        product = guild.products.get(pk=int(request.POST["product_pk"]), is_active=True)
+        tab.add_entry(
+            description=product.name,
+            amount=product.price,
+            added_by=request.user,  # type: ignore[arg-type]
+            is_self_service=True,
+            product=product,
+        )
+        messages.success(request, f"Added {product.name} to your tab.")
+    except (Product.DoesNotExist, ValueError, KeyError):
+        messages.error(request, "Couldn't find that product.")
+    except NoPaymentMethodError:
+        messages.error(request, "You need a payment method on file before adding charges.")
+    except TabLockedError:
+        messages.error(request, "Your tab is locked. Please contact an admin.")
+    except TabLimitExceededError:
+        messages.error(request, "This item would exceed your tab limit.")
+    return redirect("hub_guild_detail", pk=guild.pk)
+
+
 @login_required
 def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
-    """Guild detail page — shows about text and active products."""
+    """Guild detail page — shows about text, active products, and the EYOP form.
+
+    Members can click "Add to tab" on a product card (POST with ``product_pk``)
+    or submit the "Enter Your Own Price" form at the bottom of the page to
+    create a custom-priced TabEntry against this guild.
+    """
+    from billing.forms import CONTEXT_MEMBER_GUILD_PAGE, TabItemForm
+
     guild = get_object_or_404(Guild, pk=pk)
     ctx = _get_hub_context(request)
     products = guild.products.filter(is_active=True).order_by("name")
-    return render(request, "hub/guild_detail.html", {**ctx, "guild": guild, "products": products})
+    member = _get_member(request)
+
+    tab: Tab | None = None
+    if member is not None:
+        tab, _created = Tab.objects.get_or_create(member=member)
+
+    eyop_form: TabItemForm | None = None
+    if request.method == "POST" and tab is not None:
+        if "product_pk" in request.POST:
+            return _handle_guild_product_add(request, guild, tab)
+
+        eyop_form = TabItemForm(
+            request.POST,
+            context=CONTEXT_MEMBER_GUILD_PAGE,
+            user=request.user,
+            guild=guild,
+        )
+        if eyop_form.is_valid():
+            try:
+                if not tab.can_add_entry:
+                    raise NoPaymentMethodError("You need a payment method on file before adding charges.")
+                eyop_form.apply_to_tab(
+                    tab,
+                    added_by=request.user,
+                    is_self_service=True,
+                )
+                messages.success(request, "Added to your tab.")
+                return redirect("hub_guild_detail", pk=guild.pk)
+            except NoPaymentMethodError:
+                messages.error(request, "You need a payment method on file before adding charges.")
+            except TabLockedError:
+                messages.error(request, "Your tab is locked. Please contact an admin.")
+            except TabLimitExceededError:
+                messages.error(request, "This item would exceed your tab limit.")
+    elif tab is not None:
+        eyop_form = TabItemForm(context=CONTEXT_MEMBER_GUILD_PAGE, user=request.user, guild=guild)
+
+    return render(
+        request,
+        "hub/guild_detail.html",
+        {
+            **ctx,
+            "guild": guild,
+            "products": products,
+            "tab": tab,
+            "eyop_form": eyop_form,
+        },
+    )
 
 
 @login_required
@@ -272,31 +352,28 @@ def tab_detail(request: HttpRequest) -> HttpResponse:
     tab, _created = Tab.objects.get_or_create(member=member)
     entries = tab.entries.pending().select_related("product__guild").order_by("-created_at")
     products = Product.objects.filter(is_active=True).select_related("guild").order_by("guild__name", "name")
-    pending_checkout_charges = (
-        tab.charges.filter(status=TabCharge.Status.PENDING_CHECKOUT)
-        .select_related("stripe_account")
-        .order_by("-created_at")
-    )
 
     if request.method == "POST":
-        form = AddTabEntryForm(request.POST)
+        form = TabItemForm(request.POST, context=CONTEXT_MEMBER_TAB_PAGE, user=request.user)
         if form.is_valid():
             try:
-                tab.add_entry(
-                    description=form.cleaned_data["description"],
-                    amount=form.cleaned_data["amount"],
+                if not tab.can_add_entry:
+                    raise NoPaymentMethodError("You need a payment method on file before adding charges.")
+                form.apply_to_tab(
+                    tab,
                     added_by=request.user,  # type: ignore[arg-type]  # @login_required guarantees User
                     is_self_service=True,
-                    product=form.cleaned_data.get("product"),
                 )
                 messages.success(request, "Item added to your tab.")
                 return redirect("hub_tab_detail")
+            except NoPaymentMethodError:
+                messages.error(request, "You need a payment method on file before adding charges.")
             except TabLockedError:
                 messages.error(request, "Your tab is locked. Please contact an admin.")
             except TabLimitExceededError:
                 messages.error(request, "This item would exceed your tab limit.")
     else:
-        form = AddTabEntryForm()
+        form = TabItemForm(context=CONTEXT_MEMBER_TAB_PAGE, user=request.user)
 
     return render(
         request,
@@ -307,7 +384,6 @@ def tab_detail(request: HttpRequest) -> HttpResponse:
             "entries": entries,
             "form": form,
             "products": products,
-            "pending_checkout_charges": pending_checkout_charges,
         },
     )
 

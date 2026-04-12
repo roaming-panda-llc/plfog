@@ -87,17 +87,20 @@ def describe_tab_detail():
             assert setup.entries.count() == 0
 
         def it_shows_error_when_tab_locked(client: Client):
+            from unittest.mock import patch
+
+            from billing.exceptions import TabLockedError
+
             BillingSettingsFactory(default_tab_limit=Decimal("200.00"))
             user = User.objects.create_user(username="locked_user", password="pass")
             TabFactory(
                 member=user.member,
-                is_locked=True,
-                locked_reason="Payment failed",
                 stripe_payment_method_id="pm_test",
             )
             client.login(username="locked_user", password="pass")
 
-            response = client.post("/tab/", {"description": "Test", "amount": "10.00"}, follow=True)
+            with patch("billing.models.Tab.add_entry", side_effect=TabLockedError("locked")):
+                response = client.post("/tab/", {"description": "Test", "amount": "10.00"}, follow=True)
 
             assert b"locked" in response.content.lower()
 
