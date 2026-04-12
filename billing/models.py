@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
+from dataclasses import dataclass
+from decimal import ROUND_HALF_UP, Decimal
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
@@ -19,6 +20,23 @@ from .fields import EncryptedCharField
 if TYPE_CHECKING:
     import stripe as _stripe
     from django.contrib.auth.models import User
+
+    from membership.models import Guild
+
+
+_CENTS = Decimal("0.01")
+_ZERO = Decimal("0.00")
+_HUNDRED = Decimal("100")
+
+
+@dataclass(frozen=True)
+class EntrySplit:
+    """One row of a TabEntry's revenue breakdown — see TabEntry.compute_splits()."""
+
+    guild_id: int | None
+    admin_amount: Decimal
+    guild_amount: Decimal
+    is_admin_only: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -553,16 +571,49 @@ class Tab(models.Model):
         added_by: User | None = None,
         is_self_service: bool = False,
         product: Product | None = None,
+        guild: Guild | None = None,
+        admin_percent: Decimal | None = None,
+        split_mode: str | None = None,
     ) -> TabEntry:
         """Add a line item to this tab with race-condition protection.
 
         Uses select_for_update() inside transaction.atomic() to prevent
-        concurrent requests from both passing the limit check.
+        concurrent requests from both passing the limit check. Snapshots the
+        revenue split (guild, admin_percent, split_mode, split_guild_ids) onto
+        the entry at creation time so historical reports stay stable when
+        Product config or guild activation changes later.
+
+        Resolution order for each split field:
+          - guild: explicit `guild` kwarg > product.guild > None
+          - admin_percent: explicit kwarg > product.admin_percent_override > site default
+          - split_mode: explicit kwarg > product.split_mode > SINGLE_GUILD
 
         Raises:
             TabLockedError: If the tab is locked.
             TabLimitExceededError: If the entry would exceed the tab limit.
         """
+        from membership.models import Guild as _Guild
+
+        # Resolve snapshot fields outside the lock — these don't depend on the tab
+        resolved_guild = guild if guild is not None else (product.guild if product else None)
+        if admin_percent is not None:
+            resolved_percent = admin_percent
+        elif product is not None and product.admin_percent_override is not None:
+            resolved_percent = product.admin_percent_override
+        else:
+            resolved_percent = BillingSettings.load().default_admin_percent
+
+        resolved_split_mode = split_mode or (
+            product.split_mode if product else Product.SplitMode.SINGLE_GUILD
+        )
+
+        if resolved_split_mode == Product.SplitMode.SPLIT_EQUALLY:
+            resolved_split_guild_ids = list(
+                _Guild.objects.order_by("pk").values_list("pk", flat=True)
+            )
+        else:
+            resolved_split_guild_ids = []
+
         with transaction.atomic():
             # Lock this tab row for the duration of the transaction
             locked_self = Tab.objects.select_for_update().get(pk=self.pk)
@@ -585,6 +636,10 @@ class Tab(models.Model):
                 added_by=added_by,
                 is_self_service=is_self_service,
                 product=product,
+                guild=resolved_guild,
+                admin_percent=resolved_percent,
+                split_mode=resolved_split_mode,
+                split_guild_ids=resolved_split_guild_ids,
             )
 
     def lock(self, reason: str) -> None:
@@ -716,8 +771,6 @@ class TabEntry(models.Model):
     admin_percent = models.DecimalField(
         max_digits=5,
         decimal_places=2,
-        null=True,  # tightened in migration 0007 once Tab.add_entry is updated to populate it
-        blank=True,
         validators=[MinValueValidator(Decimal("0")), MaxValueValidator(Decimal("100"))],
         help_text=(
             "Admin percentage applied to this entry at the time it was created. "
@@ -823,6 +876,73 @@ class TabEntry(models.Model):
         self.voided_by = user
         self.voided_reason = reason
         self.save(update_fields=["voided_at", "voided_by", "voided_reason"])
+
+    def compute_splits(self) -> list[EntrySplit]:
+        """Return the per-guild breakdown for this entry.
+
+        Rules:
+          - admin_share = round(amount * admin_percent / 100, 2) (ROUND_HALF_UP)
+          - guild_total = amount - admin_share  (eliminates rounding drift)
+          - SINGLE_GUILD → one EntrySplit for self.guild with (admin_share, guild_total)
+          - SINGLE_GUILD with self.guild is None → one admin-only row (everything to admin)
+          - SPLIT_EQUALLY → one row per id in sorted(self.split_guild_ids):
+              * each guild gets floor(guild_total_cents / n) cents
+              * the remainder (guild_total_cents % n) is distributed one cent at a
+                time to the first R sorted guild IDs (stable, deterministic)
+              * admin_amount is placed on the FIRST row only; remaining rows have 0
+          - SPLIT_EQUALLY with empty split_guild_ids → falls back to admin-only
+        """
+        admin_percent = self.admin_percent or _ZERO
+        admin_share = (self.amount * admin_percent / _HUNDRED).quantize(
+            _CENTS, rounding=ROUND_HALF_UP
+        )
+        guild_total = self.amount - admin_share
+
+        if self.split_mode == Product.SplitMode.SINGLE_GUILD:
+            if self.guild_id is None:
+                # Unattributed — everything goes to admin
+                return [
+                    EntrySplit(
+                        guild_id=None,
+                        admin_amount=self.amount,
+                        guild_amount=_ZERO,
+                        is_admin_only=True,
+                    )
+                ]
+            return [
+                EntrySplit(
+                    guild_id=self.guild_id,
+                    admin_amount=admin_share,
+                    guild_amount=guild_total,
+                )
+            ]
+
+        # SPLIT_EQUALLY
+        ids = sorted(self.split_guild_ids or [])
+        if not ids:
+            return [
+                EntrySplit(
+                    guild_id=None,
+                    admin_amount=self.amount,
+                    guild_amount=_ZERO,
+                    is_admin_only=True,
+                )
+            ]
+
+        total_cents = int((guild_total * _HUNDRED).to_integral_value(rounding=ROUND_HALF_UP))
+        n = len(ids)
+        base_cents, remainder = divmod(total_cents, n)
+        splits: list[EntrySplit] = []
+        for i, gid in enumerate(ids):
+            g_cents = base_cents + (1 if i < remainder else 0)
+            splits.append(
+                EntrySplit(
+                    guild_id=gid,
+                    admin_amount=admin_share if i == 0 else _ZERO,
+                    guild_amount=(Decimal(g_cents) / _HUNDRED).quantize(_CENTS),
+                )
+            )
+        return splits
 
 
 # ---------------------------------------------------------------------------
