@@ -38,6 +38,13 @@
         <div class="guild-product-card">
             <div class="guild-product-card__name">{{ product.name }}</div>
             <div class="guild-product-card__price">${{ product.price }}</div>
+            {% if tab and tab.can_add_entry %}
+            <form method="post" class="guild-product-card__add-form">
+                {% csrf_token %}
+                <input type="hidden" name="product_pk" value="{{ product.pk }}">
+                <button type="submit" class="guild-product-card__add-btn">Add to tab</button>
+            </form>
+            {% endif %}
         </div>
         {% endfor %}
     </div>
@@ -45,4 +52,61 @@
     <p class="hub-text-muted">No products listed yet.</p>
     {% endif %}
 </div>
+
+{% if eyop_form %}
+<div class="hub-card" style="margin-top:1.5rem;">
+    <h3 class="hub-detail-label" style="margin-bottom:0.5rem;">Enter Your Own Price</h3>
+    <p class="hub-text-muted" style="margin: 0 0 1rem; font-size: 0.875rem;">
+        Add a custom item to your tab for this guild — name it, set the price, submit.
+    </p>
+    {% if not tab %}
+        <p class="hub-text-muted">Link your account to a membership to add items.</p>
+    {% elif not tab.can_add_entry %}
+        {% if tab.is_locked %}
+        <p class="hub-text-muted">Your tab is locked. Contact an admin.</p>
+        {% else %}
+        <p class="hub-text-muted">
+            You need a saved payment method before you can add items.
+            <a href="{% url 'billing_setup_payment_method' %}">Add a card →</a>
+        </p>
+        {% endif %}
+    {% else %}
+    <form method="post" class="tab-add-form">
+        {% csrf_token %}
+        <div class="tab-add-form__fields">
+            <div class="tab-add-form__field">
+                <label for="{{ eyop_form.description.id_for_label }}">{{ eyop_form.description.label }}</label>
+                {{ eyop_form.description }}
+                {% if eyop_form.description.errors %}
+                <span class="tab-form-error">{{ eyop_form.description.errors.0 }}</span>
+                {% endif %}
+            </div>
+            <div class="tab-add-form__field tab-add-form__field--amount">
+                <label for="{{ eyop_form.amount.id_for_label }}">{{ eyop_form.amount.label }}</label>
+                {{ eyop_form.amount }}
+                {% if eyop_form.amount.errors %}
+                <span class="tab-form-error">{{ eyop_form.amount.errors.0 }}</span>
+                {% endif %}
+            </div>
+            {% if not eyop_form.admin_percent.field.disabled %}
+            <div class="tab-add-form__field tab-add-form__field--amount">
+                <label for="{{ eyop_form.admin_percent.id_for_label }}">{{ eyop_form.admin_percent.label }}</label>
+                {{ eyop_form.admin_percent }}
+            </div>
+            <div class="tab-add-form__field" style="flex:1 1 100%;">
+                <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.8rem;color:var(--hub-text-muted);">
+                    {{ eyop_form.split_equally }}
+                    {{ eyop_form.split_equally.label }}
+                </label>
+            </div>
+            {% endif %}
+            <button type="submit" class="tab-add-form__btn">Add Item</button>
+        </div>
+        {% if eyop_form.non_field_errors %}
+        <div class="tab-form-error" style="margin-top:0.5rem;">{{ eyop_form.non_field_errors.0 }}</div>
+        {% endif %}
+    </form>
+    {% endif %}
+</div>
+{% endif %}
 {% endblock %}
