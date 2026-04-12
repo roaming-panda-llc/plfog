@@ -109,22 +109,13 @@
         {% csrf_token %}
         <div class="tab-add-form__fields">
             <div class="tab-add-form__field">
-                <label for="id_product">{{ form.product.label }}</label>
-                {{ form.product }}
+                {% include "components/form_field.html" with field=form.product %}
             </div>
             <div class="tab-add-form__field">
-                <label for="id_description">{{ form.description.label }}</label>
-                {{ form.description }}
-                {% if form.description.errors %}
-                <span class="tab-form-error">{{ form.description.errors.0 }}</span>
-                {% endif %}
+                {% include "components/form_field.html" with field=form.description %}
             </div>
             <div class="tab-add-form__field tab-add-form__field--amount">
-                <label for="id_amount">{{ form.amount.label }}</label>
-                {{ form.amount }}
-                {% if form.amount.errors %}
-                <span class="tab-form-error">{{ form.amount.errors.0 }}</span>
-                {% endif %}
+                {% include "components/form_field.html" with field=form.amount %}
             </div>
             <button type="submit" class="tab-add-form__btn">Add Item</button>
         </div>
