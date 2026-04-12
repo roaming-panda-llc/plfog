@@ -11,10 +11,13 @@ from billing.models import BillingSettings, Product
 from membership.models import Guild, Member
 
 if TYPE_CHECKING:
-    from django.contrib.auth.models import User
+    from django.contrib.auth.base_user import AbstractBaseUser
+    from django.contrib.auth.models import AnonymousUser
 
     from billing.exceptions import TabLimitExceededError, TabLockedError  # noqa: F401
     from billing.models import Tab, TabEntry
+
+    UserLike = AbstractBaseUser | AnonymousUser | None
 
 
 # Context values used by TabItemForm to select field set + editability.
@@ -29,11 +32,11 @@ VALID_CONTEXTS = {
 }
 
 
-def _user_can_edit_split(user: User | None) -> bool:
+def _user_can_edit_split(user: UserLike) -> bool:
     """True if user is a guild officer, fog admin, or Django superuser."""
     if user is None:
         return False
-    if user.is_superuser:
+    if getattr(user, "is_superuser", False):
         return True
     member = getattr(user, "member", None)
     if member is None:
@@ -90,7 +93,7 @@ class TabItemForm(forms.Form):
         self,
         *args: Any,
         context: str,
-        user: User | None = None,
+        user: "UserLike" = None,
         guild: Guild | None = None,
         **kwargs: Any,
     ) -> None:
@@ -155,9 +158,7 @@ class TabItemForm(forms.Form):
         if self.context == CONTEXT_MEMBER_GUILD_PAGE:
             return
         if not cleaned.get("description") or not cleaned.get("amount"):
-            raise forms.ValidationError(
-                "Either select a product or enter a description and amount."
-            )
+            raise forms.ValidationError("Either select a product or enter a description and amount.")
 
     def _resolve_guild(self, cleaned: dict[str, Any], product: Product | None) -> None:
         if self.context == CONTEXT_MEMBER_GUILD_PAGE:
@@ -179,8 +180,10 @@ class TabItemForm(forms.Form):
     @staticmethod
     def _resolve_admin_percent(cleaned: dict[str, Any], product: Product | None) -> Decimal:
         submitted = cleaned.get("admin_percent")
-        if submitted not in (None, ""):
+        if isinstance(submitted, Decimal):
             return submitted
+        if submitted not in (None, ""):
+            return Decimal(str(submitted))
         if product is not None and product.admin_percent_override is not None:
             return product.admin_percent_override
         return BillingSettings.load().default_admin_percent
@@ -189,7 +192,7 @@ class TabItemForm(forms.Form):
         self,
         tab: Tab,
         *,
-        added_by: User | None,
+        added_by: "UserLike",
         is_self_service: bool,
     ) -> TabEntry:
         """Add the entry to the tab using ``Tab.add_entry`` with the resolved kwargs.
@@ -201,7 +204,7 @@ class TabItemForm(forms.Form):
         return tab.add_entry(
             description=self.cleaned_data["description"],
             amount=self.cleaned_data["amount"],
-            added_by=added_by,
+            added_by=added_by,  # type: ignore[arg-type]  # views gate on @login_required
             is_self_service=is_self_service,
             product=self.cleaned_data.get("product"),
             guild=self.cleaned_data.get("guild"),

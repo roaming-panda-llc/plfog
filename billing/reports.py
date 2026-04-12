@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import date as date_cls
 from datetime import datetime
 from decimal import Decimal
-from typing import Iterator
+from typing import TYPE_CHECKING, Any, Iterator
 
 from django.db.models import Q, QuerySet
 from django.http import StreamingHttpResponse
@@ -22,6 +22,9 @@ from django.utils import timezone
 
 from billing.models import Product, TabCharge, TabEntry
 from membership.models import Guild
+
+if TYPE_CHECKING:
+    from django.http.request import QueryDict  # noqa: F401
 
 _ZERO = Decimal("0.00")
 
@@ -74,10 +77,7 @@ def _base_entries(
         # Match entries whose snapshot guild is in the requested set OR any
         # SPLIT_EQUALLY entry (we filter the individual splits in Python below
         # since JSONField contains semantics vary by backend).
-        qs = qs.filter(
-            Q(guild_id__in=guild_ids)
-            | Q(split_mode=Product.SplitMode.SPLIT_EQUALLY)
-        )
+        qs = qs.filter(Q(guild_id__in=guild_ids) | Q(split_mode=Product.SplitMode.SPLIT_EQUALLY))
 
     if charge_types:
         has_product = "product" in charge_types
@@ -140,7 +140,8 @@ def build_report(
 
     for entry in qs.iterator(chunk_size=500):
         splits = entry.compute_splits()
-        charge_status = entry.tab_charge.status if entry.tab_charge_id else "pending"
+        tab_charge = entry.tab_charge  # narrowed local so mypy sees the None check
+        charge_status = tab_charge.status if tab_charge is not None else "pending"
         charge_type = "product" if entry.product_id else "custom"
 
         for split in splits:
@@ -149,9 +150,7 @@ def build_report(
                 continue
 
             gname = (
-                name_cache.get(split.guild_id, "— unattributed —")
-                if split.guild_id is not None
-                else "— unattributed —"
+                name_cache.get(split.guild_id, "— unattributed —") if split.guild_id is not None else "— unattributed —"
             )
             rows.append(
                 ReportRow(
@@ -269,10 +268,10 @@ class ReportFilterForm:
     a real form for that.
     """
 
-    def __init__(self, data):
-        self.data = data or {}
+    def __init__(self, data: "QueryDict | dict[str, Any] | None") -> None:
+        self.data: Any = data if data is not None else {}
 
-    def filter_kwargs(self) -> dict:
+    def filter_kwargs(self) -> dict[str, Any]:
         return {
             "start_date": self._parse_date("start_date"),
             "end_date": self._parse_date("end_date"),

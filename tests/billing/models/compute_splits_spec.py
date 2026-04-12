@@ -110,9 +110,7 @@ def describe_compute_splits():
                 assert split.admin_amount == Decimal("0.00")
                 assert split.guild_amount == Decimal("2.00")
             # Sum reconciles to the entry amount
-            total = sum(
-                (s.admin_amount + s.guild_amount for s in splits), Decimal("0.00")
-            )
+            total = sum((s.admin_amount + s.guild_amount for s in splits), Decimal("0.00"))
             assert total == Decimal("10.00")
 
         def it_pins_remainder_allocation_for_10_dollars_0_percent_3_guilds():
@@ -158,9 +156,7 @@ def describe_compute_splits():
             assert splits[1].guild_amount == Decimal("2.23")
             assert splits[2].admin_amount == Decimal("0.00")
             assert splits[2].guild_amount == Decimal("2.23")
-            total = sum(
-                (s.admin_amount + s.guild_amount for s in splits), Decimal("0.00")
-            )
+            total = sum((s.admin_amount + s.guild_amount for s in splits), Decimal("0.00"))
             assert total == Decimal("10.00")
 
         def it_falls_back_to_admin_only_when_snapshot_is_empty():
@@ -211,12 +207,8 @@ def describe_Tab_add_entry_snapshots():
         from billing.models import Product
         from tests.billing.factories import ProductFactory
 
-        product = ProductFactory(
-            price=Decimal("12.00"), admin_percent_override=Decimal("50.00")
-        )
-        entry = tab.add_entry(
-            description=product.name, amount=product.price, product=product
-        )
+        product = ProductFactory(price=Decimal("12.00"), admin_percent_override=Decimal("50.00"))
+        entry = tab.add_entry(description=product.name, amount=product.price, product=product)
         assert entry.admin_percent == Decimal("50.00")
         assert entry.guild_id == product.guild_id
         assert entry.split_mode == Product.SplitMode.SINGLE_GUILD
@@ -228,14 +220,10 @@ def describe_Tab_add_entry_snapshots():
 
         other_guilds = [GuildFactory() for _ in range(2)]
         product = ProductFactory(split_mode=Product.SplitMode.SPLIT_EQUALLY)
-        entry = tab.add_entry(
-            description=product.name, amount=product.price, product=product
-        )
+        entry = tab.add_entry(description=product.name, amount=product.price, product=product)
         assert entry.split_mode == Product.SplitMode.SPLIT_EQUALLY
         # Snapshot includes the product's guild + the two new ones
-        expected_ids = sorted(
-            [product.guild_id] + [g.pk for g in other_guilds]
-        )
+        expected_ids = sorted([product.guild_id] + [g.pk for g in other_guilds])
         assert sorted(entry.split_guild_ids) == expected_ids
 
     def it_does_not_retroactively_affect_existing_entries(tab):
@@ -245,9 +233,7 @@ def describe_Tab_add_entry_snapshots():
         from tests.membership.factories import GuildFactory
 
         product = ProductFactory(split_mode=Product.SplitMode.SPLIT_EQUALLY)
-        entry = tab.add_entry(
-            description=product.name, amount=product.price, product=product
-        )
+        entry = tab.add_entry(description=product.name, amount=product.price, product=product)
         snapshot = list(entry.split_guild_ids)
         GuildFactory()  # new guild after the fact
         entry.refresh_from_db()

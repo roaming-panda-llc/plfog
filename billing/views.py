@@ -10,7 +10,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.db.models import DecimalField, Sum, Value
 from django.db.models.functions import Coalesce
-from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -435,7 +435,7 @@ def admin_reports(request: HttpRequest) -> HttpResponse:
 
 
 @staff_member_required
-def admin_reports_csv(request: HttpRequest) -> HttpResponse:
+def admin_reports_csv(request: HttpRequest) -> StreamingHttpResponse:
     """Streaming CSV download for the reports page, same filters via GET."""
     from billing.reports import ReportFilterForm, stream_report_csv
 

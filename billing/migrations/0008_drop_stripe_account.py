@@ -7,16 +7,18 @@ their stripe_account_id nulled before the field is removed.
 
 from __future__ import annotations
 
+from typing import Any
+
 from django.db import migrations, models
 
 
-def null_stripe_account_fks(apps, schema_editor):
+def null_stripe_account_fks(apps: Any, schema_editor: Any) -> None:
     """Defensive: null out any TabCharge.stripe_account references before drop."""
     TabCharge = apps.get_model("billing", "TabCharge")
     TabCharge.objects.filter(stripe_account__isnull=False).update(stripe_account=None)
 
 
-def reverse_noop(apps, schema_editor):
+def reverse_noop(apps: Any, schema_editor: Any) -> None:
     """No-op reverse — StripeAccount is gone for good."""
 
 

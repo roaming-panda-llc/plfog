@@ -409,14 +409,10 @@ class Tab(models.Model):
         else:
             resolved_percent = BillingSettings.load().default_admin_percent
 
-        resolved_split_mode = split_mode or (
-            product.split_mode if product else Product.SplitMode.SINGLE_GUILD
-        )
+        resolved_split_mode = split_mode or (product.split_mode if product else Product.SplitMode.SINGLE_GUILD)
 
         if resolved_split_mode == Product.SplitMode.SPLIT_EQUALLY:
-            resolved_split_guild_ids = list(
-                _Guild.objects.order_by("pk").values_list("pk", flat=True)
-            )
+            resolved_split_guild_ids = list(_Guild.objects.order_by("pk").values_list("pk", flat=True))
         else:
             resolved_split_guild_ids = []
 
@@ -595,10 +591,7 @@ class TabEntry(models.Model):
         null=True,
         blank=True,
         related_name="tab_entries",
-        help_text=(
-            "Owning guild for this entry, snapshotted at creation time. "
-            "Null for manual/unattributed entries."
-        ),
+        help_text=("Owning guild for this entry, snapshotted at creation time. Null for manual/unattributed entries."),
     )
     split_guild_ids = models.JSONField(
         default=list,
@@ -699,9 +692,7 @@ class TabEntry(models.Model):
           - SPLIT_EQUALLY with empty split_guild_ids → falls back to admin-only
         """
         admin_percent = self.admin_percent or _ZERO
-        admin_share = (self.amount * admin_percent / _HUNDRED).quantize(
-            _CENTS, rounding=ROUND_HALF_UP
-        )
+        admin_share = (self.amount * admin_percent / _HUNDRED).quantize(_CENTS, rounding=ROUND_HALF_UP)
         guild_total = self.amount - admin_share
 
         if self.split_mode == Product.SplitMode.SINGLE_GUILD:

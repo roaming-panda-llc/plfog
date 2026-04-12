@@ -2,9 +2,25 @@
 
 from __future__ import annotations
 
-VERSION = "1.4.1"
+VERSION = "1.5.0"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.5.0",
+        "date": "2026-04-11",
+        "title": "Single Stripe Account, Revenue Splits & Reports",
+        "changes": [
+            "Billing now runs through a single Past Lives Stripe account — each guild no longer links its own account separately",
+            "Every charge has a configurable admin/guild percentage split (20% / 80% by default) — set site-wide or per-product",
+            "New 'split equally across all guilds' option on any product or custom charge — the guild share gets divided evenly between active guilds",
+            "New 'Enter Your Own Price' form on every guild page — add a custom-price item to your tab without an officer creating a product first",
+            "Guild product cards now have an 'Add to tab' button so members can add items in one click from the guild page",
+            "New admin Reports page (Payments → Reports) with date/guild/status filters and CSV export — shows exactly how much to pay each guild",
+            "Product editor on the admin now includes admin % and split-mode controls for officers",
+            "Saved card required again for tab entries (the direct-keys Checkout flow is gone)",
+            "Cleanup: removed Stripe Connect OAuth flow, per-guild direct-keys management, and per-guild webhook endpoints — they're no longer needed",
+        ],
+    },
     {
         "version": "1.4.1",
         "date": "2026-04-11",

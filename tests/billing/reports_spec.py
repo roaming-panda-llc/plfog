@@ -109,9 +109,7 @@ def describe_build_report():
         TabEntryFactory.__qualname__  # silence
         from billing.models import TabEntry
 
-        TabEntry.objects.filter(pk=old.pk).update(
-            created_at=timezone.now() - timedelta(days=10)
-        )
+        TabEntry.objects.filter(pk=old.pk).update(created_at=timezone.now() - timedelta(days=10))
         TabEntryFactory(
             tab=tab,
             amount=Decimal("7.00"),

@@ -234,6 +234,7 @@ def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
     if member is not None:
         tab, _created = Tab.objects.get_or_create(member=member)
 
+    eyop_form: TabItemForm | None = None
     if request.method == "POST" and tab is not None:
         if "product_pk" in request.POST:
             return _handle_guild_product_add(request, guild, tab)
@@ -248,7 +249,7 @@ def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
             try:
                 eyop_form.apply_to_tab(
                     tab,
-                    added_by=request.user,  # type: ignore[arg-type]
+                    added_by=request.user,
                     is_self_service=True,
                 )
                 messages.success(request, "Added to your tab.")
@@ -257,12 +258,8 @@ def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
                 messages.error(request, "Your tab is locked. Please contact an admin.")
             except TabLimitExceededError:
                 messages.error(request, "This item would exceed your tab limit.")
-    else:
-        eyop_form = (
-            TabItemForm(context=CONTEXT_MEMBER_GUILD_PAGE, user=request.user, guild=guild)
-            if tab is not None
-            else None
-        )
+    elif tab is not None:
+        eyop_form = TabItemForm(context=CONTEXT_MEMBER_GUILD_PAGE, user=request.user, guild=guild)
 
     return render(
         request,
