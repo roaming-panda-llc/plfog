@@ -179,13 +179,11 @@ def describe_admin_tab_dashboard_extended():
 
     def it_provides_stripe_context(client: Client):
         _create_superuser(client)
-        from tests.billing.factories import ProductFactory, StripeAccountFactory
+        from tests.billing.factories import ProductFactory
 
-        StripeAccountFactory()
         ProductFactory()
 
         response = client.get("/billing/admin/dashboard/?tab=stripe")
-        assert "stripe_accounts" in response.context
         assert "products" in response.context
         assert "guilds" in response.context
 
@@ -329,7 +327,6 @@ def describe_billing_admin_retry_charge():
             tab=tab,
             status=TabCharge.Status.FAILED,
             amount=Decimal("25.00"),
-            stripe_account=None,
         )
 
         mock_result = {"id": "pi_test123", "charge_id": "ch_test123", "receipt_url": "https://receipt.test"}
@@ -342,27 +339,6 @@ def describe_billing_admin_retry_charge():
         assert charge.status == TabCharge.Status.SUCCEEDED
         assert charge.stripe_payment_intent_id == "pi_test123"
 
-    def it_succeeds_destination_charge_when_stripe_account_present(client: Client):
-        _create_superuser(client)
-        from tests.billing.factories import StripeAccountFactory
-
-        stripe_acct = StripeAccountFactory(stripe_account_id="acct_test")
-        tab = TabFactory(stripe_customer_id="cus_test", stripe_payment_method_id="pm_test")
-        charge = TabChargeFactory(
-            tab=tab,
-            status=TabCharge.Status.FAILED,
-            amount=Decimal("50.00"),
-            stripe_account=stripe_acct,
-            application_fee=Decimal("2.50"),
-        )
-
-        mock_result = {"id": "pi_dest123", "charge_id": "ch_dest123", "receipt_url": "https://receipt.dest"}
-        with patch("billing.views.stripe_utils.create_destination_payment_intent", return_value=mock_result):
-            response = client.post(f"/billing/admin/retry-charge/{charge.pk}/")
-
-        assert response.status_code == 200
-        assert response.json()["status"] == "succeeded"
-
     def it_returns_failed_json_when_stripe_raises(client: Client):
         _create_superuser(client)
         tab = TabFactory(stripe_customer_id="cus_test", stripe_payment_method_id="pm_test")
@@ -370,7 +346,6 @@ def describe_billing_admin_retry_charge():
             tab=tab,
             status=TabCharge.Status.FAILED,
             amount=Decimal("25.00"),
-            stripe_account=None,
         )
 
         with patch("billing.views.stripe_utils.create_payment_intent", side_effect=Exception("Card declined")):

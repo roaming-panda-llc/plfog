@@ -19,7 +19,7 @@ from django.views.decorators.http import require_POST
 from billing import stripe_utils, webhook_handlers
 from billing.exceptions import TabLimitExceededError, TabLockedError
 from billing.forms import AdminAddTabEntryForm
-from billing.models import BillingSettings, StripeAccount, Tab, TabCharge, TabEntry
+from billing.models import BillingSettings, Tab, TabCharge, TabEntry
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +143,7 @@ def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
     """Admin payments dashboard — five-tab view of billing data."""
     from django.contrib import admin as django_admin
     from billing.forms import AdminAddTabEntryForm, BillingSettingsForm
-    from billing.models import BillingSettings, Product, StripeAccount
+    from billing.models import BillingSettings, Product
     from membership.models import Guild
 
     active_tab = request.GET.get("tab", "overview")
@@ -200,15 +200,13 @@ def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
     # --- History tab ---
     charge_status_filter = request.GET.get("status", "all")
     if charge_status_filter == "succeeded":
-        history_charges = TabCharge.objects.succeeded().select_related("tab__member", "stripe_account")
+        history_charges = TabCharge.objects.succeeded().select_related("tab__member")
     elif charge_status_filter == "failed":
-        history_charges = TabCharge.objects.failed().select_related("tab__member", "stripe_account")
+        history_charges = TabCharge.objects.failed().select_related("tab__member")
     elif charge_status_filter == "needs_retry":
-        history_charges = TabCharge.objects.needs_retry().select_related("tab__member", "stripe_account")
+        history_charges = TabCharge.objects.needs_retry().select_related("tab__member")
     else:
-        history_charges = TabCharge.objects.exclude(status=TabCharge.Status.PENDING).select_related(
-            "tab__member", "stripe_account"
-        )
+        history_charges = TabCharge.objects.exclude(status=TabCharge.Status.PENDING).select_related("tab__member")
     history_charges = history_charges.order_by("-created_at")
 
     history_collected = TabCharge.objects.filter(
@@ -239,8 +237,7 @@ def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
     settings_form = BillingSettingsForm(instance=settings_obj)
     connect_platform_form = ConnectPlatformSettingsForm(instance=settings_obj)
 
-    # --- Stripe tab ---
-    stripe_accounts = StripeAccount.objects.select_related("guild").order_by("display_name")
+    # --- Stripe tab (Settings tab since v1.5.0 — single platform account) ---
     products = Product.objects.select_related("guild").order_by("guild__name", "name")
     guilds = Guild.objects.filter(is_active=True).order_by("name")
 
@@ -270,8 +267,7 @@ def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
         "settings_form": settings_form,
         "connect_platform_form": connect_platform_form,
         "billing_settings": settings_obj,
-        # Stripe
-        "stripe_accounts": stripe_accounts,
+        # Stripe (platform settings + product overview)
         "products": products,
         "guilds": guilds,
         # Shared
@@ -392,7 +388,7 @@ def billing_admin_retry_charge(request: HttpRequest, charge_pk: int) -> JsonResp
     import uuid as _uuid
 
     try:
-        charge = TabCharge.objects.select_related("tab", "stripe_account").get(pk=charge_pk)
+        charge = TabCharge.objects.select_related("tab").get(pk=charge_pk)
     except TabCharge.DoesNotExist:
         from django.http import Http404
 
@@ -407,19 +403,12 @@ def billing_admin_retry_charge(request: HttpRequest, charge_pk: int) -> JsonResp
 
 
 @staff_member_required
-def initiate_connect(request: HttpRequest, guild_id: int) -> HttpResponse:
-    """Redirect admin to Stripe Connect OAuth to link a guild's account."""
-    url = stripe_utils.get_connect_oauth_url(state=str(guild_id))
-    return redirect(url)
-
-
-@staff_member_required
 @require_POST
 def billing_test_platform_connection(request: HttpRequest) -> JsonResponse:
-    """AJAX: verify a candidate Stripe Connect platform secret key.
+    """AJAX: verify a candidate platform Stripe secret key.
 
-    Mirrors `billing_test_direct_keys` but for the platform key instead of a
-    per-guild key. Always returns 200 so the frontend can render inline.
+    Used by the "Test connection" button on the Settings tab. Always returns
+    200 so the frontend can render results inline.
     """
     secret_key = request.POST.get("secret_key", "").strip()
     if not secret_key:
@@ -427,7 +416,7 @@ def billing_test_platform_connection(request: HttpRequest) -> JsonResponse:
     if not (secret_key.startswith("sk_test_") or secret_key.startswith("sk_live_") or secret_key.startswith("rk_")):
         return JsonResponse({"ok": False, "error": "Key must start with sk_test_, sk_live_, or rk_."})
     try:
-        result = stripe_utils.verify_account_credentials(secret_key)
+        result = stripe_utils.verify_platform_credentials(secret_key)
     except Exception as exc:
         return JsonResponse({"ok": False, "error": f"Stripe rejected the key: {exc}"})
     return JsonResponse({"ok": True, **result})
@@ -436,166 +425,16 @@ def billing_test_platform_connection(request: HttpRequest) -> JsonResponse:
 @staff_member_required
 @require_POST
 def billing_save_connect_platform(request: HttpRequest) -> HttpResponse:
-    """Save the Stripe Connect platform credentials to BillingSettings."""
+    """Save the platform Stripe credentials to BillingSettings."""
     from billing.forms import ConnectPlatformSettingsForm
 
     settings_obj = BillingSettings.load()
     form = ConnectPlatformSettingsForm(request.POST, instance=settings_obj)
     if form.is_valid():
         form.save()
-        django_messages.success(request, "Stripe Connect platform settings saved.")
+        django_messages.success(request, "Stripe platform settings saved.")
     else:
         for field, errors in form.errors.items():
             for error in errors:
                 django_messages.error(request, f"{field}: {error}")
     return redirect("/billing/admin/dashboard/?tab=settings")
-
-
-@staff_member_required
-@require_POST
-def billing_test_direct_keys(request: HttpRequest) -> JsonResponse:
-    """AJAX: verify a pasted Stripe secret key by calling accounts.retrieve('self').
-
-    Returns 200 with `{ok: true, stripe_account_id, display_name, charges_enabled}`
-    on success, or 200 with `{ok: false, error}` on failure (always 200 so the
-    frontend can render the message inline).
-    """
-    secret_key = request.POST.get("secret_key", "").strip()
-    if not secret_key:
-        return JsonResponse({"ok": False, "error": "Secret key is required."})
-    if not (secret_key.startswith("sk_test_") or secret_key.startswith("sk_live_") or secret_key.startswith("rk_")):
-        return JsonResponse({"ok": False, "error": "Key must start with sk_test_, sk_live_, or rk_."})
-    try:
-        result = stripe_utils.verify_account_credentials(secret_key)
-    except Exception as exc:
-        return JsonResponse({"ok": False, "error": f"Stripe rejected the key: {exc}"})
-    return JsonResponse({"ok": True, **result})
-
-
-@staff_member_required
-@require_POST
-def billing_save_direct_keys(request: HttpRequest) -> HttpResponse:
-    """Save (or update) a guild's direct-keys Stripe credentials."""
-    from membership.models import Guild
-
-    try:
-        guild_id = int(request.POST["guild_id"])
-    except (KeyError, ValueError):
-        django_messages.error(request, "Guild is required.")
-        return redirect("/billing/admin/dashboard/?tab=stripe")
-
-    secret_key = request.POST.get("secret_key", "").strip()
-    publishable_key = request.POST.get("publishable_key", "").strip()
-    webhook_secret = request.POST.get("webhook_secret", "").strip()
-
-    if not secret_key or not publishable_key:
-        django_messages.error(request, "Secret key and publishable key are both required.")
-        return redirect("/billing/admin/dashboard/?tab=stripe")
-
-    try:
-        verified = stripe_utils.verify_account_credentials(secret_key)
-    except Exception as exc:
-        django_messages.error(request, f"Could not verify the secret key: {exc}")
-        return redirect("/billing/admin/dashboard/?tab=stripe")
-
-    try:
-        guild = Guild.objects.get(pk=guild_id)
-    except Guild.DoesNotExist:
-        django_messages.error(request, "Guild not found.")
-        return redirect("/billing/admin/dashboard/?tab=stripe")
-
-    StripeAccount.upsert_direct_keys(
-        guild,
-        stripe_account_id=verified["stripe_account_id"],
-        display_name=verified["display_name"] or guild.name,
-        secret_key=secret_key,
-        publishable_key=publishable_key,
-        webhook_secret=webhook_secret,
-    )
-    if webhook_secret:
-        django_messages.success(
-            request,
-            f"Connected {guild.name} via direct API keys ({verified['stripe_account_id']}).",
-        )
-    else:
-        django_messages.success(
-            request,
-            (
-                f"Saved API keys for {guild.name}. Now go to the Stripe dashboard for this account, "
-                "create a webhook pointing at /billing/webhooks/stripe/guild/"
-                f"{guild.pk}/, then come back and paste the signing secret."
-            ),
-        )
-    return redirect("/billing/admin/dashboard/?tab=stripe")
-
-
-@csrf_exempt
-@require_POST
-def stripe_webhook_for_guild(request: HttpRequest, guild_id: int) -> HttpResponse:
-    """Per-guild webhook endpoint for direct-keys mode.
-
-    Verifies the signature using the guild's own webhook signing secret, then
-    dispatches through the same handlers as the global webhook endpoint.
-    """
-    payload = request.body
-    sig_header = request.META.get("HTTP_STRIPE_SIGNATURE", "")
-
-    try:
-        account = StripeAccount.objects.get(
-            guild_id=guild_id,
-            auth_mode=StripeAccount.AuthMode.DIRECT_KEYS,
-        )
-    except StripeAccount.DoesNotExist:
-        logger.warning("Direct-keys webhook hit for guild %s but no account exists.", guild_id)
-        return HttpResponse(status=404)
-
-    if not account.direct_webhook_secret:
-        logger.warning("Direct-keys webhook hit for guild %s but no webhook secret is set.", guild_id)
-        return HttpResponse(status=400)
-
-    try:
-        event = stripe_utils.construct_webhook_event_for_account(
-            payload=payload,
-            sig_header=sig_header,
-            webhook_secret=account.direct_webhook_secret,
-        )
-    except Exception:
-        logger.exception("Per-guild webhook signature verification failed for guild %s.", guild_id)
-        return HttpResponse(status=400)
-
-    event_type = event.type if hasattr(event, "type") else event.get("type", "")
-    handler = _WEBHOOK_HANDLERS.get(event_type)
-    if handler:
-        try:
-            event_data = event.to_dict() if hasattr(event, "to_dict") else dict(event)
-            handler(event_data)
-        except Exception:
-            logger.exception("Per-guild webhook handler error for event %s", event_type)
-            return HttpResponse(status=500)
-    else:
-        logger.debug("Unhandled per-guild webhook event type: %s", event_type)
-    return HttpResponse(status=200)
-
-
-@staff_member_required
-def connect_callback(request: HttpRequest) -> HttpResponse:
-    """Handle Stripe Connect OAuth callback."""
-    from membership.models import Guild
-
-    error = request.GET.get("error")
-    if error:
-        django_messages.error(request, f"Stripe Connect failed: {request.GET.get('error_description', error)}")
-        return redirect("billing_admin_dashboard")
-
-    try:
-        code = request.GET["code"]
-        guild_id = request.GET["state"]
-    except KeyError:
-        django_messages.error(request, "Stripe Connect callback is missing required parameters.")
-        return redirect("billing_admin_dashboard")
-    account_id = stripe_utils.complete_connect_oauth(code=code)
-    guild = Guild.objects.get(pk=int(guild_id))
-
-    StripeAccount.upsert_for_guild(guild, account_id)
-    django_messages.success(request, f"Connected Stripe account for {guild.name}.")
-    return redirect("billing_admin_dashboard")

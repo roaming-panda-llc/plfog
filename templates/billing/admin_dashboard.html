@@ -274,7 +274,6 @@
         <tr>
           <th>Member</th>
           <th class="text-right">Amount</th>
-          <th>Guild / Account</th>
           <th>Status</th>
           <th>Retries</th>
           <th>Date</th>
@@ -286,7 +285,6 @@
         <tr>
           <td onclick="openTabModal({{ charge.tab.pk }})" style="cursor:pointer;color:#EEB44B">{{ charge.tab.member.display_name }}</td>
           <td class="text-right">${{ charge.amount }}</td>
-          <td style="color:#96ACBB">{% if charge.stripe_account %}{{ charge.stripe_account.display_name }}{% else %}Platform{% endif %}</td>
           <td>
             {% if charge.status == "succeeded" %}<span class="pl-badge pl-badge--ok">Succeeded</span>
             {% elif charge.status == "failed" %}<span class="pl-badge pl-badge--fail">Failed</span>
@@ -304,7 +302,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" style="text-align:center;color:#96ACBB;padding:2rem">No charges match this filter.</td></tr>
+        <tr><td colspan="6" style="text-align:center;color:#96ACBB;padding:2rem">No charges match this filter.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -458,61 +456,44 @@
   {% endif %}{# /settings #}
 
   {# ================================================================ #}
-  {# STRIPE TAB                                                        #}
+  {# STRIPE TAB — products overview + link to Reports                  #}
   {# ================================================================ #}
   {% if active_tab == "stripe" %}
 
   <div class="pl-card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
-      <div class="pl-section-label" style="margin-bottom:0">Connected Stripe Accounts</div>
-      <button type="button" class="pl-btn pl-btn--primary pl-btn--sm" onclick="document.getElementById('connect-stripe-modal').style.display='flex'">
-        + Connect Stripe Account
-      </button>
-    </div>
-    {% if stripe_accounts %}
+    <div class="pl-section-label">Platform Stripe Account</div>
+    <p style="color:#96ACBB;font-size:0.875rem;margin:0 0 1rem">
+      All charges now route through a single Past Lives Stripe account. Platform credentials live on
+      the <a href="?tab=settings" style="color:#EEB44B">Settings tab</a>. Revenue splits to guilds are
+      reconciled via the Reports page (manual payouts).
+    </p>
+  </div>
+
+  <div class="pl-card">
+    <div class="pl-section-label">Guild Products</div>
+    {% if products %}
     <table class="pl-table">
       <thead>
         <tr>
-          <th>Display Name</th>
+          <th>Product</th>
           <th>Guild</th>
-          <th>Mode</th>
-          <th>Account ID</th>
-          <th>Platform Fee</th>
+          <th>Price</th>
           <th>Active</th>
-          <th>Connected</th>
-          <th></th>
         </tr>
       </thead>
       <tbody>
-        {% for acct in stripe_accounts %}
+        {% for product in products %}
         <tr>
-          <td>{{ acct.display_name }}</td>
-          <td style="color:#96ACBB">{% if acct.guild %}{{ acct.guild.name }}{% else %}—{% endif %}</td>
-          <td>
-            {% if acct.auth_mode == "direct_keys" %}
-              <span class="pl-badge" style="background:#2d4a3a;color:#a0e0c0">direct keys</span>
-            {% else %}
-              <span class="pl-badge" style="background:#2a3a52;color:#a0c0e0">oauth</span>
-            {% endif %}
-          </td>
-          <td style="color:#96ACBB;font-size:0.8125rem">{{ acct.stripe_account_id|truncatechars:20 }}</td>
-          <td>{{ acct.platform_fee_percent }}%</td>
-          <td>{% if acct.is_active %}<span class="pl-badge pl-badge--ok">Active</span>{% else %}<span class="pl-badge pl-badge--muted">Inactive</span>{% endif %}</td>
-          <td style="color:#96ACBB">{% if acct.connected_at %}{{ acct.connected_at|date:"M j, Y" }}{% else %}—{% endif %}</td>
-          <td><a href="{% url 'admin:billing_stripeaccount_change' acct.pk %}" class="pl-btn pl-btn--sm pl-btn--secondary">Edit</a></td>
+          <td>{{ product.name }}</td>
+          <td style="color:#96ACBB">{{ product.guild.name }}</td>
+          <td>${{ product.price }}</td>
+          <td>{% if product.is_active %}<span class="pl-badge pl-badge--ok">Active</span>{% else %}<span class="pl-badge pl-badge--muted">Inactive</span>{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
     {% else %}
-    <div style="text-align:center;padding:3rem 1rem">
-      <div style="font-size:2rem;margin-bottom:0.75rem;opacity:0.3">⚡</div>
-      <div style="color:#F4EFDD;font-weight:600;margin-bottom:0.375rem">No Stripe accounts connected</div>
-      <div style="color:#96ACBB;font-size:0.875rem;margin-bottom:1.5rem">Connect a guild's Stripe account to start routing charges.</div>
-      <button type="button" class="pl-btn pl-btn--primary" onclick="document.getElementById('connect-stripe-modal').style.display='flex'">
-        + Connect Stripe Account
-      </button>
-    </div>
+    <div style="color:#96ACBB;padding:1rem 0">No products configured yet.</div>
     {% endif %}
   </div>
 
@@ -567,128 +548,6 @@
     </div>
   </div>
 </div>
-
-{# ================================================================ #}
-{# CONNECT STRIPE MODAL                                              #}
-{# ================================================================ #}
-<div id="connect-stripe-modal" class="pl-modal-overlay" style="display:none"
-     onclick="if(event.target===this)this.style.display='none'">
-  <div class="pl-modal" style="max-width:520px">
-    <div class="pl-modal__header">
-      <div class="pl-modal__title">Connect Stripe Account</div>
-      <button class="pl-modal__close" onclick="document.getElementById('connect-stripe-modal').style.display='none'" aria-label="Close">&times;</button>
-    </div>
-    <div class="pl-modal__body">
-      <div style="display:flex;gap:0.5rem;border-bottom:1px solid #2a3340;margin-bottom:1rem">
-        <button type="button" id="csm-tab-direct-btn" class="pl-btn pl-btn--sm pl-btn--primary" onclick="csmShowTab('direct')">Paste API Keys</button>
-        {% if billing_settings.connect_enabled %}
-        <button type="button" id="csm-tab-oauth-btn" class="pl-btn pl-btn--sm pl-btn--secondary" onclick="csmShowTab('oauth')">Connect via OAuth</button>
-        {% endif %}
-      </div>
-
-      {# --- Direct keys tab (default) --- #}
-      <div id="csm-tab-direct">
-        <p style="color:#96ACBB;font-size:0.875rem;margin:0 0 1rem">
-          Paste this guild's own Stripe API keys. Money lands directly in their Stripe balance.
-          No platform fee. Use this for consumables (clay, materials, etc.).
-        </p>
-        <form method="post" action="{% url 'billing_save_direct_keys' %}" id="csm-direct-form">
-          {% csrf_token %}
-          <div class="pl-modal__field">
-            <label for="csm-guild">Guild</label>
-            <select name="guild_id" id="csm-guild" required>
-              <option value="">— Select a guild —</option>
-              {% for guild in guilds %}
-              <option value="{{ guild.pk }}">{{ guild.name }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="pl-modal__field">
-            <label for="csm-pk">Publishable key</label>
-            <input type="text" name="publishable_key" id="csm-pk" placeholder="pk_test_…" required autocomplete="off">
-          </div>
-          <div class="pl-modal__field">
-            <label for="csm-sk">Secret key</label>
-            <input type="password" name="secret_key" id="csm-sk" placeholder="sk_test_… or rk_test_…" required autocomplete="off">
-          </div>
-          <div class="pl-modal__field">
-            <label for="csm-whsec">Webhook signing secret <span style="color:#96ACBB;font-weight:400">(optional — paste after creating the webhook)</span></label>
-            <input type="password" name="webhook_secret" id="csm-whsec" placeholder="whsec_…" autocomplete="off">
-          </div>
-          <div id="csm-test-result" style="font-size:0.875rem;margin:0.5rem 0;min-height:1.2em"></div>
-          <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem">
-            <button type="button" class="pl-btn pl-btn--secondary pl-btn--sm" onclick="csmTestKeys()">Test connection</button>
-            <button type="submit" class="pl-btn pl-btn--primary pl-btn--sm">Save</button>
-          </div>
-        </form>
-        <p style="color:#96ACBB;font-size:0.75rem;margin:1rem 0 0;border-top:1px solid #2a3340;padding-top:0.75rem">
-          After saving, configure a webhook in this guild's Stripe dashboard pointing at
-          <code style="color:#a0e0c0">/billing/webhooks/stripe/guild/&lt;guild_id&gt;/</code>,
-          then re-open this modal and paste the signing secret.
-        </p>
-      </div>
-
-      {# --- OAuth tab — only rendered when Stripe Connect is enabled in settings --- #}
-      {% if billing_settings.connect_enabled %}
-      <div id="csm-tab-oauth" style="display:none">
-        <p style="color:#96ACBB;font-size:0.875rem;margin:0 0 1.25rem">
-          Use Stripe Connect OAuth. The guild's existing Stripe account will be linked
-          to the Past Lives platform — money flows directly to them and PL can take a
-          platform fee. Use this for membership and space-lease billing.
-        </p>
-        <div class="pl-modal__field">
-          <label for="connect-guild-select">Guild</label>
-          <select id="connect-guild-select">
-            <option value="">— Select a guild —</option>
-            {% for guild in guilds %}
-            <option value="{% url 'billing_initiate_connect' guild.pk %}">{{ guild.name }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem">
-          <button type="button" class="pl-btn pl-btn--secondary pl-btn--sm" onclick="document.getElementById('connect-stripe-modal').style.display='none'">Cancel</button>
-          <button type="button" class="pl-btn pl-btn--primary pl-btn--sm" onclick="initiateStripeConnect()">Connect via Stripe →</button>
-        </div>
-      </div>
-      {% endif %}
-    </div>
-  </div>
-</div>
-
-<script>
-function csmShowTab(which) {
-  document.getElementById('csm-tab-direct').style.display = which === 'direct' ? 'block' : 'none';
-  document.getElementById('csm-tab-direct-btn').className = 'pl-btn pl-btn--sm ' + (which === 'direct' ? 'pl-btn--primary' : 'pl-btn--secondary');
-  var oauthTab = document.getElementById('csm-tab-oauth');
-  var oauthBtn = document.getElementById('csm-tab-oauth-btn');
-  if (oauthTab) oauthTab.style.display = which === 'oauth' ? 'block' : 'none';
-  if (oauthBtn) oauthBtn.className = 'pl-btn pl-btn--sm ' + (which === 'oauth' ? 'pl-btn--primary' : 'pl-btn--secondary');
-}
-function csmTestKeys() {
-  var sk = document.getElementById('csm-sk').value;
-  var resultEl = document.getElementById('csm-test-result');
-  resultEl.style.color = '#96ACBB';
-  resultEl.textContent = 'Testing…';
-  var fd = new FormData();
-  fd.append('secret_key', sk);
-  fd.append('csrfmiddlewaretoken', document.querySelector('#csm-direct-form [name=csrfmiddlewaretoken]').value);
-  fetch('{% url "billing_test_direct_keys" %}', {method:'POST', body:fd, credentials:'same-origin'})
-    .then(function(r){return r.json();})
-    .then(function(d){
-      if (d.ok) {
-        resultEl.style.color = '#a0e0c0';
-        resultEl.textContent = '✓ Connected to ' + d.stripe_account_id + ' — ' + d.display_name;
-      } else {
-        resultEl.style.color = '#e0a0a0';
-        resultEl.textContent = '✗ ' + d.error;
-      }
-    })
-    .catch(function(e){
-      resultEl.style.color = '#e0a0a0';
-      resultEl.textContent = '✗ ' + e;
-    });
-}
-</script>
 
 {# ================================================================ #}
 {# ADD CHARGE MODAL                                                   #}

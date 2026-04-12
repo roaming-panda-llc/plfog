@@ -15,7 +15,6 @@ from billing.models import BillingSettings, TabCharge
 from tests.billing.factories import (
     BillingSettingsFactory,
     ProductFactory,
-    StripeAccountFactory,
     TabChargeFactory,
     TabEntryFactory,
     TabFactory,
@@ -161,6 +160,42 @@ def describe_bill_tabs():
             assert charge.stripe_payment_intent_id == "pi_test"
             mock_receipt.assert_called_once()
 
+        @patch("billing.stripe_utils.create_payment_intent")
+        @patch("billing.management.commands.bill_tabs.send_receipt")
+        def it_creates_one_tabcharge_for_entries_across_multiple_guilds(mock_receipt, mock_stripe):
+            """Since v1.5.0 we batch all pending entries into one charge per tab."""
+            mock_stripe.return_value = {
+                "id": "pi_batch",
+                "status": "succeeded",
+                "charge_id": "ch_batch",
+                "receipt_url": "",
+            }
+            BillingSettingsFactory()
+            member = MemberFactory(status="active")
+            tab = TabFactory(
+                member=member,
+                stripe_customer_id="cus_test",
+                stripe_payment_method_id="pm_test",
+            )
+            guild_a = GuildFactory()
+            guild_b = GuildFactory()
+            product_a = ProductFactory(guild=guild_a, price=Decimal("12.00"))
+            product_b = ProductFactory(guild=guild_b, price=Decimal("8.00"))
+            tab.add_entry(description=product_a.name, amount=product_a.price, product=product_a)
+            tab.add_entry(description=product_b.name, amount=product_b.price, product=product_b)
+            tab.add_entry(description="manual", amount=Decimal("5.00"))
+
+            output = _call_bill_tabs(force=True)
+
+            assert "1 charged" in output
+            # Exactly one TabCharge, covering all three entries
+            charges = list(TabCharge.objects.filter(tab=tab))
+            assert len(charges) == 1
+            assert charges[0].amount == Decimal("25.00")
+            assert charges[0].entry_count == 3
+            # Platform path, single PaymentIntent call
+            assert mock_stripe.call_count == 1
+
         def it_skips_inactive_members():
             BillingSettingsFactory()
             member = MemberFactory(status="former")
@@ -200,6 +235,8 @@ def describe_bill_tabs():
             BillingSettingsFactory()
             member = MemberFactory(status="active")
             tab = TabFactory(member=member, stripe_customer_id="cus_test", stripe_payment_method_id="")
+            # Tab has no payment method — can_add_entry now returns False, so we
+            # can't call tab.add_entry. Instead write a row directly via the factory.
             TabEntryFactory(tab=tab, amount=Decimal("30.00"))
 
             output = _call_bill_tabs(force=True)
@@ -257,133 +294,6 @@ def describe_bill_tabs():
             assert "1 charged" in output
             charge = TabCharge.objects.get(tab=tab)
             assert charge.amount == Decimal("30.00")
-
-        @patch("billing.stripe_utils.create_payment_intent")
-        @patch("billing.management.commands.bill_tabs.send_receipt")
-        def it_skips_sub_minimum_guild_group_but_charges_platform(mock_receipt, mock_stripe):
-            mock_stripe.return_value = {
-                "id": "pi_plat",
-                "status": "succeeded",
-                "charge_id": "ch_plat",
-                "receipt_url": "",
-            }
-            BillingSettingsFactory()
-            guild = GuildFactory()
-            StripeAccountFactory(guild=guild, is_active=True)
-            product = ProductFactory(guild=guild, price=Decimal("0.25"))
-
-            member = MemberFactory(status="active")
-            tab = TabFactory(member=member, stripe_customer_id="cus_test", stripe_payment_method_id="pm_test")
-            TabEntryFactory(tab=tab, amount=Decimal("0.25"), product=product)  # Guild group: $0.25 (sub-minimum)
-            TabEntryFactory(tab=tab, amount=Decimal("5.00"))  # Platform group: $5.00
-
-            output = _call_bill_tabs(force=True)
-
-            assert "1 charged" in output  # Only platform group charged
-
-        def describe_destination_routing():
-            @patch("billing.stripe_utils.create_payment_intent")
-            @patch("billing.stripe_utils.create_destination_payment_intent")
-            @patch("billing.management.commands.bill_tabs.send_receipt")
-            def it_creates_separate_charges_per_guild(mock_receipt, mock_dest, mock_platform):
-                mock_dest.return_value = {
-                    "id": "pi_dest",
-                    "status": "succeeded",
-                    "charge_id": "ch_dest",
-                    "receipt_url": "https://stripe.com/receipt",
-                }
-                mock_platform.return_value = {
-                    "id": "pi_plat",
-                    "status": "succeeded",
-                    "charge_id": "ch_plat",
-                    "receipt_url": "https://stripe.com/receipt",
-                }
-                BillingSettingsFactory()
-                member = MemberFactory(status="active")
-                tab = TabFactory(
-                    member=member,
-                    stripe_customer_id="cus_test",
-                    stripe_payment_method_id="pm_test",
-                )
-                guild_a = GuildFactory()
-                guild_b = GuildFactory()
-                StripeAccountFactory(guild=guild_a, is_active=True)
-                StripeAccountFactory(guild=guild_b, is_active=True)
-                product_a = ProductFactory(guild=guild_a, price=Decimal("12.00"))
-                product_b = ProductFactory(guild=guild_b, price=Decimal("8.00"))
-                TabEntryFactory(tab=tab, amount=Decimal("12.00"), product=product_a)
-                TabEntryFactory(tab=tab, amount=Decimal("8.00"), product=product_b)
-                TabEntryFactory(tab=tab, amount=Decimal("5.00"))  # platform (no product)
-
-                output = _call_bill_tabs(force=True)
-
-                assert "3 charged" in output
-                assert mock_dest.call_count == 2
-                assert mock_platform.call_count == 1
-
-            @patch("billing.stripe_utils.create_destination_payment_intent")
-            @patch("billing.management.commands.bill_tabs.send_receipt")
-            def it_includes_application_fee(mock_receipt, mock_dest):
-                mock_dest.return_value = {
-                    "id": "pi_fee",
-                    "status": "succeeded",
-                    "charge_id": "ch_fee",
-                    "receipt_url": "https://stripe.com/receipt",
-                }
-                BillingSettingsFactory()
-                member = MemberFactory(status="active")
-                tab = TabFactory(
-                    member=member,
-                    stripe_customer_id="cus_test",
-                    stripe_payment_method_id="pm_test",
-                )
-                guild = GuildFactory()
-                StripeAccountFactory(guild=guild, is_active=True, platform_fee_percent=Decimal("15.00"))
-                product = ProductFactory(guild=guild, price=Decimal("100.00"))
-                TabEntryFactory(tab=tab, amount=Decimal("100.00"), product=product)
-
-                _call_bill_tabs(force=True)
-
-                assert mock_dest.call_count == 1
-                call_kwargs = mock_dest.call_args[1]
-                assert call_kwargs["application_fee_cents"] == 1500
-
-            @patch("billing.stripe_utils.create_payment_intent")
-            @patch("billing.management.commands.bill_tabs.send_receipt")
-            def it_skips_entries_with_disconnected_guild(mock_receipt, mock_platform):
-                mock_platform.return_value = {
-                    "id": "pi_plat",
-                    "status": "succeeded",
-                    "charge_id": "ch_plat",
-                    "receipt_url": "https://stripe.com/receipt",
-                }
-                BillingSettingsFactory()
-                guild = GuildFactory()
-                StripeAccountFactory(guild=guild, is_active=False)
-                product = ProductFactory(guild=guild, price=Decimal("20.00"))
-
-                # Tab 1: only disconnected guild entries — will be skipped entirely
-                member1 = MemberFactory(status="active")
-                tab1 = TabFactory(
-                    member=member1,
-                    stripe_customer_id="cus_test1",
-                    stripe_payment_method_id="pm_test1",
-                )
-                TabEntryFactory(tab=tab1, amount=Decimal("20.00"), product=product)
-
-                # Tab 2: platform entry only — will succeed
-                member2 = MemberFactory(status="active")
-                tab2 = TabFactory(
-                    member=member2,
-                    stripe_customer_id="cus_test2",
-                    stripe_payment_method_id="pm_test2",
-                )
-                TabEntryFactory(tab=tab2, amount=Decimal("5.00"))  # platform (no product)
-
-                output = _call_bill_tabs(force=True)
-
-                assert "1 charged" in output
-                assert "1 skipped" in output
 
     def describe_advisory_lock():
         def it_acquire_lock_returns_true_for_sqlite():

@@ -7,7 +7,7 @@ from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponse
 from unfold.admin import ModelAdmin, TabularInline
 
-from .models import BillingSettings, Product, StripeAccount, Tab, TabCharge, TabEntry
+from .models import BillingSettings, Product, Tab, TabCharge, TabEntry
 
 
 # ---------------------------------------------------------------------------
@@ -156,42 +156,6 @@ class TabChargeAdmin(ModelAdmin):
         "created_at",
         "charged_at",
         "receipt_sent_at",
-    ]
-
-    def has_delete_permission(self, request: HttpRequest, obj: object = None) -> bool:
-        return False
-
-
-# ---------------------------------------------------------------------------
-# StripeAccount
-# ---------------------------------------------------------------------------
-
-
-@admin.register(StripeAccount)
-class StripeAccountAdmin(ModelAdmin):
-    list_display = [
-        "display_name",
-        "guild",
-        "auth_mode",
-        "stripe_account_id",
-        "is_active",
-        "platform_fee_percent",
-        "connected_at",
-    ]
-    list_filter = ["is_active", "auth_mode"]
-    search_fields = ["display_name", "guild__name"]
-    readonly_fields = ["stripe_account_id", "connected_at", "created_at"]
-    fieldsets = [
-        (None, {"fields": ["guild", "display_name", "auth_mode", "is_active", "platform_fee_percent"]}),
-        ("Stripe", {"fields": ["stripe_account_id", "connected_at"], "classes": ["collapse"]}),
-        (
-            "Direct API Keys (direct_keys mode only)",
-            {
-                "fields": ["direct_publishable_key", "direct_secret_key", "direct_webhook_secret"],
-                "classes": ["collapse"],
-                "description": "Encrypted at rest. Used only when auth_mode = direct_keys.",
-            },
-        ),
     ]
 
     def has_delete_permission(self, request: HttpRequest, obj: object = None) -> bool:

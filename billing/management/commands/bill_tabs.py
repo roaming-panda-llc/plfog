@@ -9,11 +9,9 @@ from decimal import Decimal
 
 from django.core.management.base import BaseCommand
 from django.db import connection, transaction
-from django.db.models import DecimalField, Sum, Value
-from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from billing.models import BillingSettings, StripeAccount, Tab, TabCharge, TabEntry
+from billing.models import BillingSettings, Tab, TabCharge, TabEntry
 from billing.notifications import notify_admin_charge_failed, send_receipt
 
 logger = logging.getLogger(__name__)
@@ -115,15 +113,22 @@ class Command(BaseCommand):
         return False
 
     def _process_tab(self, tab: Tab, settings: BillingSettings) -> int:
-        """Process a single tab. Returns the count of charges created."""
+        """Process a single tab — creates ONE TabCharge for all pending entries.
+
+        Since v1.5.0, all charges route through the single platform Stripe account,
+        so there's no need to group entries by destination. All pending non-voided
+        entries get batched into one TabCharge and one PaymentIntent.
+        """
         with transaction.atomic():
             locked_tab = Tab.objects.select_for_update().get(pk=tab.pk)
 
-            # Compute pending balance (quick check before grouping)
-            pending_total = locked_tab.entries.filter(
-                tab_charge__isnull=True,
-                voided_at__isnull=True,
-            ).aggregate(total=Coalesce(Sum("amount"), Value(Decimal("0.00")), output_field=DecimalField()))["total"]
+            pending_entries = list(
+                locked_tab.entries.filter(
+                    tab_charge__isnull=True,
+                    voided_at__isnull=True,
+                )
+            )
+            pending_total = sum((e.amount for e in pending_entries), Decimal("0.00"))
 
             # Skip zero or sub-minimum balances
             if pending_total < Decimal("0.50"):
@@ -140,90 +145,22 @@ class Command(BaseCommand):
                 logger.warning("Tab %s: no Stripe customer ID, skipping.", tab.pk)
                 return 0
 
-            charges_to_process = self._build_charges_by_destination(locked_tab)
-
-        # Stripe calls outside the DB transaction to avoid long locks
-        charges_created = 0
-        for charge, idempotency_key, fee_cents in charges_to_process:
-            success = self._execute_charge(tab, charge, idempotency_key, fee_cents, settings)
-            if success:
-                charges_created += 1
-
-        return charges_created
-
-    def _build_charges_by_destination(self, locked_tab: Tab) -> list[tuple[TabCharge, str, int | None]]:
-        """Group pending entries by guild and create a TabCharge per group."""
-        pending_entries = list(
-            locked_tab.entries.filter(
-                tab_charge__isnull=True,
-                voided_at__isnull=True,
-            ).select_related("product__guild")
-        )
-
-        groups: dict[int | None, list[TabEntry]] = {}
-        for entry in pending_entries:
-            guild_id = entry.product.guild_id if entry.product else None
-            groups.setdefault(guild_id, []).append(entry)
-
-        charges_to_process: list[tuple[TabCharge, str, int | None]] = []
-
-        for guild_id, entries in groups.items():
-            group_total = sum((e.amount for e in entries), Decimal("0.00"))
-            if group_total < Decimal("0.50"):
-                continue
-
-            stripe_account = self._resolve_stripe_account(locked_tab, guild_id, len(entries))
-            if guild_id is not None and stripe_account is None:
-                continue  # Disconnected guild — skip
-
-            application_fee, fee_cents = self._compute_fee(stripe_account, group_total)
-
-            idempotency_key = str(uuid.uuid4())
             charge = TabCharge.objects.create(
                 tab=locked_tab,
-                amount=group_total,
+                amount=pending_total,
                 status=TabCharge.Status.PROCESSING,
-                stripe_account=stripe_account,
-                application_fee=application_fee,
             )
+            TabEntry.objects.filter(pk__in=[e.pk for e in pending_entries]).update(tab_charge=charge)
+            idempotency_key = str(uuid.uuid4())
 
-            entry_ids = [e.pk for e in entries]
-            TabEntry.objects.filter(pk__in=entry_ids).update(tab_charge=charge)
-            charges_to_process.append((charge, idempotency_key, fee_cents))
-
-        return charges_to_process
-
-    def _resolve_stripe_account(self, tab: Tab, guild_id: int | None, entry_count: int) -> StripeAccount | None:
-        """Look up the active StripeAccount for a guild. Returns None for platform charges."""
-        if guild_id is None:
-            return None
-        try:
-            return StripeAccount.objects.get(guild_id=guild_id, is_active=True)
-        except StripeAccount.DoesNotExist:
-            logger.warning(
-                "Tab %s: no active StripeAccount for guild %s, skipping %d entries.",
-                tab.pk,
-                guild_id,
-                entry_count,
-            )
-            return None
-
-    @staticmethod
-    def _compute_fee(stripe_account: StripeAccount | None, amount: Decimal) -> tuple[Decimal | None, int | None]:
-        """Compute application fee for a destination charge."""
-        if stripe_account is None:
-            return None, None
-        fee = stripe_account.compute_fee(amount)
-        if fee > Decimal("0.00"):
-            return fee, int(fee * 100)
-        return None, None
+        # Stripe call outside the DB transaction to avoid long locks
+        return 1 if self._execute_charge(tab, charge, idempotency_key, settings) else 0
 
     def _execute_charge(
         self,
         tab: Tab,
         charge: TabCharge,
         idempotency_key: str,
-        fee_cents: int | None,
         settings: BillingSettings,
     ) -> bool:
         """Call Stripe for a single charge. Returns True on success."""
@@ -240,7 +177,7 @@ class Command(BaseCommand):
 
     def _process_retries(self, settings: BillingSettings) -> int:
         """Retry failed charges that are due for retry. Returns count of retries attempted."""
-        retryable = TabCharge.objects.needs_retry().select_related("tab", "tab__member", "stripe_account")
+        retryable = TabCharge.objects.needs_retry().select_related("tab", "tab__member")
         retry_count = 0
 
         for charge in retryable:

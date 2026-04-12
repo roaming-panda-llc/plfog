@@ -272,11 +272,6 @@ def tab_detail(request: HttpRequest) -> HttpResponse:
     tab, _created = Tab.objects.get_or_create(member=member)
     entries = tab.entries.pending().select_related("product__guild").order_by("-created_at")
     products = Product.objects.filter(is_active=True).select_related("guild").order_by("guild__name", "name")
-    pending_checkout_charges = (
-        tab.charges.filter(status=TabCharge.Status.PENDING_CHECKOUT)
-        .select_related("stripe_account")
-        .order_by("-created_at")
-    )
 
     if request.method == "POST":
         form = AddTabEntryForm(request.POST)
@@ -307,7 +302,6 @@ def tab_detail(request: HttpRequest) -> HttpResponse:
             "entries": entries,
             "form": form,
             "products": products,
-            "pending_checkout_charges": pending_checkout_charges,
         },
     )
 

@@ -77,10 +77,11 @@ def describe_Tab():
             tab = TabFactory(is_locked=True)
             assert tab.can_add_entry is False
 
-        def it_returns_true_without_a_saved_payment_method():
-            # Direct-keys mode bills via Checkout sessions; no card needed up front.
+        def it_returns_false_without_a_saved_payment_method():
+            # v1.5.0: restored the has_payment_method gate — charges go through the
+            # platform account off-session, so a saved card is required up front.
             tab = TabFactory(is_locked=False, stripe_payment_method_id="")
-            assert tab.can_add_entry is True
+            assert tab.can_add_entry is False
 
     def describe_remaining_limit():
         def it_returns_full_limit_with_no_entries():

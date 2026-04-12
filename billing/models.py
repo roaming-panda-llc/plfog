@@ -1,4 +1,4 @@
-"""Billing models — BillingSettings, StripeAccount, Product, Tab, TabEntry, TabCharge."""
+"""Billing models — BillingSettings, Product, Tab, TabEntry, TabCharge."""
 
 from __future__ import annotations
 
@@ -18,7 +18,6 @@ from .exceptions import TabLimitExceededError, TabLockedError
 from .fields import EncryptedCharField
 
 if TYPE_CHECKING:
-    import stripe as _stripe
     from django.contrib.auth.models import User
 
     from membership.models import Guild
@@ -98,9 +97,9 @@ class BillingSettings(models.Model):
         ),
     )
 
-    # ---- Stripe Connect platform configuration ----
-    # Used by OAuth-mode StripeAccount rows. Direct-keys mode does not need any
-    # of these — each guild's keys live on the StripeAccount row instead.
+    # ---- Stripe platform configuration ----
+    # Credentials for the single Past Lives platform Stripe account. All charges
+    # and SetupIntents run through these keys.
     connect_enabled = models.BooleanField(
         default=False,
         help_text="Master switch for Stripe Connect platform billing. When off, the OAuth tab is hidden.",
@@ -190,197 +189,6 @@ class BillingSettings(models.Model):
     def load(cls) -> BillingSettings:
         """Load the singleton instance, creating it with defaults if needed."""
         obj, _created = cls.objects.get_or_create(pk=1)
-        return obj
-
-
-# ---------------------------------------------------------------------------
-# StripeAccount
-# ---------------------------------------------------------------------------
-
-
-class StripeAccount(models.Model):
-    """A Stripe account linked to a guild — either via Connect OAuth or pasted API keys."""
-
-    class AuthMode(models.TextChoices):
-        OAUTH = "oauth", "Stripe Connect (OAuth)"
-        DIRECT_KEYS = "direct_keys", "Direct API Keys"
-
-    guild = models.OneToOneField(
-        "membership.Guild",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="stripe_account",
-        help_text="The guild this Stripe account belongs to.",
-    )
-    auth_mode = models.CharField(
-        max_length=20,
-        choices=AuthMode.choices,
-        default=AuthMode.OAUTH,
-        help_text="How this guild's Stripe account is authenticated.",
-    )
-    stripe_account_id = models.CharField(
-        max_length=255,
-        blank=True,
-        default="",
-        help_text="Stripe account ID (acct_xxx). Set by OAuth or by verifying direct keys.",
-    )
-    direct_secret_key = EncryptedCharField(
-        max_length=512,
-        blank=True,
-        default="",
-        help_text="Guild's Stripe secret key (sk_test_… or sk_live_…). Encrypted at rest.",
-    )
-    direct_publishable_key = models.CharField(
-        max_length=255,
-        blank=True,
-        default="",
-        help_text="Guild's Stripe publishable key (pk_…). Sent to the browser.",
-    )
-    direct_webhook_secret = EncryptedCharField(
-        max_length=512,
-        blank=True,
-        default="",
-        help_text="Webhook signing secret from this guild's Stripe dashboard. Encrypted at rest.",
-    )
-    display_name = models.CharField(
-        max_length=255,
-        help_text="Human-readable name for this Stripe account.",
-    )
-    is_active = models.BooleanField(
-        default=True,
-        help_text="Whether this Stripe account is currently active.",
-    )
-    platform_fee_percent = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=Decimal("0.00"),
-        help_text="Percentage of each charge kept by the platform (0-100).",
-    )
-    connected_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        help_text="When this Stripe account was connected.",
-    )
-    created_at = models.DateTimeField(auto_now_add=True, help_text="When this record was created.")
-
-    class Meta:
-        verbose_name = "Stripe Account"
-        verbose_name_plural = "Stripe Accounts"
-
-    def __str__(self) -> str:
-        return self.display_name
-
-    def compute_fee(self, amount: Decimal) -> Decimal:
-        """Calculate the platform fee for a given amount.
-
-        Args:
-            amount: The charge amount to compute the fee on.
-
-        Returns:
-            The platform fee rounded to 2 decimal places.
-        """
-        if self.platform_fee_percent == 0:
-            return Decimal("0.00")
-        return (amount * self.platform_fee_percent / Decimal("100")).quantize(Decimal("0.01"))
-
-    def clean(self) -> None:
-        """Enforce direct-keys invariants. Direct mode cannot collect platform fees
-        because Stripe Checkout sessions on a connected account's own keys have
-        no application_fee_amount mechanism.
-        """
-        super().clean()
-        if self.auth_mode == self.AuthMode.DIRECT_KEYS and self.platform_fee_percent != Decimal("0.00"):
-            raise ValidationError(
-                {
-                    "platform_fee_percent": (
-                        "Platform fee must be 0 in direct-keys mode. "
-                        "Use OAuth (Stripe Connect) if you need to collect a platform fee."
-                    )
-                }
-            )
-
-    def get_stripe_client(self) -> _stripe.StripeClient:
-        """Return a Stripe SDK client scoped to this account.
-
-        OAuth mode returns the platform client (calls are made *on behalf of* the
-        connected account using transfer_data). Direct-keys mode returns a client
-        instantiated with the guild's own secret key (calls hit the guild's account
-        directly).
-        """
-        import stripe
-
-        from billing import stripe_utils as _stripe_utils
-
-        if self.auth_mode == self.AuthMode.DIRECT_KEYS:
-            if not self.direct_secret_key:
-                raise ValueError(f"StripeAccount {self.pk} is in direct-keys mode but has no secret key.")
-            return stripe.StripeClient(self.direct_secret_key)
-        return stripe.StripeClient(_stripe_utils._platform_secret_key())
-
-    @classmethod
-    def upsert_for_guild(cls, guild: object, account_id: str) -> StripeAccount:
-        """Create or update the OAuth-mode Stripe account linked to a guild.
-
-        Args:
-            guild: The Guild instance to link.
-            account_id: The Stripe Connect account ID (acct_xxx).
-
-        Returns:
-            The created or updated StripeAccount.
-        """
-        obj, _ = cls.objects.update_or_create(
-            guild=guild,
-            defaults={
-                "auth_mode": cls.AuthMode.OAUTH,
-                "stripe_account_id": account_id,
-                "display_name": guild.name,  # type: ignore[attr-defined]
-                "is_active": True,
-                "connected_at": timezone.now(),
-            },
-        )
-        return obj
-
-    @classmethod
-    def upsert_direct_keys(
-        cls,
-        guild: object,
-        *,
-        stripe_account_id: str,
-        display_name: str,
-        secret_key: str,
-        publishable_key: str,
-        webhook_secret: str,
-    ) -> StripeAccount:
-        """Create or update a direct-keys Stripe account for a guild.
-
-        Args:
-            guild: The Guild instance to link.
-            stripe_account_id: acct_xxx returned by `verify_account_credentials`.
-            display_name: Human-readable name for this account.
-            secret_key: The guild's Stripe secret key (encrypted at rest).
-            publishable_key: The guild's Stripe publishable key.
-            webhook_secret: Webhook signing secret from the guild's dashboard
-                (encrypted at rest). May be empty initially — the admin pastes it
-                after configuring the webhook in Stripe.
-
-        Returns:
-            The created or updated StripeAccount.
-        """
-        obj, _ = cls.objects.update_or_create(
-            guild=guild,
-            defaults={
-                "auth_mode": cls.AuthMode.DIRECT_KEYS,
-                "stripe_account_id": stripe_account_id,
-                "display_name": display_name,
-                "direct_secret_key": secret_key,
-                "direct_publishable_key": publishable_key,
-                "direct_webhook_secret": webhook_secret,
-                "platform_fee_percent": Decimal("0.00"),
-                "is_active": True,
-                "connected_at": timezone.now(),
-            },
-        )
         return obj
 
 
@@ -549,14 +357,12 @@ class Tab(models.Model):
 
     @property
     def can_add_entry(self) -> bool:
-        """True if the tab is not locked.
+        """True if the tab is not locked AND a payment method is on file.
 
-        Note: a saved payment method is no longer required. Direct-keys guilds bill
-        via Stripe Checkout sessions (one-off hosted pages), so the member does not
-        need to save a card up front. They pay at the end of each billing cycle by
-        opening the per-charge `stripe_checkout_url`.
+        A saved card is required because every charge now runs through the
+        single platform Stripe account via an off-session PaymentIntent.
         """
-        return not self.is_locked
+        return not self.is_locked and self.has_payment_method
 
     @property
     def remaining_limit(self) -> Decimal:
@@ -982,20 +788,13 @@ class TabCharge(models.Model):
         related_name="charges",
         help_text="The tab this charge belongs to.",
     )
-    stripe_account = models.ForeignKey(
-        StripeAccount,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="charges",
-        help_text="The Stripe Connect account this charge was sent to.",
-    )
     application_fee = models.DecimalField(
         max_digits=8,
         decimal_places=2,
         null=True,
         blank=True,
-        help_text="Platform application fee collected on this charge.",
+        editable=False,
+        help_text="DEPRECATED — historical only, not written after v1.5.0.",
     )
     status = models.CharField(
         max_length=20,
@@ -1025,11 +824,13 @@ class TabCharge(models.Model):
     stripe_checkout_session_id = models.CharField(
         max_length=255,
         blank=True,
-        help_text="Stripe Checkout Session ID (direct-keys mode only).",
+        editable=False,
+        help_text="DEPRECATED — historical only, not written after v1.5.0.",
     )
     stripe_checkout_url = models.URLField(
         blank=True,
-        help_text="Hosted Checkout URL the member opens to pay (direct-keys mode only).",
+        editable=False,
+        help_text="DEPRECATED — historical only, not written after v1.5.0.",
     )
     failure_reason = models.TextField(
         blank=True,
@@ -1079,7 +880,7 @@ class TabCharge(models.Model):
         return self.entries.count()
 
     def execute_stripe_charge(self, idempotency_key: str) -> bool:
-        """Call Stripe for this charge, updating fields in place. Returns True on success.
+        """Call Stripe for this charge via the single platform account. Returns True on success.
 
         On success: sets status=SUCCEEDED, stripe_payment_intent_id, stripe_charge_id,
         stripe_receipt_url, charged_at, and saves.
@@ -1088,55 +889,19 @@ class TabCharge(models.Model):
         from billing import stripe_utils as _stripe_utils
 
         tab = self.tab
-        fee_cents: int | None = int(self.application_fee * 100) if self.application_fee else None
         amount_cents = int(self.amount * 100)
         description = f"Past Lives Makerspace tab — {self.entry_count} items"
         metadata = {"tab_id": str(tab.pk), "charge_id": str(self.pk)}
 
         try:
-            if self.stripe_account and self.stripe_account.auth_mode == StripeAccount.AuthMode.DIRECT_KEYS:
-                # Direct-keys mode: create a hosted Checkout session on the guild's
-                # own Stripe account. The member opens the URL to pay; we mark the
-                # charge SUCCEEDED via the per-guild webhook on checkout.session.completed.
-                session = _stripe_utils.create_checkout_session_for_account(
-                    stripe_account=self.stripe_account,
-                    amount_cents=amount_cents,
-                    description=description,
-                    metadata=metadata,
-                    idempotency_key=idempotency_key,
-                )
-                self.stripe_checkout_session_id = session["id"]
-                self.stripe_checkout_url = session["url"]
-                self.status = self.Status.PENDING_CHECKOUT
-                self.save(
-                    update_fields=[
-                        "stripe_checkout_session_id",
-                        "stripe_checkout_url",
-                        "status",
-                    ]
-                )
-                return True
-            if self.stripe_account:
-                # OAuth Connect mode: destination charge with optional platform fee.
-                result = _stripe_utils.create_destination_payment_intent(
-                    customer_id=tab.stripe_customer_id,
-                    payment_method_id=tab.stripe_payment_method_id,
-                    amount_cents=amount_cents,
-                    description=description,
-                    metadata=metadata,
-                    idempotency_key=idempotency_key,
-                    destination_account_id=self.stripe_account.stripe_account_id,
-                    application_fee_cents=fee_cents,
-                )
-            else:
-                result = _stripe_utils.create_payment_intent(
-                    customer_id=tab.stripe_customer_id,
-                    payment_method_id=tab.stripe_payment_method_id,
-                    amount_cents=amount_cents,
-                    description=description,
-                    metadata=metadata,
-                    idempotency_key=idempotency_key,
-                )
+            result = _stripe_utils.create_payment_intent(
+                customer_id=tab.stripe_customer_id,
+                payment_method_id=tab.stripe_payment_method_id,
+                amount_cents=amount_cents,
+                description=description,
+                metadata=metadata,
+                idempotency_key=idempotency_key,
+            )
             self.stripe_payment_intent_id = result["id"]
             self.stripe_charge_id = result["charge_id"]
             self.stripe_receipt_url = result["receipt_url"]

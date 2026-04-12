@@ -5,7 +5,7 @@ from decimal import Decimal
 import factory
 from django.contrib.auth import get_user_model
 
-from billing.models import BillingSettings, Product, StripeAccount, Tab, TabCharge, TabEntry
+from billing.models import BillingSettings, Product, Tab, TabCharge, TabEntry
 from tests.membership.factories import GuildFactory, MemberFactory
 
 User = get_user_model()
@@ -28,26 +28,6 @@ class BillingSettingsFactory(factory.django.DjangoModelFactory):
     charge_frequency = BillingSettings.ChargeFrequency.MONTHLY
     default_tab_limit = Decimal("200.00")
     default_admin_percent = Decimal("20.00")
-
-
-class StripeAccountFactory(factory.django.DjangoModelFactory):
-    class Meta:
-        model = StripeAccount
-
-    guild = factory.SubFactory(GuildFactory)
-    auth_mode = StripeAccount.AuthMode.OAUTH
-    stripe_account_id = factory.Sequence(lambda n: f"acct_test_{n:04d}")
-    display_name = factory.LazyAttribute(lambda o: f"{o.guild.name} Account" if o.guild else "Platform Account")
-    is_active = True
-    platform_fee_percent = Decimal("0.00")
-
-
-class DirectKeysStripeAccountFactory(StripeAccountFactory):
-    auth_mode = StripeAccount.AuthMode.DIRECT_KEYS
-    direct_secret_key = "sk_test_directkeysfactory"
-    direct_publishable_key = "pk_test_directkeysfactory"
-    direct_webhook_secret = "whsec_directkeysfactory"
-    platform_fee_percent = Decimal("0.00")
 
 
 class ProductFactory(factory.django.DjangoModelFactory):
