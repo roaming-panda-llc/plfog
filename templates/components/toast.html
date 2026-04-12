@@ -19,10 +19,11 @@ Triggered by:
 
 <script>
 function plToastManager() {
+    var _nextId = 0;
     return {
         toasts: [],
         add(detail) {
-            var id = Date.now();
+            var id = ++_nextId;
             this.toasts.push({id: id, message: detail.message, type: detail.type || 'success', visible: true});
             var self = this;
             setTimeout(function() { self.dismiss(id); }, 4000);
