@@ -27,6 +27,7 @@ class BillingSettingsFactory(factory.django.DjangoModelFactory):
     pk = 1
     charge_frequency = BillingSettings.ChargeFrequency.MONTHLY
     default_tab_limit = Decimal("200.00")
+    default_admin_percent = Decimal("20.00")
 
 
 class StripeAccountFactory(factory.django.DjangoModelFactory):
@@ -57,6 +58,8 @@ class ProductFactory(factory.django.DjangoModelFactory):
     price = Decimal("10.00")
     guild = factory.SubFactory(GuildFactory)
     is_active = True
+    admin_percent_override = None
+    split_mode = Product.SplitMode.SINGLE_GUILD
 
 
 class TabFactory(factory.django.DjangoModelFactory):
@@ -74,9 +77,14 @@ class TabEntryFactory(factory.django.DjangoModelFactory):
         model = TabEntry
 
     tab = factory.SubFactory(TabFactory)
+    product = None
     description = factory.Faker("sentence", nb_words=4)
     amount = Decimal("25.00")
     entry_type = TabEntry.EntryType.MANUAL
+    admin_percent = Decimal("20.00")
+    split_mode = Product.SplitMode.SINGLE_GUILD
+    split_guild_ids: list = []
+    guild = factory.LazyAttribute(lambda o: o.product.guild if o.product else None)
 
 
 class TabChargeFactory(factory.django.DjangoModelFactory):

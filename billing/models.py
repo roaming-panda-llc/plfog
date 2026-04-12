@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
 from django.db.models import DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce
@@ -68,6 +69,16 @@ class BillingSettings(models.Model):
         default=24,
         help_text="Hours between retry attempts for failed charges.",
     )
+    default_admin_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("20.00"),
+        validators=[MinValueValidator(Decimal("0")), MaxValueValidator(Decimal("100"))],
+        help_text=(
+            "Site-wide default admin percentage on each charge (0-100). Overridden per-product "
+            "on Product.admin_percent_override."
+        ),
+    )
 
     # ---- Stripe Connect platform configuration ----
     # Used by OAuth-mode StripeAccount rows. Direct-keys mode does not need any
@@ -126,6 +137,10 @@ class BillingSettings(models.Model):
                     | (Q(charge_day_of_month__gte=1) & Q(charge_day_of_month__lte=28))
                 ),
                 name="billing_settings_day_of_month_range",
+            ),
+            models.CheckConstraint(
+                condition=(Q(default_admin_percent__gte=0) & Q(default_admin_percent__lte=100)),
+                name="billing_settings_default_admin_percent_range",
             ),
         ]
 
@@ -359,6 +374,10 @@ class StripeAccount(models.Model):
 class Product(models.Model):
     """A purchasable product offered by a guild."""
 
+    class SplitMode(models.TextChoices):
+        SINGLE_GUILD = "single_guild", "Guild share to owning guild"
+        SPLIT_EQUALLY = "split_equally", "Guild share split equally across all active guilds"
+
     name = models.CharField(
         max_length=255,
         help_text="Display name of the product.",
@@ -373,6 +392,23 @@ class Product(models.Model):
         on_delete=models.CASCADE,
         related_name="products",
         help_text="The guild that offers this product.",
+    )
+    admin_percent_override = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0")), MaxValueValidator(Decimal("100"))],
+        help_text=(
+            "Admin percent for this product (0-100). Overrides BillingSettings.default_admin_percent "
+            "when set. Null uses the site default."
+        ),
+    )
+    split_mode = models.CharField(
+        max_length=20,
+        choices=SplitMode.choices,
+        default=SplitMode.SINGLE_GUILD,
+        help_text="How the guild portion of this product's charges is allocated.",
     )
     is_active = models.BooleanField(
         default=True,
@@ -393,10 +429,24 @@ class Product(models.Model):
         ordering = ["guild__name", "name"]
         constraints = [
             models.CheckConstraint(condition=Q(price__gt=0), name="product_price_positive"),
+            models.CheckConstraint(
+                condition=(
+                    Q(admin_percent_override__isnull=True)
+                    | (Q(admin_percent_override__gte=0) & Q(admin_percent_override__lte=100))
+                ),
+                name="product_admin_percent_override_range",
+            ),
         ]
 
     def __str__(self) -> str:
         return self.name
+
+    @property
+    def effective_admin_percent(self) -> Decimal:
+        """Resolve the admin percent for this product (override or site default)."""
+        if self.admin_percent_override is not None:
+            return self.admin_percent_override
+        return BillingSettings.load().default_admin_percent
 
 
 # ---------------------------------------------------------------------------
@@ -658,6 +708,46 @@ class TabEntry(models.Model):
         max_digits=8,
         decimal_places=2,
         help_text="Amount in USD. Must be positive.",
+    )
+    # ---- Snapshot split fields (frozen at entry creation) ----
+    # See Tab.add_entry() — these are never recomputed at read time, so historical
+    # reports stay stable when Product.admin_percent_override changes or guilds
+    # activate/deactivate later.
+    admin_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,  # temporary — migration 0007 tightens after backfill
+        blank=True,
+        validators=[MinValueValidator(Decimal("0")), MaxValueValidator(Decimal("100"))],
+        help_text=(
+            "Admin percentage applied to this entry at the time it was created. "
+            "Guild share = amount * (1 - admin_percent/100)."
+        ),
+    )
+    split_mode = models.CharField(
+        max_length=20,
+        choices=Product.SplitMode.choices,
+        default=Product.SplitMode.SINGLE_GUILD,
+        help_text="How the guild portion of this entry is allocated among guilds.",
+    )
+    guild = models.ForeignKey(
+        "membership.Guild",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="tab_entries",
+        help_text=(
+            "Owning guild for this entry, snapshotted at creation time. "
+            "Null for manual/unattributed entries."
+        ),
+    )
+    split_guild_ids = models.JSONField(
+        default=list,
+        blank=True,
+        help_text=(
+            "Snapshot of active guild IDs at entry creation, used for SPLIT_EQUALLY entries. "
+            "Empty list for SINGLE_GUILD entries."
+        ),
     )
     entry_type = models.CharField(
         max_length=20,
