@@ -1,0 +1,40 @@
+{% comment %}
+Destructive action confirmation modal.
+
+Parameters (pass via {% include ... with %}):
+  confirm_id           — required, unique DOM id
+  confirm_title        — optional, heading (default: "Are you sure?")
+  confirm_message      — required, body text
+  confirm_action_url   — required, form POST target
+  confirm_button_text  — optional, button label (default: "Confirm")
+  confirm_button_style — optional, "danger" (default) or "primary"
+{% endcomment %}
+<div x-data="{ open: false }"
+     x-show="open"
+     x-transition:enter="modal-enter"
+     x-transition:leave="modal-leave"
+     @open-confirm.window="if ($event.detail === '{{ confirm_id }}') open = true"
+     @keydown.escape.window="open = false"
+     class="pl-modal-backdrop"
+     style="display: none;"
+     role="dialog"
+     aria-modal="true">
+    <div class="pl-modal pl-modal--sm" @click.outside="open = false">
+        <div class="pl-modal__header">
+            <h2 class="pl-modal__title">{{ confirm_title|default:"Are you sure?" }}</h2>
+            <button type="button" @click="open = false" class="pl-modal__close" aria-label="Close">&times;</button>
+        </div>
+        <div class="pl-modal__body">
+            <p style="margin:0 0 1.5rem;">{{ confirm_message }}</p>
+            <div class="pl-modal__actions">
+                <form method="post" action="{{ confirm_action_url }}" style="flex:1;">
+                    {% csrf_token %}
+                    <button type="submit" class="pl-btn pl-btn--{{ confirm_button_style|default:'danger' }}" style="width:100%;">
+                        {{ confirm_button_text|default:"Confirm" }}
+                    </button>
+                </form>
+                <button type="button" @click="open = false" class="pl-btn pl-btn--secondary" style="flex:1;">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
