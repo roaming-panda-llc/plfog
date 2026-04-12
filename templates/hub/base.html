@@ -9,6 +9,7 @@
     <link rel="icon" type="image/png" href="{% static 'img/favicon.png' %}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/hub.css' %}">
+    <link rel="stylesheet" href="{% static 'css/components.css' %}">
     <script>
         (function() {
             var t = localStorage.getItem('theme');
@@ -163,6 +164,7 @@
         </main>
     </div>
 
+    {% include "components/toast.html" %}
     {% include "includes/changelog_modal.html" %}
     <script src="{% static 'js/htmx.min.js' %}"></script>
     <script>
@@ -175,6 +177,19 @@
         document.addEventListener('htmx:afterSettle', function(event) {
             if (window.Alpine) {
                 Alpine.initTree(event.detail.elt);
+            }
+        });
+    </script>
+    <script>
+        document.body.addEventListener('htmx:afterRequest', function(event) {
+            var trigger = event.detail.xhr && event.detail.xhr.getResponseHeader('HX-Trigger');
+            if (trigger) {
+                try {
+                    var data = JSON.parse(trigger);
+                    if (data.showToast) {
+                        window.dispatchEvent(new CustomEvent('show-toast', {detail: data.showToast}));
+                    }
+                } catch(e) {}
             }
         });
     </script>
