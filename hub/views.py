@@ -13,8 +13,9 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from billing.exceptions import TabLimitExceededError, TabLockedError
+from billing.forms import CONTEXT_MEMBER_TAB_PAGE, TabItemForm
 from billing.models import Product, Tab, TabCharge
-from hub.forms import AddTabEntryForm, BetaFeedbackForm, EmailPreferencesForm, ProfileSettingsForm, VotePreferenceForm
+from hub.forms import BetaFeedbackForm, EmailPreferencesForm, ProfileSettingsForm, VotePreferenceForm
 from membership.cycle import get_cycle_context
 from membership.models import FundingSnapshot, Guild, Member, VotePreference
 
@@ -274,15 +275,13 @@ def tab_detail(request: HttpRequest) -> HttpResponse:
     products = Product.objects.filter(is_active=True).select_related("guild").order_by("guild__name", "name")
 
     if request.method == "POST":
-        form = AddTabEntryForm(request.POST)
+        form = TabItemForm(request.POST, context=CONTEXT_MEMBER_TAB_PAGE, user=request.user)
         if form.is_valid():
             try:
-                tab.add_entry(
-                    description=form.cleaned_data["description"],
-                    amount=form.cleaned_data["amount"],
+                form.apply_to_tab(
+                    tab,
                     added_by=request.user,  # type: ignore[arg-type]  # @login_required guarantees User
                     is_self_service=True,
-                    product=form.cleaned_data.get("product"),
                 )
                 messages.success(request, "Item added to your tab.")
                 return redirect("hub_tab_detail")
@@ -291,7 +290,7 @@ def tab_detail(request: HttpRequest) -> HttpResponse:
             except TabLimitExceededError:
                 messages.error(request, "This item would exceed your tab limit.")
     else:
-        form = AddTabEntryForm()
+        form = TabItemForm(context=CONTEXT_MEMBER_TAB_PAGE, user=request.user)
 
     return render(
         request,

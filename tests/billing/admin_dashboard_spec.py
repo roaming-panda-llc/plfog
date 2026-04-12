@@ -271,6 +271,7 @@ def describe_billing_admin_save_settings():
                 "charge_day_of_week": "1",
                 "charge_day_of_month": "",
                 "default_tab_limit": "150.00",
+                "default_admin_percent": "20.00",
                 "max_retry_attempts": "5",
                 "retry_interval_hours": "12",
             },

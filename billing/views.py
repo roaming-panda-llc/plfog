@@ -18,7 +18,7 @@ from django.views.decorators.http import require_POST
 
 from billing import stripe_utils, webhook_handlers
 from billing.exceptions import TabLimitExceededError, TabLockedError
-from billing.forms import AdminAddTabEntryForm
+from billing.forms import CONTEXT_ADMIN_DASHBOARD, TabItemForm
 from billing.models import BillingSettings, Tab, TabCharge, TabEntry
 
 logger = logging.getLogger(__name__)
@@ -142,7 +142,7 @@ _VALID_TABS = {"overview", "open-tabs", "history", "settings", "stripe"}
 def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
     """Admin payments dashboard — five-tab view of billing data."""
     from django.contrib import admin as django_admin
-    from billing.forms import AdminAddTabEntryForm, BillingSettingsForm
+    from billing.forms import BillingSettingsForm
     from billing.models import BillingSettings, Product
     from membership.models import Guild
 
@@ -242,7 +242,7 @@ def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
     guilds = Guild.objects.filter(is_active=True).order_by("name")
 
     # --- Add Charge modal form ---
-    add_charge_form = AdminAddTabEntryForm()
+    add_charge_form = TabItemForm(context=CONTEXT_ADMIN_DASHBOARD, user=request.user)
 
     context = {
         **django_admin.site.each_context(request),
@@ -283,18 +283,12 @@ def admin_add_tab_entry(request: HttpRequest) -> HttpResponse:
     from django.contrib import admin
 
     if request.method == "POST":
-        form = AdminAddTabEntryForm(request.POST)
+        form = TabItemForm(request.POST, context=CONTEXT_ADMIN_DASHBOARD, user=request.user)
         if form.is_valid():
             member = form.cleaned_data["member"]
             tab, _created = Tab.objects.get_or_create(member=member)
-            product = form.cleaned_data.get("product")
             try:
-                tab.add_entry(
-                    description=form.cleaned_data["description"],
-                    amount=form.cleaned_data["amount"],
-                    added_by=request.user,  # type: ignore[misc]
-                    product=product,
-                )
+                form.apply_to_tab(tab, added_by=request.user, is_self_service=False)
             except (TabLockedError, TabLimitExceededError) as exc:
                 django_messages.error(request, str(exc))
                 context = {**admin.site.each_context(request), "form": form}
@@ -302,7 +296,7 @@ def admin_add_tab_entry(request: HttpRequest) -> HttpResponse:
             django_messages.success(request, f"Added ${form.cleaned_data['amount']} to {member.display_name}'s tab.")
             return redirect("billing_admin_dashboard")
     else:
-        form = AdminAddTabEntryForm()
+        form = TabItemForm(context=CONTEXT_ADMIN_DASHBOARD, user=request.user)
 
     context = {**admin.site.each_context(request), "form": form}
     return render(request, "billing/admin_add_entry.html", context)
