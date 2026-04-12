@@ -716,7 +716,7 @@ class TabEntry(models.Model):
     admin_percent = models.DecimalField(
         max_digits=5,
         decimal_places=2,
-        null=True,  # temporary — migration 0007 tightens after backfill
+        null=True,  # tightened in migration 0007 once Tab.add_entry is updated to populate it
         blank=True,
         validators=[MinValueValidator(Decimal("0")), MaxValueValidator(Decimal("100"))],
         help_text=(
