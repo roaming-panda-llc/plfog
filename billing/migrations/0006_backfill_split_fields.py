@@ -55,8 +55,10 @@ def backfill(apps: Any, schema_editor: Any) -> None:
     TabCharge.objects.filter(application_fee__isnull=True).update(application_fee=Decimal("0.00"))
 
 
-def reverse_noop(apps: Any, schema_editor: Any) -> None:
-    """No-op reverse — the forward migration doesn't destroy data, only fills it."""
+def reverse_backfill(apps: Any, schema_editor: Any) -> None:
+    """Reverse: null out the backfilled split fields so 0007 can be reversed cleanly."""
+    TabEntry = apps.get_model("billing", "TabEntry")
+    TabEntry.objects.all().update(admin_percent=None, split_mode="single_guild", split_guild_ids=[], guild_id=None)
 
 
 class Migration(migrations.Migration):
@@ -65,5 +67,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(backfill, reverse_noop),
+        migrations.RunPython(backfill, reverse_backfill),
     ]

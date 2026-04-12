@@ -200,7 +200,8 @@ class TabItemForm(forms.Form):
         Raises ``TabLockedError`` or ``TabLimitExceededError`` — caller should
         catch and render.
         """
-        assert self.is_valid(), "call form.is_valid() before apply_to_tab()"
+        if not self.is_valid():
+            raise RuntimeError("call form.is_valid() before apply_to_tab()")
         return tab.add_entry(
             description=self.cleaned_data["description"],
             amount=self.cleaned_data["amount"],

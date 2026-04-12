@@ -99,6 +99,20 @@ def describe_guild_detail():
             assert response.status_code == 302
             assert tab.entries.count() == 0
 
+        def it_shows_error_when_no_payment_method(client: Client):
+            BillingSettingsFactory()
+            guild = GuildFactory()
+            product = ProductFactory(guild=guild, price=Decimal("10.00"))
+            MembershipPlanFactory()
+            user = User.objects.create_user(username="nocard_add", password="pass")
+            tab = TabFactory(member=user.member, stripe_payment_method_id="")
+            client.login(username="nocard_add", password="pass")
+
+            response = client.post(f"/guilds/{guild.pk}/", {"product_pk": product.pk})
+
+            assert response.status_code == 302
+            assert tab.entries.count() == 0
+
         def it_shows_error_when_tab_is_locked(client: Client):
             BillingSettingsFactory()
             guild = GuildFactory()
@@ -161,6 +175,22 @@ def describe_guild_detail():
             response = client.get(f"/guilds/{guild.pk}/")
             assert response.status_code == 200
             assert b"saved payment method" in response.content
+
+        def it_shows_error_when_no_payment_method_on_eyop_post(client: Client):
+            BillingSettingsFactory()
+            guild = GuildFactory()
+            MembershipPlanFactory()
+            user = User.objects.create_user(username="nocard_eyop", password="pass")
+            TabFactory(member=user.member, stripe_payment_method_id="")
+            client.login(username="nocard_eyop", password="pass")
+
+            response = client.post(
+                f"/guilds/{guild.pk}/",
+                {"description": "Custom item", "amount": "5.00"},
+            )
+
+            assert response.status_code == 200
+            assert b"payment method" in response.content.lower()
 
         def it_shows_error_when_tab_is_locked_on_eyop_post(client: Client):
             BillingSettingsFactory()

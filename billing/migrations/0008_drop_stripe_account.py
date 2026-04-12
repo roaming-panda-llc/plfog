@@ -19,7 +19,12 @@ def null_stripe_account_fks(apps: Any, schema_editor: Any) -> None:
 
 
 def reverse_noop(apps: Any, schema_editor: Any) -> None:
-    """No-op reverse — StripeAccount is gone for good."""
+    """No-op reverse (explicitly approved — irreversible by design).
+
+    StripeAccount is permanently removed. Reversing this migration requires
+    restoring the model definition in models.py, which is outside the scope of
+    a data-migration reverse function.
+    """
 
 
 class Migration(migrations.Migration):

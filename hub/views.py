@@ -12,7 +12,7 @@ from django.db.models import Count, Prefetch
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
-from billing.exceptions import TabLimitExceededError, TabLockedError
+from billing.exceptions import NoPaymentMethodError, TabLimitExceededError, TabLockedError
 from billing.forms import CONTEXT_MEMBER_TAB_PAGE, TabItemForm
 from billing.models import Product, Tab, TabCharge
 from hub.forms import BetaFeedbackForm, EmailPreferencesForm, ProfileSettingsForm, VotePreferenceForm
@@ -197,6 +197,8 @@ def snapshot_detail(request: HttpRequest, pk: int) -> HttpResponse:
 def _handle_guild_product_add(request: HttpRequest, guild: Guild, tab: Tab) -> HttpResponse:
     """Handle the product-card "Add to tab" button POST from /guilds/<pk>/."""
     try:
+        if not tab.can_add_entry:
+            raise NoPaymentMethodError("You need a payment method on file before adding charges.")
         product = guild.products.get(pk=int(request.POST["product_pk"]), is_active=True)
         tab.add_entry(
             description=product.name,
@@ -208,6 +210,8 @@ def _handle_guild_product_add(request: HttpRequest, guild: Guild, tab: Tab) -> H
         messages.success(request, f"Added {product.name} to your tab.")
     except (Product.DoesNotExist, ValueError, KeyError):
         messages.error(request, "Couldn't find that product.")
+    except NoPaymentMethodError:
+        messages.error(request, "You need a payment method on file before adding charges.")
     except TabLockedError:
         messages.error(request, "Your tab is locked. Please contact an admin.")
     except TabLimitExceededError:
@@ -247,6 +251,8 @@ def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
         )
         if eyop_form.is_valid():
             try:
+                if not tab.can_add_entry:
+                    raise NoPaymentMethodError("You need a payment method on file before adding charges.")
                 eyop_form.apply_to_tab(
                     tab,
                     added_by=request.user,
@@ -254,6 +260,8 @@ def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
                 )
                 messages.success(request, "Added to your tab.")
                 return redirect("hub_guild_detail", pk=guild.pk)
+            except NoPaymentMethodError:
+                messages.error(request, "You need a payment method on file before adding charges.")
             except TabLockedError:
                 messages.error(request, "Your tab is locked. Please contact an admin.")
             except TabLimitExceededError:

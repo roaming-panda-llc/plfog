@@ -6,6 +6,7 @@ switching branches or pulling new migrations.
 
 from __future__ import annotations
 
+import os
 import sys
 
 from django.conf import settings
@@ -18,7 +19,8 @@ class Command(BaseRunserver):
         if settings.DEBUG:
             self.stdout.write(self.style.NOTICE("[dev] Checking for unapplied migrations…"))
             try:
-                call_command("migrate", "--check", stdout=open("/dev/null", "w"))
+                with open(os.devnull, "w") as devnull:
+                    call_command("migrate", "--check", stdout=devnull)
                 self.stdout.write(self.style.SUCCESS("[dev] All migrations applied."))
             except SystemExit:
                 self.stdout.write(self.style.WARNING("[dev] Unapplied migrations detected — running migrate…"))

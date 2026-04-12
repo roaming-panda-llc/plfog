@@ -224,6 +224,19 @@ def describe_TabItemForm_apply_to_tab():
         assert entry.admin_percent == Decimal("20.00")
         assert entry.split_mode == Product.SplitMode.SINGLE_GUILD
 
+    def it_raises_runtime_error_when_form_is_invalid():
+        BillingSettingsFactory()
+        tab = TabFactory()
+        guild = GuildFactory()
+        form = TabItemForm(
+            data={},
+            context=CONTEXT_MEMBER_GUILD_PAGE,
+            guild=guild,
+        )
+        assert not form.is_valid()
+        with pytest.raises(RuntimeError, match="call form.is_valid"):
+            form.apply_to_tab(tab, added_by=None, is_self_service=True)
+
 
 def describe_VoidTabEntryForm():
     def it_is_valid_with_reason():
