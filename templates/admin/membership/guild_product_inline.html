@@ -74,29 +74,33 @@
             {% endif %}
         </div>
 
-        {# Add product form — first non-original form; skip the last one (JS empty template) #}
-        {% for inline_admin_form in inline_admin_formset %}
-            {% if not inline_admin_form.original and not forloop.last %}
-            <div class="pl-add-product">
-                <h4 class="pl-add-product__title">Add Product</h4>
-                <div class="pl-add-product__fields">
-                    {% for fieldset in inline_admin_form %}
-                        {% for line in fieldset %}
-                            {% for field in line %}
-                                {% if not field.field.is_hidden %}
-                                <div class="pl-add-product__field">
-                                    <label for="{{ field.field.auto_id }}">{{ field.field.label }}</label>
-                                    {{ field.field }}
-                                </div>
-                                {% endif %}
+        {# Add product form — hidden by default, revealed on button click #}
+        <div x-data="{ showForm: false }">
+            <button type="button" @click="showForm = !showForm" class="pl-product-btn pl-product-btn--add" style="margin-top:1rem;">
+                <span x-text="showForm ? '− Cancel' : '+ Add Product'"></span>
+            </button>
+            {% for inline_admin_form in inline_admin_formset %}
+                {% if not inline_admin_form.original and not forloop.last %}
+                <div x-show="showForm" x-transition class="pl-add-product" style="margin-top:0.75rem;">
+                    <div class="pl-add-product__fields">
+                        {% for fieldset in inline_admin_form %}
+                            {% for line in fieldset %}
+                                {% for field in line %}
+                                    {% if not field.field.is_hidden %}
+                                    <div class="pl-add-product__field">
+                                        <label for="{{ field.field.auto_id }}">{{ field.field.label }}</label>
+                                        {{ field.field }}
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
                             {% endfor %}
                         {% endfor %}
-                    {% endfor %}
+                    </div>
+                    <button type="submit" name="_save" class="pl-add-product__btn">Add Product</button>
                 </div>
-                <button type="submit" name="_save" class="pl-add-product__btn">Add Product</button>
-            </div>
-            {% endif %}
-        {% endfor %}
+                {% endif %}
+            {% endfor %}
+        </div>
     </div>
 </div>
 
