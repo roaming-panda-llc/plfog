@@ -169,9 +169,10 @@ class TabChargeAdmin(ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(ModelAdmin):
-    list_display = ["name", "guild_name", "price", "is_active"]
-    list_filter = ["is_active", "guild"]
+    list_display = ["name", "guild_name", "price", "admin_percent_override", "split_mode", "is_active"]
+    list_filter = ["is_active", "guild", "split_mode"]
     search_fields = ["name", "guild__name"]
+    fields = ["name", "guild", "price", "admin_percent_override", "split_mode", "is_active"]
 
     @admin.display(description="Guild", ordering="guild__name")
     def guild_name(self, obj: Product) -> str:

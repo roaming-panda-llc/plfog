@@ -257,7 +257,7 @@ class MemberAdmin(ModelAdmin):
 
 class GuildProductInline(TabularInline):
     model = Product
-    fields = ["name", "price"]
+    fields = ["name", "price", "admin_percent_override", "split_mode", "is_active"]
     extra = 1
     show_change_link = False
     template = "admin/membership/guild_product_inline.html"
