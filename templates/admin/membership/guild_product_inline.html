@@ -49,7 +49,7 @@
                                 {% url 'admin:billing_product_change' inline_admin_form.original.pk as edit_url %}
                                 <a href="{{ edit_url }}" class="pl-product-btn pl-product-btn--edit">Edit</a>
                                 <button type="button" class="pl-product-btn pl-product-btn--delete"
-                                    onclick="plOpenDeleteModal('{{ inline_admin_form.original.name|escapejs }}', '{{ inline_admin_formset.formset.prefix }}-{{ forloop.counter0 }}')">
+                                    @click="$dispatch('open-product-delete', {name: '{{ inline_admin_form.original.name|escapejs }}', prefix: '{{ inline_admin_formset.formset.prefix }}-{{ forloop.counter0 }}'})">
                                     Delete
                                 </button>
                                 {# Hidden delete checkbox — checked by JS when user confirms #}
@@ -104,38 +104,31 @@
     </div>
 </div>
 
-{# Delete confirmation modal #}
-<div id="pl-product-delete-modal" class="changelog-overlay" style="display:none;" onclick="if(event.target===this)this.style.display='none'">
-    <div class="changelog-modal" style="max-width:400px;width:100%;">
-        <div class="changelog-modal__header">
-            <h2 class="changelog-modal__title">Delete product?</h2>
-            <button type="button" class="changelog-modal__close" onclick="document.getElementById('pl-product-delete-modal').style.display='none'">&times;</button>
+{# Delete confirmation modal — uses pl-modal component styles #}
+<div x-data="{ open: false, productName: '', deletePrefix: '' }"
+     x-show="open"
+     x-transition:enter="modal-enter"
+     x-transition:leave="modal-leave"
+     @open-product-delete.window="open = true; productName = $event.detail.name; deletePrefix = $event.detail.prefix"
+     @keydown.escape.window="open = false"
+     class="pl-modal-backdrop"
+     style="display: none;"
+     role="dialog"
+     aria-modal="true">
+    <div class="pl-modal pl-modal--sm" @click.outside="open = false">
+        <div class="pl-modal__header">
+            <h2 class="pl-modal__title">Delete product?</h2>
+            <button type="button" @click="open = false" class="pl-modal__close" aria-label="Close">&times;</button>
         </div>
-        <div class="changelog-modal__body">
-            <p style="margin:0 0 1.5rem;">Are you sure you want to delete <strong id="pl-delete-product-name"></strong>? This cannot be undone.</p>
-            <div style="display:flex;gap:0.75rem;">
-                <button type="submit" name="_save" id="pl-delete-confirm-btn" class="hub-btn hub-btn--danger" style="flex:1;" onclick="plConfirmDelete()">Yes, delete</button>
-                <button type="button" class="hub-btn" style="flex:1;" onclick="document.getElementById('pl-product-delete-modal').style.display='none'">Cancel</button>
+        <div class="pl-modal__body">
+            <p style="margin:0 0 1.5rem;">Are you sure you want to delete <strong x-text="productName"></strong>? This cannot be undone.</p>
+            <div class="pl-modal__actions">
+                <button type="submit" name="_save" class="pl-btn pl-btn--danger" style="flex:1;"
+                    @click="var input = document.querySelector('[name=\'' + deletePrefix + '-DELETE\']'); if (input) input.checked = true; open = false;">
+                    Yes, delete
+                </button>
+                <button type="button" @click="open = false" class="pl-btn pl-btn--secondary" style="flex:1;">Cancel</button>
             </div>
         </div>
     </div>
 </div>
-
-<script>
-(function() {
-    var _pendingDeletePrefix = null;
-
-    window.plOpenDeleteModal = function(name, prefix) {
-        _pendingDeletePrefix = prefix;
-        document.getElementById('pl-delete-product-name').textContent = name;
-        document.getElementById('pl-product-delete-modal').style.display = 'flex';
-    };
-
-    window.plConfirmDelete = function() {
-        if (!_pendingDeletePrefix) return;
-        var deleteInput = document.querySelector('[name="' + _pendingDeletePrefix + '-DELETE"]');
-        if (deleteInput) deleteInput.checked = true;
-        document.getElementById('pl-product-delete-modal').style.display = 'none';
-    };
-})();
-</script>
