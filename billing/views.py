@@ -394,9 +394,18 @@ def admin_reports(request: HttpRequest) -> HttpResponse:
     filter_kwargs = filter_form.filter_kwargs()
     rows, payout_summary, admin_total = build_report(**filter_kwargs)
 
+    # Resolve multi-value fields to lists so the template can check membership
+    _getlist = effective_filters.getlist if hasattr(effective_filters, "getlist") else lambda k: []
+    selected_guilds = _getlist("guilds")
+    selected_charge_types = _getlist("charge_type")
+    selected_statuses = _getlist("status")
+
     context = {
         **django_admin.site.each_context(request),
         "filters": effective_filters,
+        "selected_guilds": selected_guilds,
+        "selected_charge_types": selected_charge_types,
+        "selected_statuses": selected_statuses,
         "rows": rows,
         "payout_summary": payout_summary,
         "admin_total": admin_total,

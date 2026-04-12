@@ -226,6 +226,19 @@ def describe_Tab_add_entry_snapshots():
         expected_ids = sorted([product.guild_id] + [g.pk for g in other_guilds])
         assert sorted(entry.split_guild_ids) == expected_ids
 
+    def it_excludes_inactive_guilds_from_split_equally_snapshot(tab):
+        from billing.models import Product
+        from tests.billing.factories import ProductFactory
+        from tests.membership.factories import GuildFactory
+
+        active_guild = GuildFactory(is_active=True)
+        GuildFactory(is_active=False)  # should be excluded
+        product = ProductFactory(split_mode=Product.SplitMode.SPLIT_EQUALLY)
+        entry = tab.add_entry(description=product.name, amount=product.price, product=product)
+        # Only active guilds: product's guild + active_guild
+        expected_ids = sorted([product.guild_id, active_guild.pk])
+        assert sorted(entry.split_guild_ids) == expected_ids
+
     def it_does_not_retroactively_affect_existing_entries(tab):
         """Creating a new guild after an entry must not alter that entry's snapshot."""
         from billing.models import Product

@@ -412,7 +412,9 @@ class Tab(models.Model):
         resolved_split_mode = split_mode or (product.split_mode if product else Product.SplitMode.SINGLE_GUILD)
 
         if resolved_split_mode == Product.SplitMode.SPLIT_EQUALLY:
-            resolved_split_guild_ids = list(_Guild.objects.order_by("pk").values_list("pk", flat=True))
+            resolved_split_guild_ids = list(
+                _Guild.objects.filter(is_active=True).order_by("pk").values_list("pk", flat=True)
+            )
         else:
             resolved_split_guild_ids = []
 

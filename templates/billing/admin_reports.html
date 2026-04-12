@@ -54,7 +54,7 @@
           <label for="guilds">Guilds (Ctrl/Cmd+click for multiple)</label>
           <select name="guilds" id="guilds" multiple size="5">
             {% for g in guilds %}
-            <option value="{{ g.pk }}" {% if g.pk|stringformat:"s" in filters.guilds %}selected{% endif %}>{{ g.name }}</option>
+            <option value="{{ g.pk }}" {% if g.pk|stringformat:"s" in selected_guilds %}selected{% endif %}>{{ g.name }}</option>
             {% endfor %}
           </select>
         </div>
@@ -64,7 +64,7 @@
             {% for value, label in charge_type_choices %}
             <label>
               <input type="checkbox" name="charge_type" value="{{ value }}"
-                {% if value in filters.charge_type %}checked{% endif %}>
+                {% if value in selected_charge_types %}checked{% endif %}>
               {{ label }}
             </label>
             {% endfor %}
@@ -76,7 +76,7 @@
             {% for value, label in status_choices %}
             <label>
               <input type="checkbox" name="status" value="{{ value }}"
-                {% if value in filters.status %}checked{% endif %}>
+                {% if value in selected_statuses %}checked{% endif %}>
               {{ label }}
             </label>
             {% endfor %}

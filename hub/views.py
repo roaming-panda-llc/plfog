@@ -357,6 +357,8 @@ def tab_detail(request: HttpRequest) -> HttpResponse:
         form = TabItemForm(request.POST, context=CONTEXT_MEMBER_TAB_PAGE, user=request.user)
         if form.is_valid():
             try:
+                if not tab.can_add_entry:
+                    raise NoPaymentMethodError("You need a payment method on file before adding charges.")
                 form.apply_to_tab(
                     tab,
                     added_by=request.user,  # type: ignore[arg-type]  # @login_required guarantees User
@@ -364,6 +366,8 @@ def tab_detail(request: HttpRequest) -> HttpResponse:
                 )
                 messages.success(request, "Item added to your tab.")
                 return redirect("hub_tab_detail")
+            except NoPaymentMethodError:
+                messages.error(request, "You need a payment method on file before adding charges.")
             except TabLockedError:
                 messages.error(request, "Your tab is locked. Please contact an admin.")
             except TabLimitExceededError:
