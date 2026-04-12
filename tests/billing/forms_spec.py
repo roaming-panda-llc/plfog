@@ -309,6 +309,63 @@ def describe_BillingSettingsForm():
         assert "default_tab_limit" in form.errors
 
 
+def describe_user_can_edit_split():
+    def it_returns_false_when_user_has_no_member_attr():
+        from billing.forms import _user_can_edit_split
+        from django.contrib.auth.models import AnonymousUser
+
+        # AnonymousUser has no .member attribute — exercises the `member is None` branch
+        user = AnonymousUser()
+        assert _user_can_edit_split(user) is False
+
+
+def describe_TabItemForm_unknown_context():
+    def it_raises_value_error_for_unknown_context():
+        import pytest
+
+        with pytest.raises(ValueError, match="Unknown TabItemForm context"):
+            TabItemForm(context="bogus_context")
+
+    def it_reaches_role_gating_without_any_field_branch_via_extended_valid_contexts():
+        import billing.forms as billing_forms
+        from unittest.mock import patch
+
+        # The elif chain in __init__ has three branches; to hit the implicit
+        # "else" (132->139 False path), we need a context that passes the
+        # VALID_CONTEXTS guard at line 101 but matches none of the three elifs.
+        # We patch VALID_CONTEXTS to include a fourth value.
+        with patch.object(billing_forms, "VALID_CONTEXTS", billing_forms.VALID_CONTEXTS | {"extra_context"}):
+            form = TabItemForm(context="extra_context")
+        # The form was created without setting any context-specific fields —
+        # confirms the False branch of the final elif was taken.
+        assert form.context == "extra_context"
+
+
+def describe_TabItemForm_resolve_admin_percent():
+    def it_converts_non_decimal_non_empty_submitted_value_via_decimal_str():
+        BillingSettingsFactory()
+        # We exercise the branch: submitted not None, not "", not Decimal → Decimal(str(submitted))
+        # TabItemForm.fields["admin_percent"] is a DecimalField, but we can bypass it by
+        # using a superuser-style user (can edit split) and a product with no override,
+        # then checking that a raw numeric string submitted value is converted.
+        from tests.membership.factories import MembershipPlanFactory
+
+        MembershipPlanFactory()
+        user = UserFactory()
+        # Make user a superuser so the field isn't disabled
+        user.is_superuser = True
+        user.save()
+        # Manually call _resolve_admin_percent with a non-Decimal, non-None, non-"" value
+        # The static method coerces via Decimal(str(submitted))
+        from billing.forms import TabItemForm
+
+        cleaned: dict = {"admin_percent": 35}  # int, not Decimal
+        result = TabItemForm._resolve_admin_percent(cleaned, None)
+        from decimal import Decimal
+
+        assert result == Decimal("35")
+
+
 def describe_ConnectPlatformSettingsForm():
     def it_is_valid_when_disabled_with_all_fields_empty():
         form = ConnectPlatformSettingsForm(

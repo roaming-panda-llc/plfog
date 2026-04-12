@@ -30,13 +30,11 @@
 </style>
 
 <div class="pl-dashboard">
-  <div class="pl-card">
-    <h1 class="pl-card__title">Billing Reports</h1>
-    <p class="pl-text-muted" style="margin:0 0 0.5rem">
-      Filter charges and tab entries by date, guild, type, or status. The payout
-      summary shows exactly how much to send each guild for the filtered window.
+  <div>
+    <h1 class="pl-card__title">Reports</h1>
+    <p class="pl-text-muted">
+      Tab entries and guild payout breakdown. Defaults to the current month.
     </p>
-    <a href="{% url 'billing_admin_dashboard' %}" style="color:#EEB44B;font-size:0.875rem;">← Back to Payments</a>
   </div>
 
   {# Filters #}

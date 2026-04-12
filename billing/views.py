@@ -8,7 +8,7 @@ from decimal import Decimal
 from django.contrib import messages as django_messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
-from django.db.models import DecimalField, Sum, Value
+from django.db.models import DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.http import HttpRequest, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import redirect, render
@@ -135,7 +135,7 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
     return HttpResponse(status=200)
 
 
-_VALID_TABS = {"overview", "open-tabs", "history", "settings", "stripe"}
+_VALID_TABS = {"overview", "open-tabs", "settings", "stripe"}
 
 
 @staff_member_required
@@ -182,6 +182,15 @@ def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
     )
 
     # --- Open Tabs tab ---
+    # Annotate with pending balance so we can exclude $0 tabs
+    _pending_balance = Coalesce(
+        Sum(
+            "entries__amount",
+            filter=Q(entries__tab_charge__isnull=True, entries__voided_at__isnull=True),
+        ),
+        Value(Decimal("0.00")),
+        output_field=DecimalField(),
+    )
     tab_filter = request.GET.get("filter", "outstanding")
     if tab_filter == "all":
         open_tabs = Tab.objects.select_related("member").order_by("member__full_legal_name")
@@ -196,39 +205,7 @@ def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
             .distinct()
             .select_related("member")
         )
-
-    # --- History tab ---
-    charge_status_filter = request.GET.get("status", "all")
-    if charge_status_filter == "succeeded":
-        history_charges = TabCharge.objects.succeeded().select_related("tab__member")
-    elif charge_status_filter == "failed":
-        history_charges = TabCharge.objects.failed().select_related("tab__member")
-    elif charge_status_filter == "needs_retry":
-        history_charges = TabCharge.objects.needs_retry().select_related("tab__member")
-    else:
-        history_charges = TabCharge.objects.exclude(status=TabCharge.Status.PENDING).select_related("tab__member")
-    history_charges = history_charges.order_by("-created_at")
-
-    history_collected = TabCharge.objects.filter(
-        status=TabCharge.Status.SUCCEEDED,
-        charged_at__gte=month_start,
-    ).aggregate(total=Coalesce(Sum("amount"), Value(Decimal("0.00")), output_field=DecimalField()))["total"]
-
-    history_failed_count = TabCharge.objects.filter(
-        status=TabCharge.Status.FAILED,
-        created_at__gte=month_start,
-    ).count()
-
-    history_total_count = (
-        TabCharge.objects.filter(created_at__gte=month_start).exclude(status=TabCharge.Status.PENDING).count()
-    )
-
-    history_succeeded_count = TabCharge.objects.filter(
-        status=TabCharge.Status.SUCCEEDED,
-        charged_at__gte=month_start,
-    ).count()
-
-    history_success_rate = int(history_succeeded_count / history_total_count * 100) if history_total_count else 100
+    open_tabs = open_tabs.annotate(_balance=_pending_balance).exclude(_balance__lte=Decimal("0.00"))
 
     # --- Settings tab ---
     from billing.forms import ConnectPlatformSettingsForm
@@ -248,7 +225,6 @@ def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
         **django_admin.site.each_context(request),
         "active_tab": active_tab,
         "tab_filter": tab_filter,
-        "charge_status_filter": charge_status_filter,
         # Overview
         "total_outstanding": total_outstanding,
         "collected_this_month": collected_this_month,
@@ -258,11 +234,6 @@ def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
         "failed_charges": failed_charges,
         # Open Tabs
         "open_tabs": open_tabs,
-        # History
-        "history_charges": history_charges,
-        "history_collected": history_collected,
-        "history_failed_count": history_failed_count,
-        "history_success_rate": history_success_rate,
         # Settings
         "settings_form": settings_form,
         "connect_platform_form": connect_platform_form,
@@ -398,7 +369,11 @@ def billing_admin_retry_charge(request: HttpRequest, charge_pk: int) -> JsonResp
 
 @staff_member_required
 def admin_reports(request: HttpRequest) -> HttpResponse:
-    """Reports page — filtered entry list + per-guild payout summary."""
+    """Reports page — filtered entry list + per-guild payout summary.
+
+    When opened without any GET params, defaults to the current month so the
+    page always shows data immediately.
+    """
     from django.contrib import admin as django_admin
 
     from billing.reports import (
@@ -409,20 +384,19 @@ def admin_reports(request: HttpRequest) -> HttpResponse:
     )
     from membership.models import Guild
 
-    filter_form = ReportFilterForm(request.GET)
-    filter_kwargs = filter_form.filter_kwargs()
+    # Default to current month when no filters are provided
+    now = timezone.now()
+    month_start = now.replace(day=1).date()
+    default_filters = {"start_date": month_start.isoformat(), "end_date": now.date().isoformat()}
+    effective_filters = request.GET if request.GET else default_filters
 
-    rows: list = []
-    payout_summary: list = []
-    admin_total = Decimal("0.00")
-    # Only run the report if the user has opened the page with filters OR pressed
-    # the Run button (empty GET still renders the form with defaults).
-    if request.GET:
-        rows, payout_summary, admin_total = build_report(**filter_kwargs)
+    filter_form = ReportFilterForm(effective_filters)
+    filter_kwargs = filter_form.filter_kwargs()
+    rows, payout_summary, admin_total = build_report(**filter_kwargs)
 
     context = {
         **django_admin.site.each_context(request),
-        "filters": request.GET,
+        "filters": effective_filters,
         "rows": rows,
         "payout_summary": payout_summary,
         "admin_total": admin_total,
@@ -478,4 +452,4 @@ def billing_save_connect_platform(request: HttpRequest) -> HttpResponse:
         for field, errors in form.errors.items():
             for error in errors:
                 django_messages.error(request, f"{field}: {error}")
-    return redirect("/billing/admin/dashboard/?tab=settings")
+    return redirect("/billing/admin/dashboard/?tab=stripe")

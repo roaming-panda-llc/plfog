@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 from django.contrib.auth.models import User
 from django.test import Client
 
+from billing.exceptions import TabLimitExceededError, TabLockedError
 from billing.models import Product, TabEntry
 from tests.billing.factories import BillingSettingsFactory, ProductFactory, TabFactory
 from tests.membership.factories import GuildFactory, MembershipPlanFactory
@@ -97,6 +99,30 @@ def describe_guild_detail():
             assert response.status_code == 302
             assert tab.entries.count() == 0
 
+        def it_shows_error_when_tab_is_locked(client: Client):
+            BillingSettingsFactory()
+            guild = GuildFactory()
+            product = ProductFactory(guild=guild, price=Decimal("10.00"))
+            _user, tab = _linked_user(client)
+
+            with patch("billing.models.Tab.add_entry", side_effect=TabLockedError("locked")):
+                response = client.post(f"/guilds/{guild.pk}/", {"product_pk": product.pk})
+
+            assert response.status_code == 302
+            assert response.url == f"/guilds/{guild.pk}/"
+
+        def it_shows_error_when_tab_limit_exceeded(client: Client):
+            BillingSettingsFactory()
+            guild = GuildFactory()
+            product = ProductFactory(guild=guild, price=Decimal("10.00"))
+            _user, tab = _linked_user(client)
+
+            with patch("billing.models.Tab.add_entry", side_effect=TabLimitExceededError("exceeded")):
+                response = client.post(f"/guilds/{guild.pk}/", {"product_pk": product.pk})
+
+            assert response.status_code == 302
+            assert response.url == f"/guilds/{guild.pk}/"
+
     def describe_eyop_form():
         def it_adds_a_custom_item_with_the_guild_snapshot(client: Client):
             BillingSettingsFactory()
@@ -135,3 +161,61 @@ def describe_guild_detail():
             response = client.get(f"/guilds/{guild.pk}/")
             assert response.status_code == 200
             assert b"saved payment method" in response.content
+
+        def it_shows_error_when_tab_is_locked_on_eyop_post(client: Client):
+            BillingSettingsFactory()
+            guild = GuildFactory()
+            _user, tab = _linked_user(client, username="eyoplocked")
+
+            with patch("billing.models.Tab.add_entry", side_effect=TabLockedError("locked")):
+                response = client.post(
+                    f"/guilds/{guild.pk}/",
+                    {"description": "Custom item", "amount": "5.00"},
+                )
+
+            assert response.status_code == 200
+            assert b"locked" in response.content.lower()
+
+        def it_shows_error_when_tab_limit_exceeded_on_eyop_post(client: Client):
+            BillingSettingsFactory()
+            guild = GuildFactory()
+            _user, tab = _linked_user(client, username="eyoplimit")
+
+            with patch("billing.models.Tab.add_entry", side_effect=TabLimitExceededError("exceeded")):
+                response = client.post(
+                    f"/guilds/{guild.pk}/",
+                    {"description": "Custom item", "amount": "5.00"},
+                )
+
+            assert response.status_code == 200
+            assert b"limit" in response.content.lower()
+
+        def it_rerenders_when_eyop_form_is_invalid(client: Client):
+            BillingSettingsFactory()
+            guild = GuildFactory()
+            _user, tab = _linked_user(client, username="eyopinvalid")
+
+            # Post with missing amount — form is invalid, view re-renders
+            response = client.post(
+                f"/guilds/{guild.pk}/",
+                {"description": "No amount here"},
+            )
+
+            assert response.status_code == 200
+
+    def describe_member_none_branches():
+        def it_renders_without_eyop_form_when_user_has_no_member(client: Client):
+            # A plain User with no linked Member (unlinked account)
+            guild = GuildFactory()
+            user = User.objects.create_user(username="nomember", password="pass")
+            # Remove the auto-created member if present (some signals create one)
+            from membership.models import Member
+
+            Member.objects.filter(user=user).delete()
+            client.login(username="nomember", password="pass")
+
+            response = client.get(f"/guilds/{guild.pk}/")
+
+            # Page still renders, but no eyop form shown
+            assert response.status_code == 200
+            assert response.context["eyop_form"] is None

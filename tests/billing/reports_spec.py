@@ -279,3 +279,91 @@ def describe_admin_reports_csv_view():
         response = client.get("/billing/admin/reports/export/csv/")
         assert response.status_code == 200
         assert response["Content-Type"] == "text/csv"
+
+
+def describe_build_report_custom_only_branch():
+    def it_filters_custom_only_excluding_product_entries():
+        BillingSettingsFactory()
+        guild = GuildFactory()
+        product = ProductFactory(guild=guild)
+        member = MemberFactory()
+        tab = TabFactory(member=member)
+        TabEntryFactory(tab=tab, product=product, guild=guild, amount=Decimal("4.00"))
+        TabEntryFactory(tab=tab, product=None, guild=None, amount=Decimal("5.00"), description="Custom charge")
+
+        rows, _, _ = build_report(charge_types=["custom"])
+
+        assert len(rows) == 1
+        assert rows[0].charge_type == "custom"
+
+    def it_returns_all_entries_when_both_charge_types_requested():
+        BillingSettingsFactory()
+        guild = GuildFactory()
+        product = ProductFactory(guild=guild)
+        member = MemberFactory()
+        tab = TabFactory(member=member)
+        TabEntryFactory(tab=tab, product=product, guild=guild, amount=Decimal("4.00"))
+        TabEntryFactory(tab=tab, product=None, guild=None, amount=Decimal("5.00"), description="Custom charge")
+
+        # When both "product" and "custom" are requested, no SQL filter is applied
+        rows, _, _ = build_report(charge_types=["product", "custom"])
+
+        assert len(rows) == 2
+
+    def it_increments_payout_count_for_second_entry_to_same_guild():
+        BillingSettingsFactory()
+        guild = GuildFactory()
+        member = MemberFactory()
+        tab = TabFactory(member=member)
+        TabEntryFactory(
+            tab=tab,
+            amount=Decimal("10.00"),
+            admin_percent=Decimal("20.00"),
+            guild=guild,
+        )
+        TabEntryFactory(
+            tab=tab,
+            amount=Decimal("6.00"),
+            admin_percent=Decimal("20.00"),
+            guild=guild,
+        )
+
+        _, payouts, _ = build_report()
+
+        assert len(payouts) == 1
+        assert payouts[0].entry_count == 2
+        assert payouts[0].guild_amount == Decimal("12.80")  # (10 * 0.8) + (6 * 0.8)
+
+
+def describe_ReportFilterForm():
+    def it_returns_none_for_invalid_date_format():
+        from billing.reports import ReportFilterForm
+
+        form = ReportFilterForm({"start_date": "not-a-date"})
+        result = form._parse_date("start_date")
+        assert result is None
+
+    def it_parses_int_list_from_plain_string():
+        from billing.reports import ReportFilterForm
+
+        # When data is a plain dict with a string value (not a QueryDict),
+        # _parse_int_list wraps the string in a list
+        form = ReportFilterForm({"guilds": "42"})
+        result = form._parse_int_list("guilds")
+        assert result == [42]
+
+    def it_skips_non_int_values_in_int_list():
+        from billing.reports import ReportFilterForm
+
+        # Exercises the TypeError/ValueError except branch
+        form = ReportFilterForm({"guilds": ["not-a-number", "99"]})
+        result = form._parse_int_list("guilds")
+        assert result == [99]
+
+    def it_parses_str_list_from_plain_string():
+        from billing.reports import ReportFilterForm
+
+        # data.get() returns a string → wraps in list if non-empty
+        form = ReportFilterForm({"charge_type": "product"})
+        result = form._parse_str_list("charge_type")
+        assert result == ["product"]

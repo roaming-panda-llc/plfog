@@ -370,6 +370,12 @@ UNFOLD = {
                         "link": reverse_lazy("billing_admin_dashboard"),
                         "permission": lambda request: request.user.is_superuser,
                     },
+                    {
+                        "title": "Reports",
+                        "icon": "assessment",
+                        "link": reverse_lazy("billing_admin_reports"),
+                        "permission": lambda request: request.user.is_superuser,
+                    },
                 ],
             },
         ],

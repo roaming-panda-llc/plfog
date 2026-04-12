@@ -99,7 +99,6 @@
   <div class="pl-tab-nav">
     <a href="?tab=overview" class="{% if active_tab == 'overview' %}active{% endif %}">Overview</a>
     <a href="?tab=open-tabs" class="{% if active_tab == 'open-tabs' %}active{% endif %}">Open Tabs</a>
-    <a href="?tab=history" class="{% if active_tab == 'history' %}active{% endif %}">History</a>
     <a href="?tab=settings" class="{% if active_tab == 'settings' %}active{% endif %}">Settings</a>
     <a href="?tab=stripe" class="{% if active_tab == 'stripe' %}active{% endif %}">Stripe</a>
   </div>
@@ -240,77 +239,6 @@
   {% endif %}{# /open-tabs #}
 
   {# ================================================================ #}
-  {# HISTORY TAB                                                       #}
-  {# ================================================================ #}
-  {% if active_tab == "history" %}
-
-  <div class="pl-stats pl-stats--3">
-    <div class="pl-stat">
-      <div class="pl-stat__value">${{ history_collected }}</div>
-      <div class="pl-stat__label">Collected This Month</div>
-    </div>
-    <div class="pl-stat">
-      <div class="pl-stat__value" style="color:{% if history_failed_count %}#f87171{% else %}#EEB44B{% endif %}">{{ history_failed_count }}</div>
-      <div class="pl-stat__label">Failed This Month</div>
-    </div>
-    <div class="pl-stat">
-      <div class="pl-stat__value">{{ history_success_rate }}%</div>
-      <div class="pl-stat__label">Success Rate</div>
-    </div>
-  </div>
-
-  <div class="pl-toolbar">
-    <div class="pl-filters">
-      <a href="?tab=history&status=all" class="pl-filter {% if charge_status_filter == 'all' %}active{% endif %}">All</a>
-      <a href="?tab=history&status=succeeded" class="pl-filter {% if charge_status_filter == 'succeeded' %}active{% endif %}">Succeeded</a>
-      <a href="?tab=history&status=failed" class="pl-filter {% if charge_status_filter == 'failed' %}active{% endif %}">Failed</a>
-      <a href="?tab=history&status=needs_retry" class="pl-filter {% if charge_status_filter == 'needs_retry' %}active{% endif %}">Needs Retry</a>
-    </div>
-  </div>
-
-  <div class="pl-card">
-    <table class="pl-table">
-      <thead>
-        <tr>
-          <th>Member</th>
-          <th class="text-right">Amount</th>
-          <th>Status</th>
-          <th>Retries</th>
-          <th>Date</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for charge in history_charges %}
-        <tr>
-          <td onclick="openTabModal({{ charge.tab.pk }})" style="cursor:pointer;color:#EEB44B">{{ charge.tab.member.display_name }}</td>
-          <td class="text-right">${{ charge.amount }}</td>
-          <td>
-            {% if charge.status == "succeeded" %}<span class="pl-badge pl-badge--ok">Succeeded</span>
-            {% elif charge.status == "failed" %}<span class="pl-badge pl-badge--fail">Failed</span>
-            {% elif charge.status == "processing" %}<span class="pl-badge pl-badge--warn">Processing</span>
-            {% else %}<span class="pl-badge pl-badge--muted">{{ charge.get_status_display }}</span>{% endif %}
-          </td>
-          <td style="color:#96ACBB">{{ charge.retry_count }}</td>
-          <td style="color:#96ACBB">{% if charge.charged_at %}{{ charge.charged_at|date:"M j, Y" }}{% else %}{{ charge.created_at|date:"M j, Y" }}{% endif %}</td>
-          <td>
-            {% if charge.status == "succeeded" and charge.stripe_receipt_url %}
-              <a href="{{ charge.stripe_receipt_url }}" target="_blank" class="pl-btn pl-btn--sm pl-btn--secondary">Receipt</a>
-            {% elif charge.status == "failed" %}
-              <button class="pl-btn pl-btn--sm pl-btn--secondary" onclick="retryCharge({{ charge.pk }}, this)">Retry</button>
-            {% endif %}
-          </td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="6" style="text-align:center;color:#96ACBB;padding:2rem">No charges match this filter.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-
-  {% endif %}{# /history #}
-
-  {# ================================================================ #}
   {# SETTINGS TAB                                                      #}
   {# ================================================================ #}
   {% if active_tab == "settings" %}
@@ -369,14 +297,19 @@
     </form>
   </div>
 
-  {# ---- Stripe Connect Platform card ---- #}
-  <div class="pl-card" style="margin-top:1.5rem">
-    <div class="pl-section-label">Stripe Connect Platform</div>
+  {% endif %}{# /settings #}
+
+  {# ================================================================ #}
+  {# STRIPE TAB — platform credentials + products overview             #}
+  {# ================================================================ #}
+  {% if active_tab == "stripe" %}
+
+  {# ---- Stripe Platform Credentials ---- #}
+  <div class="pl-card">
+    <div class="pl-section-label">Stripe Platform Credentials</div>
     <p style="color:#96ACBB;font-size:0.875rem;margin:0 0 1.25rem">
-      When enabled, guild admins can connect their Stripe account via OAuth (in addition to pasting API keys),
-      and Past Lives can collect a platform fee on charges. Use this for memberships and space leases.
-      Get the Client ID + keys from
-      <a href="https://dashboard.stripe.com/settings/connect" target="_blank" rel="noopener" style="color:#a0c0e0">dashboard.stripe.com/settings/connect</a>.
+      All charges route through the single Past Lives platform Stripe account. Get the keys from
+      <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener" style="color:#a0c0e0">dashboard.stripe.com/apikeys</a>.
     </p>
 
     <form method="post" action="{% url 'billing_save_connect_platform' %}" id="connect-platform-form">
@@ -385,7 +318,7 @@
       <div class="pl-form-row">
         <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer">
           {{ connect_platform_form.connect_enabled }}
-          <span>Enable Stripe Connect platform billing</span>
+          <span>Enable Stripe billing</span>
         </label>
         {% if connect_platform_form.connect_enabled.errors %}<div class="pl-form-errors">{{ connect_platform_form.connect_enabled.errors }}</div>{% endif %}
       </div>
@@ -421,9 +354,38 @@
 
       <div style="display:flex;gap:0.5rem">
         <button type="button" class="pl-btn pl-btn--secondary" onclick="testConnectPlatform()">Test connection</button>
-        <button type="submit" class="pl-btn pl-btn--primary">Save Connect Settings</button>
+        <button type="submit" class="pl-btn pl-btn--primary">Save Stripe Settings</button>
       </div>
     </form>
+  </div>
+
+  {# ---- Guild Products ---- #}
+  <div class="pl-card">
+    <div class="pl-section-label">Guild Products</div>
+    {% if products %}
+    <table class="pl-table">
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th>Guild</th>
+          <th>Price</th>
+          <th>Active</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for product in products %}
+        <tr>
+          <td>{{ product.name }}</td>
+          <td style="color:#96ACBB">{{ product.guild.name }}</td>
+          <td>${{ product.price }}</td>
+          <td>{% if product.is_active %}<span class="pl-badge pl-badge--ok">Active</span>{% else %}<span class="pl-badge pl-badge--muted">Inactive</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="color:#96ACBB;padding:1rem 0">No products configured yet.</div>
+    {% endif %}
   </div>
 
   <script>
@@ -452,51 +414,6 @@
       });
   }
   </script>
-
-  {% endif %}{# /settings #}
-
-  {# ================================================================ #}
-  {# STRIPE TAB — products overview + link to Reports                  #}
-  {# ================================================================ #}
-  {% if active_tab == "stripe" %}
-
-  <div class="pl-card">
-    <div class="pl-section-label">Platform Stripe Account</div>
-    <p style="color:#96ACBB;font-size:0.875rem;margin:0 0 1rem">
-      All charges now route through a single Past Lives Stripe account. Platform credentials live on
-      the <a href="?tab=settings" style="color:#EEB44B">Settings tab</a>. Revenue splits to guilds are
-      reconciled via the Reports page (manual payouts).
-    </p>
-    <a href="{% url 'billing_admin_reports' %}" class="pl-btn pl-btn--primary">Open Reports →</a>
-  </div>
-
-  <div class="pl-card">
-    <div class="pl-section-label">Guild Products</div>
-    {% if products %}
-    <table class="pl-table">
-      <thead>
-        <tr>
-          <th>Product</th>
-          <th>Guild</th>
-          <th>Price</th>
-          <th>Active</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for product in products %}
-        <tr>
-          <td>{{ product.name }}</td>
-          <td style="color:#96ACBB">{{ product.guild.name }}</td>
-          <td>${{ product.price }}</td>
-          <td>{% if product.is_active %}<span class="pl-badge pl-badge--ok">Active</span>{% else %}<span class="pl-badge pl-badge--muted">Inactive</span>{% endif %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <div style="color:#96ACBB;padding:1rem 0">No products configured yet.</div>
-    {% endif %}
-  </div>
 
   {% endif %}{# /stripe #}
 
