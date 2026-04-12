@@ -46,6 +46,7 @@
                 <th>Description</th>
                 <th class="tab-table__right">Amount</th>
                 <th>Date</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -54,10 +55,47 @@
                 <td>{{ entry.description }}{% if entry.product %} <span class="tab-entry-guild">→ {{ entry.product.guild.name }}</span>{% endif %}</td>
                 <td class="tab-table__right">${{ entry.amount }}</td>
                 <td class="tab-table__date">{{ entry.created_at|date:"M j, Y" }}</td>
+                <td>
+                    <button type="button"
+                            class="pl-btn pl-btn--secondary"
+                            style="padding:0.25rem 0.5rem;font-size:0.75rem;"
+                            @click="$dispatch('open-confirm', 'void-{{ entry.pk }}')">
+                        Void
+                    </button>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+    {% for entry in entries %}
+    <div x-data="{ open: false }"
+         x-show="open"
+         x-transition:enter="modal-enter"
+         x-transition:leave="modal-leave"
+         @open-confirm.window="if ($event.detail === 'void-{{ entry.pk }}') open = true"
+         @keydown.escape.window="open = false"
+         class="pl-modal-backdrop"
+         style="display: none;">
+        <div class="pl-modal pl-modal--sm" @click.outside="open = false">
+            <div class="pl-modal__header">
+                <h2 class="pl-modal__title">Void this charge?</h2>
+                <button type="button" @click="open = false" class="pl-modal__close">&times;</button>
+            </div>
+            <div class="pl-modal__body">
+                <p style="margin:0 0 1rem;">This will remove <strong>{{ entry.description }}</strong> (${{ entry.amount }}) from your tab.</p>
+                <form hx-post="{% url 'hub_void_tab_entry' entry.pk %}" hx-swap="none"
+                      @htmx:after-request="if (event.detail.successful) { open = false; location.reload(); }">
+                    {% csrf_token %}
+                    {% include "components/form_field.html" with field=void_form.reason field_label="Reason" field_hint="Brief reason for voiding this charge" %}
+                    <div class="pl-modal__actions" style="margin-top:1rem;">
+                        <button type="submit" class="pl-btn pl-btn--danger" style="flex:1;">Void Charge</button>
+                        <button type="button" @click="open = false" class="pl-btn pl-btn--secondary" style="flex:1;">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
     {% else %}
     <p class="hub-text-muted">No pending charges.</p>
     {% endif %}

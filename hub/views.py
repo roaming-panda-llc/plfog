@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any, TypedDict
 
 from allauth.account.models import EmailAddress
@@ -9,8 +10,9 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.db.models import Count, Prefetch
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST, require_http_methods
 
 from billing.exceptions import NoPaymentMethodError, TabLimitExceededError, TabLockedError
 from billing.forms import CONTEXT_MEMBER_TAB_PAGE, TabItemForm
@@ -283,6 +285,104 @@ def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
+@require_POST
+def guild_cart_confirm(request: HttpRequest, pk: int) -> HttpResponse:
+    """Batch-add cart items to the member's tab. Expects JSON body with items array."""
+    from hub.toast import trigger_toast
+
+    guild = get_object_or_404(Guild, pk=pk)
+    member = _get_member(request)
+    if member is None:
+        return JsonResponse({"error": "No linked membership."}, status=400)
+
+    tab, _created = Tab.objects.get_or_create(member=member)
+    if not tab.can_add_entry:
+        return JsonResponse({"error": "Payment method required."}, status=400)
+
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({"error": "Invalid JSON."}, status=400)
+
+    items = body.get("items", [])
+    if not items:
+        return JsonResponse({"error": "Cart is empty."}, status=400)
+
+    active_products = {p.pk: p for p in guild.products.filter(is_active=True)}
+    entries_created = 0
+
+    for item in items:
+        product_pk = item.get("product_pk")
+        quantity = item.get("quantity", 1)
+        product = active_products.get(product_pk)
+        if product is None:
+            return JsonResponse({"error": f"Product {product_pk} not found."}, status=400)
+
+        for _ in range(int(quantity)):
+            try:
+                tab.add_entry(
+                    description=product.name,
+                    amount=product.price,
+                    added_by=request.user,  # type: ignore[arg-type]
+                    is_self_service=True,
+                    product=product,
+                )
+                entries_created += 1
+            except (TabLockedError, TabLimitExceededError) as e:
+                response = JsonResponse({"error": str(e)}, status=400)
+                trigger_toast(response, str(e), "error")
+                return response
+
+    response = HttpResponse(status=204)
+    item_word = "item" if entries_created == 1 else "items"
+    trigger_toast(response, f"{entries_created} {item_word} added to your tab!", "success")
+    return response
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def guild_eyop_form(request: HttpRequest, pk: int) -> HttpResponse:
+    """Return the EYOP form partial (GET) or process submission (POST)."""
+    from billing.forms import CONTEXT_MEMBER_GUILD_PAGE, TabItemForm
+    from hub.toast import trigger_toast
+
+    guild = get_object_or_404(Guild, pk=pk)
+    member = _get_member(request)
+    if member is None:
+        return HttpResponse("No linked membership.", status=400)
+
+    tab, _created = Tab.objects.get_or_create(member=member)
+
+    if request.method == "POST":
+        form = TabItemForm(request.POST, context=CONTEXT_MEMBER_GUILD_PAGE, user=request.user, guild=guild)
+        if form.is_valid():
+            try:
+                if not tab.can_add_entry:
+                    raise NoPaymentMethodError("Payment method required.")
+                form.apply_to_tab(tab, added_by=request.user, is_self_service=True)  # type: ignore[arg-type]
+                response = HttpResponse(status=204)
+                trigger_toast(response, "Added to your tab!", "success")
+                return response
+            except NoPaymentMethodError:
+                response = HttpResponse(status=400)
+                trigger_toast(response, "You need a payment method on file.", "error")
+                return response
+            except TabLockedError:
+                response = HttpResponse(status=400)
+                trigger_toast(response, "Your tab is locked.", "error")
+                return response
+            except TabLimitExceededError:
+                response = HttpResponse(status=400)
+                trigger_toast(response, "This would exceed your tab limit.", "error")
+                return response
+
+        return render(request, "hub/partials/eyop_form.html", {"eyop_form": form, "guild": guild})
+
+    form = TabItemForm(context=CONTEXT_MEMBER_GUILD_PAGE, user=request.user, guild=guild)
+    return render(request, "hub/partials/eyop_form.html", {"eyop_form": form, "guild": guild})
+
+
+@login_required
 def profile_settings(request: HttpRequest) -> HttpResponse:
     """Profile settings page."""
     member = _get_member(request)
@@ -342,6 +442,8 @@ def beta_feedback(request: HttpRequest) -> HttpResponse:
 @login_required
 def tab_detail(request: HttpRequest) -> HttpResponse:
     """My Tab page — shows current balance, pending entries, and self-service add form."""
+    from billing.forms import VoidTabEntryForm
+
     member = _get_member(request)
     ctx = _get_hub_context(request)
 
@@ -384,8 +486,40 @@ def tab_detail(request: HttpRequest) -> HttpResponse:
             "entries": entries,
             "form": form,
             "products": products,
+            "void_form": VoidTabEntryForm(),
         },
     )
+
+
+@login_required
+@require_POST
+def void_tab_entry(request: HttpRequest, entry_pk: int) -> HttpResponse:
+    """Void a pending tab entry. Only the owning member can void their own entries."""
+    from billing.forms import VoidTabEntryForm
+    from billing.models import TabEntry as TabEntryModel
+    from hub.toast import trigger_toast
+
+    member = _get_member(request)
+    if member is None:
+        return HttpResponse(status=404)
+
+    entry = get_object_or_404(TabEntryModel, pk=entry_pk, tab__member=member)
+
+    form = VoidTabEntryForm(request.POST)
+    if form.is_valid():
+        try:
+            entry.void(user=request.user, reason=form.cleaned_data["reason"])  # type: ignore[arg-type]
+            response = HttpResponse(status=204)
+            trigger_toast(response, "Charge voided.", "success")
+            return response
+        except ValueError as e:
+            response = HttpResponse(status=400)
+            trigger_toast(response, str(e), "error")
+            return response
+
+    response = HttpResponse(status=400)
+    trigger_toast(response, "Reason is required.", "error")
+    return response
 
 
 @login_required
