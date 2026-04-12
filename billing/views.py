@@ -397,6 +397,53 @@ def billing_admin_retry_charge(request: HttpRequest, charge_pk: int) -> JsonResp
 
 
 @staff_member_required
+def admin_reports(request: HttpRequest) -> HttpResponse:
+    """Reports page — filtered entry list + per-guild payout summary."""
+    from django.contrib import admin as django_admin
+
+    from billing.reports import (
+        CHARGE_TYPE_CHOICES,
+        STATUS_CHOICES,
+        ReportFilterForm,
+        build_report,
+    )
+    from membership.models import Guild
+
+    filter_form = ReportFilterForm(request.GET)
+    filter_kwargs = filter_form.filter_kwargs()
+
+    rows: list = []
+    payout_summary: list = []
+    admin_total = Decimal("0.00")
+    # Only run the report if the user has opened the page with filters OR pressed
+    # the Run button (empty GET still renders the form with defaults).
+    if request.GET:
+        rows, payout_summary, admin_total = build_report(**filter_kwargs)
+
+    context = {
+        **django_admin.site.each_context(request),
+        "filters": request.GET,
+        "rows": rows,
+        "payout_summary": payout_summary,
+        "admin_total": admin_total,
+        "guilds": Guild.objects.filter(is_active=True).order_by("name"),
+        "charge_type_choices": CHARGE_TYPE_CHOICES,
+        "status_choices": STATUS_CHOICES,
+        "query_string": request.META.get("QUERY_STRING", ""),
+    }
+    return render(request, "billing/admin_reports.html", context)
+
+
+@staff_member_required
+def admin_reports_csv(request: HttpRequest) -> HttpResponse:
+    """Streaming CSV download for the reports page, same filters via GET."""
+    from billing.reports import ReportFilterForm, stream_report_csv
+
+    filter_form = ReportFilterForm(request.GET)
+    return stream_report_csv(**filter_form.filter_kwargs())
+
+
+@staff_member_required
 @require_POST
 def billing_test_platform_connection(request: HttpRequest) -> JsonResponse:
     """AJAX: verify a candidate platform Stripe secret key.

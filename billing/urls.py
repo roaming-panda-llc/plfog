@@ -13,6 +13,8 @@ urlpatterns = [
     path("admin/save-settings/", views.billing_admin_save_settings, name="billing_admin_save_settings"),
     path("admin/retry-charge/<int:charge_pk>/", views.billing_admin_retry_charge, name="billing_admin_retry_charge"),
     path("admin/tab/<int:tab_pk>/detail/", views.billing_admin_tab_detail_api, name="billing_admin_tab_detail_api"),
+    path("admin/reports/", views.admin_reports, name="billing_admin_reports"),
+    path("admin/reports/export/csv/", views.admin_reports_csv, name="billing_admin_reports_csv"),
     path(
         "admin/connect-platform/test/",
         views.billing_test_platform_connection,

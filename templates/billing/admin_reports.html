@@ -1,0 +1,174 @@
+{% extends "admin/base.html" %}
+{% load i18n %}
+
+{% block title %}Billing Reports | {{ site_title }}{% endblock %}
+
+{% block content %}
+<style>
+  .pl-dashboard { display: flex; flex-direction: column; gap: 1.5rem; padding: 2rem 2.5rem; }
+  .pl-card { background-color: #092E4C; border: 1px solid transparent; border-radius: 10px; padding: 2rem; }
+  .pl-card__title { font-family: 'Lato', system-ui, sans-serif; font-size: 1.75rem; font-weight: 700; color: #F4EFDD; margin-bottom: 0.5rem; }
+  .pl-text-muted { color: #96ACBB; font-size: 0.9375rem; }
+  .pl-section-label { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #96ACBB; margin-bottom: 0.75rem; }
+  .pl-table { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }
+  .pl-table thead th { text-align: left; padding: 0.5rem 0.75rem; font-weight: 500; color: #96ACBB; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 0.875rem; }
+  .pl-table thead th.text-right { text-align: right; }
+  .pl-table tbody td { padding: 0.5rem 0.75rem; color: #F4EFDD; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .pl-table tbody td.text-right { text-align: right; }
+  .pl-btn { display: inline-flex; align-items: center; padding: 0.625rem 1.5rem; font-family: 'Inter', system-ui, sans-serif; font-size: 0.9375rem; font-weight: 700; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; transition: background-color 0.15s ease; }
+  .pl-btn--primary { background-color: #EEB44B; color: #092E4C; }
+  .pl-btn--primary:hover { background-color: #d4a043; }
+  .pl-btn--secondary { background-color: transparent; border: 1px solid rgba(255,255,255,0.12); color: #F4EFDD; }
+  .pl-btn--secondary:hover { background-color: rgba(255,255,255,0.06); }
+  .pl-filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+  .pl-filter-grid label { display: block; font-size: 0.8125rem; color: #96ACBB; margin-bottom: 0.25rem; }
+  .pl-filter-grid input[type="date"], .pl-filter-grid select { width: 100%; padding: 0.5rem 0.6rem; background: #0a1929; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #F4EFDD; font-size: 0.875rem; box-sizing: border-box; }
+  .pl-checkbox-group { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: #F4EFDD; }
+  .pl-checkbox-group label { display: flex; align-items: center; gap: 0.5rem; color: #F4EFDD; }
+  .pl-filter-actions { display: flex; gap: 0.75rem; margin-top: 0.5rem; }
+  .pl-admin-total { color: #EEB44B; font-weight: 700; }
+</style>
+
+<div class="pl-dashboard">
+  <div class="pl-card">
+    <h1 class="pl-card__title">Billing Reports</h1>
+    <p class="pl-text-muted" style="margin:0 0 0.5rem">
+      Filter charges and tab entries by date, guild, type, or status. The payout
+      summary shows exactly how much to send each guild for the filtered window.
+    </p>
+    <a href="{% url 'billing_admin_dashboard' %}" style="color:#EEB44B;font-size:0.875rem;">← Back to Payments</a>
+  </div>
+
+  {# Filters #}
+  <div class="pl-card">
+    <div class="pl-section-label">Filters</div>
+    <form method="get">
+      <div class="pl-filter-grid">
+        <div>
+          <label for="start_date">Start date</label>
+          <input type="date" name="start_date" id="start_date" value="{{ filters.start_date }}">
+        </div>
+        <div>
+          <label for="end_date">End date</label>
+          <input type="date" name="end_date" id="end_date" value="{{ filters.end_date }}">
+        </div>
+        <div>
+          <label for="guilds">Guilds (Ctrl/Cmd+click for multiple)</label>
+          <select name="guilds" id="guilds" multiple size="5">
+            {% for g in guilds %}
+            <option value="{{ g.pk }}" {% if g.pk|stringformat:"s" in filters.guilds %}selected{% endif %}>{{ g.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>Charge type</label>
+          <div class="pl-checkbox-group">
+            {% for value, label in charge_type_choices %}
+            <label>
+              <input type="checkbox" name="charge_type" value="{{ value }}"
+                {% if value in filters.charge_type %}checked{% endif %}>
+              {{ label }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        <div>
+          <label>Status</label>
+          <div class="pl-checkbox-group">
+            {% for value, label in status_choices %}
+            <label>
+              <input type="checkbox" name="status" value="{{ value }}"
+                {% if value in filters.status %}checked{% endif %}>
+              {{ label }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="pl-filter-actions">
+        <button type="submit" class="pl-btn pl-btn--primary">Run report</button>
+        {% if query_string %}
+        <a href="{% url 'billing_admin_reports_csv' %}?{{ query_string }}" class="pl-btn pl-btn--secondary">Download CSV</a>
+        {% else %}
+        <a href="{% url 'billing_admin_reports_csv' %}" class="pl-btn pl-btn--secondary">Download CSV</a>
+        {% endif %}
+        <a href="{% url 'billing_admin_reports' %}" class="pl-btn pl-btn--secondary">Reset</a>
+      </div>
+    </form>
+  </div>
+
+  {% if payout_summary or rows %}
+  <div class="pl-card">
+    <div class="pl-section-label">Payout summary</div>
+    {% if payout_summary %}
+    <table class="pl-table">
+      <thead>
+        <tr>
+          <th>Guild</th>
+          <th class="text-right">Entries</th>
+          <th class="text-right">Guild share</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in payout_summary %}
+        <tr>
+          <td>{{ row.guild_name }}</td>
+          <td class="text-right">{{ row.entry_count }}</td>
+          <td class="text-right">${{ row.guild_amount }}</td>
+        </tr>
+        {% endfor %}
+        <tr>
+          <td colspan="2" class="pl-admin-total">Past Lives admin total</td>
+          <td class="text-right pl-admin-total">${{ admin_total }}</td>
+        </tr>
+      </tbody>
+    </table>
+    {% else %}
+    <p class="pl-text-muted">No guild payouts in this window.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if rows %}
+  <div class="pl-card">
+    <div class="pl-section-label">Entries ({{ rows|length }})</div>
+    <table class="pl-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Member</th>
+          <th>Description</th>
+          <th>Guild</th>
+          <th>Split</th>
+          <th>Status</th>
+          <th class="text-right">Amount</th>
+          <th class="text-right">Admin %</th>
+          <th class="text-right">Admin $</th>
+          <th class="text-right">Guild $</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.created_at|date:"Y-m-d" }}</td>
+          <td>{{ r.member_name }}</td>
+          <td>{{ r.description }}</td>
+          <td>{{ r.guild_name }}</td>
+          <td>{{ r.split_mode_display }}</td>
+          <td>{{ r.charge_status }}</td>
+          <td class="text-right">${{ r.amount }}</td>
+          <td class="text-right">{{ r.admin_percent }}%</td>
+          <td class="text-right">${{ r.admin_amount }}</td>
+          <td class="text-right">${{ r.guild_amount }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% elif query_string %}
+  <div class="pl-card">
+    <p class="pl-text-muted">No entries match the current filters.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
