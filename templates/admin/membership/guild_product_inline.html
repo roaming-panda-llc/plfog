@@ -74,36 +74,51 @@
             {% endif %}
         </div>
 
-        {# Add product form — hidden by default, revealed on button click #}
-        <div x-data="{ showForm: false }">
-            <button type="button" @click="showForm = !showForm" class="pl-product-btn pl-product-btn--add" style="margin-top:1rem;">
-                <span x-text="showForm ? '− Cancel' : '+ Add Product'"></span>
-            </button>
-            {% for inline_admin_form in inline_admin_formset %}
-                {% if not inline_admin_form.original and not forloop.last %}
-                <div x-show="showForm" x-transition class="pl-add-product" style="margin-top:0.75rem;">
-                    <div class="pl-add-product__fields">
-                        {% for fieldset in inline_admin_form %}
-                            {% for line in fieldset %}
-                                {% for field in line %}
-                                    {% if not field.field.is_hidden %}
-                                    <div class="pl-add-product__field">
-                                        {% if field.field.field.widget.input_type == "checkbox" %}
-                                        {% include "components/toggle.html" with field=field.field toggle_label=field.field.label %}
-                                        {% else %}
-                                        <label for="{{ field.field.auto_id }}">{{ field.field.label }}</label>
-                                        {{ field.field }}
+        {# Add product button — opens modal #}
+        <button type="button" @click="$dispatch('open-modal', 'add-product')" class="pl-product-btn pl-product-btn--add" style="margin-top:1rem;">
+            + Add Product
+        </button>
+
+        {# Add product modal — fields stay inside the parent admin form so save works #}
+        <div x-data="{ open: false }"
+             x-show="open"
+             x-transition:enter="modal-enter"
+             x-transition:leave="modal-leave"
+             @open-modal.window="if ($event.detail === 'add-product') open = true"
+             @close-modal.window="if ($event.detail === 'add-product') open = false"
+             @keydown.escape.window="open = false"
+             class="pl-modal-backdrop"
+             style="display: none;"
+             role="dialog"
+             aria-modal="true">
+            <div class="pl-modal pl-modal--sm" @click.outside="open = false">
+                <div class="pl-modal__header">
+                    <h2 class="pl-modal__title">Add Product</h2>
+                    <button type="button" @click="open = false" class="pl-modal__close" aria-label="Close">&times;</button>
+                </div>
+                <div class="pl-modal__body">
+                    {% for inline_admin_form in inline_admin_formset %}
+                        {% if not inline_admin_form.original and not forloop.last %}
+                            {% for fieldset in inline_admin_form %}
+                                {% for line in fieldset %}
+                                    {% for field in line %}
+                                        {% if not field.field.is_hidden %}
+                                        <div style="margin-bottom:1rem;">
+                                            {% if field.field.field.widget.input_type == "checkbox" %}
+                                            {% include "components/toggle.html" with field=field.field toggle_label=field.field.label %}
+                                            {% else %}
+                                            {% include "components/form_field.html" with field=field.field %}
+                                            {% endif %}
+                                        </div>
                                         {% endif %}
-                                    </div>
-                                    {% endif %}
+                                    {% endfor %}
                                 {% endfor %}
                             {% endfor %}
-                        {% endfor %}
-                    </div>
-                    <button type="submit" name="_save" class="pl-add-product__btn">Add Product</button>
+                        {% endif %}
+                    {% endfor %}
+                    <button type="submit" name="_save" class="pl-btn pl-btn--primary" style="width:100%;margin-top:0.5rem;">Add Product</button>
                 </div>
-                {% endif %}
-            {% endfor %}
+            </div>
         </div>
     </div>
 </div>
