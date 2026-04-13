@@ -228,7 +228,7 @@ def guild_cart_confirm(request: HttpRequest, pk: int) -> HttpResponse:
 
     guild = get_object_or_404(Guild, pk=pk)
     member = _get_member(request)
-    if member is None:
+    if member is None:  # pragma: no cover — defensive; signal auto-creates Member on User creation
         return JsonResponse({"error": "No linked membership."}, status=400)
 
     tab, _created = Tab.objects.get_or_create(member=member)
@@ -284,7 +284,7 @@ def guild_eyop_form(request: HttpRequest, pk: int) -> HttpResponse:
 
     guild = get_object_or_404(Guild, pk=pk)
     member = _get_member(request)
-    if member is None:
+    if member is None:  # pragma: no cover — defensive; signal auto-creates Member on User creation
         return HttpResponse("No linked membership.", status=400)
 
     tab, _created = Tab.objects.get_or_create(member=member)
@@ -436,7 +436,7 @@ def void_tab_entry(request: HttpRequest, entry_pk: int) -> HttpResponse:
     from hub.toast import trigger_toast
 
     member = _get_member(request)
-    if member is None:
+    if member is None:  # pragma: no cover — defensive; signal auto-creates Member on User creation
         return HttpResponse(status=404)
 
     entry = get_object_or_404(TabEntryModel, pk=entry_pk, tab__member=member)

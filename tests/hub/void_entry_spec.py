@@ -64,3 +64,22 @@ def describe_void_tab_entry():
         )
         assert response.status_code == 302
         assert "/accounts/login/" in response.url
+
+    def it_returns_error_when_already_voided(client: Client, setup):
+        entry = setup["entry"]
+        entry.void(user=setup["user"], reason="first void")
+
+        response = client.post(
+            f"/tab/void/{entry.pk}/",
+            {"reason": "second void"},
+        )
+        assert response.status_code == 400
+        payload = json.loads(response["HX-Trigger"])
+        assert payload["showToast"]["type"] == "error"
+
+    def it_returns_error_when_reason_missing(client: Client, setup):
+        entry = setup["entry"]
+        response = client.post(f"/tab/void/{entry.pk}/", {"reason": ""})
+        assert response.status_code == 400
+        payload = json.loads(response["HX-Trigger"])
+        assert payload["showToast"]["message"] == "Reason is required."

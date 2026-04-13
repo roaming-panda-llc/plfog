@@ -46,3 +46,4 @@ omit = ["*/migrations/*", "*/tests/*", "manage.py", "plfog/settings.py", "*/mana
 [tool.coverage.report]
 fail_under = 100
 show_missing = true
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:"]
