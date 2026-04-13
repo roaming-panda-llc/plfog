@@ -269,10 +269,10 @@ def guild_cart_confirm(request: HttpRequest, pk: int) -> HttpResponse:
                 trigger_toast(response, str(e), "error")
                 return response
 
-    response = HttpResponse(status=204)
+    success_response = HttpResponse(status=204)
     item_word = "item" if entries_created == 1 else "items"
-    trigger_toast(response, f"{entries_created} {item_word} added to your tab!", "success")
-    return response
+    trigger_toast(success_response, f"{entries_created} {item_word} added to your tab!", "success")
+    return success_response
 
 
 @login_required
