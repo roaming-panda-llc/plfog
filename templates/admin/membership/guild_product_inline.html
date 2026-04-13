@@ -88,8 +88,12 @@
                                 {% for field in line %}
                                     {% if not field.field.is_hidden %}
                                     <div class="pl-add-product__field">
+                                        {% if field.field.field.widget.input_type == "checkbox" %}
+                                        {% include "components/toggle.html" with field=field.field toggle_label=field.field.label %}
+                                        {% else %}
                                         <label for="{{ field.field.auto_id }}">{{ field.field.label }}</label>
                                         {{ field.field }}
+                                        {% endif %}
                                     </div>
                                     {% endif %}
                                 {% endfor %}
