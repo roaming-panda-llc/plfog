@@ -262,6 +262,13 @@ class GuildProductInline(TabularInline):
     show_change_link = False
     template = "admin/membership/guild_product_inline.html"
 
+    def formfield_for_dbfield(self, db_field: Any, request: Any = None, **kwargs: Any) -> Any:  # type: ignore[override]
+        field = super().formfield_for_dbfield(db_field, request, **kwargs)
+        if db_field.name == "admin_percent_override" and field is not None:
+            field.label = "Admin %"
+            field.widget.attrs["placeholder"] = "20 (default)"
+        return field
+
 
 @admin.register(Guild)
 class GuildAdmin(ModelAdmin):
