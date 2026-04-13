@@ -38,10 +38,14 @@ def describe_guild_cart_confirm():
 
         response = client.post(
             f"/guilds/{guild.pk}/cart/confirm/",
-            data=json.dumps({"items": [
-                {"product_pk": p1.pk, "quantity": 2},
-                {"product_pk": p2.pk, "quantity": 1},
-            ]}),
+            data=json.dumps(
+                {
+                    "items": [
+                        {"product_pk": p1.pk, "quantity": 2},
+                        {"product_pk": p2.pk, "quantity": 1},
+                    ]
+                }
+            ),
             content_type="application/json",
             HTTP_HX_REQUEST="true",
         )
