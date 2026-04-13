@@ -8,16 +8,7 @@
 
     <form method="post" class="hub-form" style="margin-top: 1.5rem;">
         {% csrf_token %}
-        <div class="hub-toggle-row">
-            <div>
-                <div class="hub-toggle-label">Voting Result Emails</div>
-                <div class="hub-toggle-desc">Get notified when guild voting results are published</div>
-            </div>
-            <label class="hub-toggle">
-                {{ form.voting_results }}
-                <span class="hub-toggle__slider"></span>
-            </label>
-        </div>
+        {% include "components/toggle.html" with field=form.voting_results toggle_label="Voting Result Emails" toggle_description="Get notified when guild voting results are published" %}
         {% if form.errors %}
         <ul class="hub-field-errors">
             {% for field_errors in form.errors.values %}

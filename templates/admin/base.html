@@ -1,9 +1,10 @@
 {% extends 'unfold/layouts/skeleton.html' %}
 
-{% load admin_list i18n unfold %}
+{% load admin_list i18n static unfold %}
 
 {% block extrahead %}
     {{ block.super }}
+    <link rel="stylesheet" href="{% static 'css/components.css' %}">
     {# Unified theme system — one localStorage key ('theme'), works across hub + admin #}
     <script>
         (function() {
@@ -85,4 +86,19 @@
         </svg>
         Feedback
     </a>
+    <script defer src="{% static 'js/alpine.min.js' %}"></script>
+    {% include "components/toast.html" %}
+    <script>
+        document.body.addEventListener('htmx:afterRequest', function(event) {
+            var trigger = event.detail.xhr && event.detail.xhr.getResponseHeader('HX-Trigger');
+            if (trigger) {
+                try {
+                    var data = JSON.parse(trigger);
+                    if (data.showToast) {
+                        window.dispatchEvent(new CustomEvent('show-toast', {detail: data.showToast}));
+                    }
+                } catch(e) {}
+            }
+        });
+    </script>
 {% endblock %}

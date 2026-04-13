@@ -1672,6 +1672,8 @@ textarea:focus {
 
 .pl-products-section {
     padding: 1.5rem;
+    overflow-x: hidden;
+    max-width: 100%;
 }
 
 .pl-products-title {
@@ -1785,6 +1787,32 @@ textarea:focus {
     color: #ff6b6b;
 }
 
+.pl-product-btn--add {
+    background: rgba(238, 180, 75, 0.1);
+    color: #EEB44B;
+    border: 1px dashed rgba(238, 180, 75, 0.3);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: all 0.15s ease;
+}
+
+.pl-product-btn--add:hover {
+    background: rgba(238, 180, 75, 0.15);
+    border-color: rgba(238, 180, 75, 0.5);
+}
+
+[data-theme="light"] .pl-product-btn--add {
+    background: rgba(238, 180, 75, 0.08);
+    border-color: rgba(238, 180, 75, 0.4);
+}
+
+[data-theme="light"] .pl-product-btn--add:hover {
+    background: rgba(238, 180, 75, 0.15);
+}
+
 .pl-products-empty {
     padding: 1.5rem;
     color: #96ACBB;
@@ -1815,14 +1843,15 @@ textarea:focus {
     align-items: flex-end;
     flex-wrap: wrap;
     margin-bottom: 1rem;
+    max-width: 100%;
 }
 
 .pl-add-product__field {
     display: flex;
     flex-direction: column;
     gap: 0.375rem;
-    flex: 1;
-    min-width: 140px;
+    flex: 1 1 140px;
+    min-width: 0;
 }
 
 .pl-add-product__field label {
@@ -1846,6 +1875,17 @@ textarea:focus {
     border-color: #EEB44B !important;
     outline: none !important;
     box-shadow: 0 0 0 3px rgba(238,180,75,0.15) !important;
+}
+
+/* Fix: checkbox in Add Product inline — match the admin fieldset toggle treatment */
+.pl-add-product__field input[type="checkbox"] {
+    width: auto !important;
+    max-width: none !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
 }
 
 .pl-add-product__btn {

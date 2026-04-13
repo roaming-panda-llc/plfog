@@ -8,9 +8,12 @@ urlpatterns = [
     path("guilds/voting/history/<int:pk>/", views.snapshot_detail, name="hub_snapshot_detail"),
     path("members/", views.member_directory, name="hub_member_directory"),
     path("guilds/<int:pk>/", views.guild_detail, name="hub_guild_detail"),
+    path("guilds/<int:pk>/cart/confirm/", views.guild_cart_confirm, name="hub_guild_cart_confirm"),
+    path("guilds/<int:pk>/eyop-form/", views.guild_eyop_form, name="hub_guild_eyop_form"),
     path("settings/profile/", views.profile_settings, name="hub_profile_settings"),
     path("settings/emails/", views.email_preferences, name="hub_email_preferences"),
     path("feedback/", views.beta_feedback, name="hub_beta_feedback"),
     path("tab/", views.tab_detail, name="hub_tab_detail"),
     path("tab/history/", views.tab_history, name="hub_tab_history"),
+    path("tab/void/<int:entry_pk>/", views.void_tab_entry, name="hub_void_tab_entry"),
 ]

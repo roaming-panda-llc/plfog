@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from django import forms
 from django.contrib import admin
+from django.db import models
 from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.utils import timezone
@@ -261,6 +263,15 @@ class GuildProductInline(TabularInline):
     extra = 1
     show_change_link = False
     template = "admin/membership/guild_product_inline.html"
+
+    def formfield_for_dbfield(  # type: ignore[override]
+        self, db_field: models.Field, request: HttpRequest | None = None, **kwargs: object
+    ) -> forms.Field | None:
+        field = super().formfield_for_dbfield(db_field, request, **kwargs)
+        if db_field.name == "admin_percent_override" and field is not None:
+            field.label = "Admin %"
+            field.widget.attrs["placeholder"] = "20 (default)"  # type: ignore[union-attr]
+        return field
 
 
 @admin.register(Guild)
