@@ -20,7 +20,7 @@
 </div>
 {% endif %}
 
-{# Summary card #}
+{# Combined balance + pending entries #}
 <div class="hub-card tab-summary">
     <div class="tab-summary__row">
         <span class="tab-summary__label">Current Balance</span>
@@ -34,10 +34,57 @@
         <span class="tab-summary__label">Remaining</span>
         <span class="tab-summary__value">${{ tab.remaining_limit }}</span>
     </div>
+    {% if next_charge_at %}
+    <p class="hub-text-muted" style="margin:1rem 0 0;font-size:0.875rem;">
+        Your tab will be processed by Stripe on {{ next_charge_at|date:"F jS" }} at {{ next_charge_at|date:"g:i A" }}.
+    </p>
+    {% endif %}
+
+    {% if entries %}
+    <table class="tab-table" style="margin-top:1.25rem;">
+        <thead>
+            <tr>
+                <th>Description</th>
+                <th class="tab-table__right">Amount</th>
+                <th>Date</th>
+                <th class="tab-table__right"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in entries %}
+            <tr>
+                <td>{{ entry.description }}{% if entry.product %} <span class="tab-entry-guild">→ {{ entry.product.guild.name }}</span>{% endif %}</td>
+                <td class="tab-table__right">${{ entry.amount }}</td>
+                <td class="tab-table__date">{{ entry.created_at|date:"M j, Y" }}</td>
+                <td class="tab-table__right">
+                    <button type="button"
+                            class="tab-table__remove"
+                            aria-label="Remove {{ entry.description }} from tab"
+                            title="Remove from tab"
+                            hx-post="{% url 'hub_void_tab_entry' entry.pk %}"
+                            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                            hx-swap="none"
+                            @htmx:after-request="if (event.detail.successful) location.reload()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                            <path d="M10 11v6"/>
+                            <path d="M14 11v6"/>
+                            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                        </svg>
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="hub-text-muted" style="margin-top:1.25rem;">No pending charges.</p>
+    {% endif %}
 </div>
 
-{# Payment method card #}
-<div class="hub-card">
+{# Payment method card — bottom of page #}
+<div class="hub-card" style="margin-top:1.5rem;">
     <h2 class="tab-section-title">Payment Method</h2>
     {% if tab.has_payment_method %}
     <div class="tab-summary__row">
@@ -49,51 +96,6 @@
         <span class="tab-summary__label hub-text-muted">No card on file.</span>
         <a href="{% url 'billing_setup_payment_method' %}" class="tab-history-link">Add a card</a>
     </div>
-    {% endif %}
-</div>
-
-{# Pending entries #}
-<div class="hub-card">
-    <h2 class="tab-section-title">Pending Charges</h2>
-    {% if next_charge_at %}
-    <p class="hub-text-muted" style="margin-top:-0.25rem;margin-bottom:1rem;font-size:0.875rem;">
-        Your tab will be processed by Stripe on {{ next_charge_at|date:"F jS" }} at {{ next_charge_at|date:"g:i A" }}.
-    </p>
-    {% endif %}
-    {% if entries %}
-    <table class="tab-table">
-        <thead>
-            <tr>
-                <th>Description</th>
-                <th class="tab-table__right">Amount</th>
-                <th>Date</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for entry in entries %}
-            <tr>
-                <td>{{ entry.description }}{% if entry.product %} <span class="tab-entry-guild">→ {{ entry.product.guild.name }}</span>{% endif %}</td>
-                <td class="tab-table__right">${{ entry.amount }}</td>
-                <td class="tab-table__date">{{ entry.created_at|date:"M j, Y" }}</td>
-                <td>
-                    <button type="button"
-                            class="pl-btn pl-btn--secondary pl-btn--icon"
-                            aria-label="Remove {{ entry.description }} from tab"
-                            title="Remove from tab"
-                            hx-post="{% url 'hub_void_tab_entry' entry.pk %}"
-                            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                            hx-swap="none"
-                            @htmx:after-request="if (event.detail.successful) location.reload()">
-                        &times;
-                    </button>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p class="hub-text-muted">No pending charges.</p>
     {% endif %}
 </div>
 

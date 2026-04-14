@@ -180,19 +180,8 @@
             }
         });
     </script>
-    <script>
-        document.body.addEventListener('htmx:afterRequest', function(event) {
-            var trigger = event.detail.xhr && event.detail.xhr.getResponseHeader('HX-Trigger');
-            if (trigger) {
-                try {
-                    var data = JSON.parse(trigger);
-                    if (data.showToast) {
-                        window.dispatchEvent(new CustomEvent('show-toast', {detail: data.showToast}));
-                    }
-                } catch(e) {}
-            }
-        });
-    </script>
+    {# HTMX auto-fires HX-Trigger JSON keys as events (and a kebab-case alias — see htmx Dt()) #}
+    {# — so the `showToast` key in trigger_toast dispatches `show-toast` directly. No manual parse. #}
     {% block extra_js %}{% endblock %}
 
     <a href="{% url 'hub_beta_feedback' %}" class="pl-feedback-btn" hx-boost="false" title="Send Feedback">

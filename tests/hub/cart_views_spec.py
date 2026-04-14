@@ -183,7 +183,7 @@ def describe_guild_eyop_form():
 
         response = client.post(
             f"/guilds/{guild.pk}/eyop-form/",
-            {"description": "Custom item", "amount": "7.50"},
+            {"description": "Custom item", "amount": "7.50", "quantity": "1"},
             HTTP_HX_REQUEST="true",
         )
 
@@ -191,6 +191,20 @@ def describe_guild_eyop_form():
         entry = TabEntry.objects.get(tab=tab)
         assert entry.description == "Custom item"
         assert entry.amount == Decimal("7.50")
+
+    def it_creates_n_entries_when_quantity_is_n(client: Client):
+        BillingSettingsFactory()
+        guild = GuildFactory()
+        _user, tab = _linked_user(client, username="eyopq")
+
+        response = client.post(
+            f"/guilds/{guild.pk}/eyop-form/",
+            {"description": "Clay", "amount": "2.50", "quantity": "3"},
+            HTTP_HX_REQUEST="true",
+        )
+
+        assert response.status_code == 204
+        assert TabEntry.objects.filter(tab=tab).count() == 3
 
     def it_requires_login(client: Client):
         guild = GuildFactory()
@@ -207,7 +221,7 @@ def describe_guild_eyop_form():
 
         response = client.post(
             f"/guilds/{guild.pk}/eyop-form/",
-            {"description": "Test", "amount": "5.00"},
+            {"description": "Test", "amount": "5.00", "quantity": "1"},
         )
         assert response.status_code == 400
 
@@ -219,7 +233,7 @@ def describe_guild_eyop_form():
         with patch("billing.models.Tab.add_entry", side_effect=TabLockedError("locked")):
             response = client.post(
                 f"/guilds/{guild.pk}/eyop-form/",
-                {"description": "Test", "amount": "5.00"},
+                {"description": "Test", "amount": "5.00", "quantity": "1"},
             )
         assert response.status_code == 400
 
@@ -231,7 +245,7 @@ def describe_guild_eyop_form():
         with patch("billing.models.Tab.add_entry", side_effect=TabLimitExceededError("exceeded")):
             response = client.post(
                 f"/guilds/{guild.pk}/eyop-form/",
-                {"description": "Test", "amount": "5.00"},
+                {"description": "Test", "amount": "5.00", "quantity": "1"},
             )
         assert response.status_code == 400
 

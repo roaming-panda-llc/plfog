@@ -1,0 +1,14 @@
+<form hx-post="{% url 'hub_guild_eyop_form' guild.pk %}"
+      hx-target="#eyop-modal-body"
+      hx-swap="innerHTML">
+    {% csrf_token %}
+    {% include "components/form_field.html" with field=eyop_form.description %}
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:0.75rem;">
+        {% include "components/form_field.html" with field=eyop_form.amount %}
+        {% include "components/form_field.html" with field=eyop_form.quantity %}
+    </div>
+    {% if eyop_form.non_field_errors %}
+    <div class="pl-field-error" style="margin-bottom:1rem;">{{ eyop_form.non_field_errors.0 }}</div>
+    {% endif %}
+    <button type="submit" class="pl-btn pl-btn--primary" style="width:100%;margin-top:0.5rem;">Add to Tab</button>
+</form>

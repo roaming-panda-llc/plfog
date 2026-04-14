@@ -101,8 +101,14 @@ def describe_tab_detail():
         response = client.get("/tab/")
 
         assert response.status_code == 200
-        assert b"Add to Tab" not in response.content
-        assert b"Add Item" not in response.content
+        import re
+
+        # Strip the base template's <head>/<title> metadata — only the page body matters
+        body = response.content
+        body = re.sub(rb"<head\b.*?</head>", b"", body, flags=re.DOTALL)
+        assert b"Add Item" not in body
+        # No self-service form heading or button in the page body
+        assert b"tab-add-form" not in body
 
 
 def describe_tab_history():

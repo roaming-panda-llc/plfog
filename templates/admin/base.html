@@ -88,17 +88,4 @@
     </a>
     <script defer src="{% static 'js/alpine.min.js' %}"></script>
     {% include "components/toast.html" %}
-    <script>
-        document.body.addEventListener('htmx:afterRequest', function(event) {
-            var trigger = event.detail.xhr && event.detail.xhr.getResponseHeader('HX-Trigger');
-            if (trigger) {
-                try {
-                    var data = JSON.parse(trigger);
-                    if (data.showToast) {
-                        window.dispatchEvent(new CustomEvent('show-toast', {detail: data.showToast}));
-                    }
-                } catch(e) {}
-            }
-        });
-    </script>
 {% endblock %}

@@ -198,6 +198,8 @@ def snapshot_detail(request: HttpRequest, pk: int) -> HttpResponse:
 @login_required
 def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Guild detail page — shows about text, active products, and cart interface."""
+    from billing.forms import CONTEXT_MEMBER_GUILD_PAGE, TabItemForm
+
     guild = get_object_or_404(Guild, pk=pk)
     ctx = _get_hub_context(request)
     products = guild.products.filter(is_active=True).order_by("name")
@@ -207,6 +209,8 @@ def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
     if member is not None:
         tab, _created = Tab.objects.get_or_create(member=member)
 
+    eyop_form = TabItemForm(context=CONTEXT_MEMBER_GUILD_PAGE, user=request.user, guild=guild)
+
     return render(
         request,
         "hub/guild_detail.html",
@@ -215,6 +219,7 @@ def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "guild": guild,
             "products": products,
             "tab": tab,
+            "eyop_form": eyop_form,
         },
     )
 
@@ -291,12 +296,15 @@ def guild_eyop_form(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method == "POST":
         form = TabItemForm(request.POST, context=CONTEXT_MEMBER_GUILD_PAGE, user=request.user, guild=guild)
         if form.is_valid():
+            quantity = form.cleaned_data.get("quantity", 1)
             try:
                 if not tab.can_add_entry:
                     raise NoPaymentMethodError("Payment method required.")
-                form.apply_to_tab(tab, added_by=request.user, is_self_service=True)  # type: ignore[arg-type]
+                for _ in range(quantity):
+                    form.apply_to_tab(tab, added_by=request.user, is_self_service=True)  # type: ignore[arg-type]
                 response = HttpResponse(status=204)
-                trigger_toast(response, "Added to your tab!", "success")
+                word = "item" if quantity == 1 else "items"
+                trigger_toast(response, f"{quantity} {word} added to your tab!", "success")
                 return response
             except NoPaymentMethodError:
                 response = HttpResponse(status=400)
