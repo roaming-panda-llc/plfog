@@ -78,6 +78,9 @@ MIDDLEWARE = [
     "plfog.service_worker_middleware.ServiceWorkerAllowedMiddleware",
 ]
 
+if DEBUG and os.environ.get("DEV_AUTO_LOGIN_EMAIL"):
+    MIDDLEWARE.append("plfog.dev_auto_login.DevAutoLoginMiddleware")
+
 ROOT_URLCONF = "plfog.urls"
 
 TEMPLATES = [
