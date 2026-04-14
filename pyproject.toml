@@ -19,6 +19,7 @@ extend-select = ["C901"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["C901"]
+"**/spec/**" = ["C901"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10

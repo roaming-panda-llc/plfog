@@ -13,8 +13,9 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from django import forms
+from django.forms import BaseInlineFormSet, inlineformset_factory
 
-from billing.models import BillingSettings, Product
+from billing.models import BillingSettings, Product, ProductRevenueSplit
 from membership.models import Guild, Member
 
 if TYPE_CHECKING:
@@ -252,3 +253,84 @@ class ConnectPlatformSettingsForm(forms.ModelForm):
             for field in missing:
                 self.add_error(field, "Required when Stripe Connect is enabled.")
         return cleaned
+
+
+class ProductForm(forms.ModelForm):
+    """Product fields only — splits are handled by ProductRevenueSplitFormSet."""
+
+    class Meta:
+        model = Product
+        fields = ["name", "price", "guild"]
+
+
+class _BaseProductSplitFormSet(BaseInlineFormSet):
+    """Validates: >=1 active row, sum=100, no duplicates, recipient_type/guild rules."""
+
+    def clean(self) -> None:
+        super().clean()
+        if any(self.errors):
+            return  # let per-form errors surface first
+
+        active_rows = [
+            f.cleaned_data
+            for f in self.forms
+            if f.cleaned_data and not f.cleaned_data.get("DELETE", False)
+        ]
+        if not active_rows:
+            raise forms.ValidationError("At least one revenue split row is required.")
+
+        self._check_total(active_rows)
+        self._check_recipient_rules(active_rows)
+
+    @staticmethod
+    def _check_total(active_rows: list[dict[str, Any]]) -> None:
+        total = sum((row["percent"] for row in active_rows), Decimal("0"))
+        if total != Decimal("100"):
+            raise forms.ValidationError(
+                f"Revenue splits must sum to 100% — currently {total}%."
+            )
+
+    @staticmethod
+    def _check_recipient_rules(active_rows: list[dict[str, Any]]) -> None:
+        seen_admin = False
+        seen_guilds: set[int] = set()
+        for row in active_rows:
+            rtype = row["recipient_type"]
+            guild = row.get("guild")
+            if rtype == ProductRevenueSplit.RecipientType.ADMIN:
+                if guild is not None:
+                    raise forms.ValidationError("Admin rows must not select a guild.")
+                if seen_admin:
+                    raise forms.ValidationError("Only one Admin row is allowed per product.")
+                seen_admin = True
+            elif rtype == ProductRevenueSplit.RecipientType.GUILD:
+                if guild is None:
+                    raise forms.ValidationError("Guild rows must select a guild.")
+                if guild.pk in seen_guilds:
+                    raise forms.ValidationError(
+                        f"Guild '{guild.name}' appears more than once. "
+                        f"Each guild may only appear in one split row."
+                    )
+                seen_guilds.add(guild.pk)
+
+
+ProductRevenueSplitFormSet = inlineformset_factory(
+    Product,
+    ProductRevenueSplit,
+    formset=_BaseProductSplitFormSet,
+    fields=["recipient_type", "guild", "percent"],
+    extra=0,
+    can_delete=True,
+    min_num=1,
+    validate_min=True,
+)
+
+
+def build_product_split_formset(
+    *,
+    data: Any = None,
+    instance: Product | None = None,
+    prefix: str = "splits",
+) -> BaseInlineFormSet:
+    """Convenience constructor used by views and tests so the prefix is consistent."""
+    return ProductRevenueSplitFormSet(data=data, instance=instance, prefix=prefix)
