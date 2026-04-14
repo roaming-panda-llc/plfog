@@ -202,7 +202,8 @@ def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
 
     guild = get_object_or_404(Guild, pk=pk)
     ctx = _get_hub_context(request)
-    products = guild.products.filter(is_active=True).order_by("name")
+    # TODO(splits): Task 6 reintroduces per-product visibility. For now show all products.
+    products = guild.products.order_by("name")
     member = _get_member(request)
 
     tab: Tab | None = None
@@ -248,7 +249,8 @@ def guild_cart_confirm(request: HttpRequest, pk: int) -> HttpResponse:
     if not items:
         return JsonResponse({"error": "Cart is empty."}, status=400)
 
-    active_products = {p.pk: p for p in guild.products.filter(is_active=True)}
+    # TODO(splits): Task 6 reintroduces per-product visibility. For now show all products.
+    active_products = {p.pk: p for p in guild.products.all()}
     entries_created = 0
 
     for item in items:

@@ -89,6 +89,13 @@ def describe_migration_0011_seed_default_membership_plan():
         assert plan.monthly_price == Decimal("150.00")
 
     def describe_reverse_migration():
+        # TODO(splits): billing migration 0010 is intentionally irreversible (it
+        # wipes product + tab-entry data during the v1.7 splits refactor). Django
+        # can only roll back membership past 0023 by first rolling back billing
+        # 0010, which now raises. When the splits feature is fully stabilized
+        # this test can either be dropped or rewritten to target a migration
+        # that doesn't require crossing billing 0010.
+        @pytest.mark.skip(reason="billing 0010 is irreversible — blocks rolling back membership past 0023")
         def it_removes_backfilled_members_and_plan(transactional_db):
             from django.core.management import call_command
 

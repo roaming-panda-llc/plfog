@@ -258,8 +258,9 @@ class MemberAdmin(ModelAdmin):
 
 
 class GuildProductInline(TabularInline):
+    # TODO(splits): Task 6 restores the splits editor on this inline.
     model = Product
-    fields = ["name", "price", "admin_percent_override", "split_mode", "is_active"]
+    fields = ["name", "price"]
     extra = 1
     show_change_link = False
     template = "admin/membership/guild_product_inline.html"
@@ -268,9 +269,6 @@ class GuildProductInline(TabularInline):
         self, db_field: models.Field, request: HttpRequest | None = None, **kwargs: object
     ) -> forms.Field | None:
         field = super().formfield_for_dbfield(db_field, request, **kwargs)
-        if db_field.name == "admin_percent_override" and field is not None:
-            field.label = "Admin %"
-            field.widget.attrs["placeholder"] = "20 (default)"  # type: ignore[union-attr]
         return field
 
 

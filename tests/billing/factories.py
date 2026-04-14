@@ -5,7 +5,15 @@ from decimal import Decimal
 import factory
 from django.contrib.auth import get_user_model
 
-from billing.models import BillingSettings, Product, Tab, TabCharge, TabEntry
+from billing.models import (
+    BillingSettings,
+    Product,
+    ProductRevenueSplit,
+    Tab,
+    TabCharge,
+    TabEntry,
+    TabEntrySplit,
+)
 from tests.membership.factories import GuildFactory, MemberFactory
 
 User = get_user_model()
@@ -37,9 +45,38 @@ class ProductFactory(factory.django.DjangoModelFactory):
     name = factory.Sequence(lambda n: f"Product {n}")
     price = Decimal("10.00")
     guild = factory.SubFactory(GuildFactory)
-    is_active = True
-    admin_percent_override = None
-    split_mode = Product.SplitMode.SINGLE_GUILD
+
+    @factory.post_generation
+    def with_default_splits(self, create, extracted, **kwargs):
+        """Auto-attach 20% Admin / 80% owning-guild splits unless caller opts out."""
+        if not create:
+            return
+        if extracted is False:
+            return  # caller passed `with_default_splits=False`
+        if self.splits.exists():
+            return  # caller already added splits manually
+        ProductRevenueSplit.objects.create(
+            product=self,
+            recipient_type=ProductRevenueSplit.RecipientType.ADMIN,
+            guild=None,
+            percent=Decimal("20"),
+        )
+        ProductRevenueSplit.objects.create(
+            product=self,
+            recipient_type=ProductRevenueSplit.RecipientType.GUILD,
+            guild=self.guild,
+            percent=Decimal("80"),
+        )
+
+
+class ProductRevenueSplitFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = ProductRevenueSplit
+
+    product = factory.SubFactory(ProductFactory, with_default_splits=False)
+    recipient_type = ProductRevenueSplit.RecipientType.GUILD
+    guild = factory.SubFactory(GuildFactory)
+    percent = Decimal("100")
 
 
 class TabFactory(factory.django.DjangoModelFactory):
@@ -61,10 +98,17 @@ class TabEntryFactory(factory.django.DjangoModelFactory):
     description = factory.Faker("sentence", nb_words=4)
     amount = Decimal("25.00")
     entry_type = TabEntry.EntryType.MANUAL
-    admin_percent = Decimal("20.00")
-    split_mode = Product.SplitMode.SINGLE_GUILD
-    split_guild_ids: list = []
-    guild = factory.LazyAttribute(lambda o: o.product.guild if o.product else None)
+
+
+class TabEntrySplitFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = TabEntrySplit
+
+    entry = factory.SubFactory(TabEntryFactory)
+    recipient_type = TabEntrySplit.RecipientType.GUILD
+    guild = factory.SubFactory(GuildFactory)
+    percent = Decimal("100")
+    amount = Decimal("10.00")
 
 
 class TabChargeFactory(factory.django.DjangoModelFactory):

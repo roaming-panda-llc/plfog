@@ -183,7 +183,13 @@ def describe_bill_tabs():
             product_b = ProductFactory(guild=guild_b, price=Decimal("8.00"))
             tab.add_entry(description=product_a.name, amount=product_a.price, product=product_a)
             tab.add_entry(description=product_b.name, amount=product_b.price, product=product_b)
-            tab.add_entry(description="manual", amount=Decimal("5.00"))
+            # TODO(splits): Task 7 reintroduces a cleaner manual path. For now
+            # synthesize a 100% admin split so add_entry() accepts it.
+            tab.add_entry(
+                description="manual",
+                amount=Decimal("5.00"),
+                splits=[{"recipient_type": "admin", "guild": None, "percent": Decimal("100")}],
+            )
 
             output = _call_bill_tabs(force=True)
 

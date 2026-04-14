@@ -11,7 +11,7 @@ from tests.membership.factories import GuildFactory
 def describe_ProductRevenueSplit():
     def describe_constraints():
         def it_allows_an_admin_row_with_no_guild(db):
-            product = ProductFactory()
+            product = ProductFactory(with_default_splits=False)
             ProductRevenueSplit.objects.create(
                 product=product,
                 recipient_type=ProductRevenueSplit.RecipientType.ADMIN,
@@ -21,7 +21,7 @@ def describe_ProductRevenueSplit():
             assert product.splits.count() == 1
 
         def it_allows_a_guild_row_with_a_guild(db):
-            product = ProductFactory()
+            product = ProductFactory(with_default_splits=False)
             guild = GuildFactory()
             ProductRevenueSplit.objects.create(
                 product=product,
@@ -32,7 +32,7 @@ def describe_ProductRevenueSplit():
             assert product.splits.count() == 1
 
         def it_rejects_an_admin_row_that_has_a_guild(db):
-            product = ProductFactory()
+            product = ProductFactory(with_default_splits=False)
             guild = GuildFactory()
             with pytest.raises(IntegrityError), transaction.atomic():
                 ProductRevenueSplit.objects.create(
@@ -43,7 +43,7 @@ def describe_ProductRevenueSplit():
                 )
 
         def it_rejects_a_guild_row_with_no_guild(db):
-            product = ProductFactory()
+            product = ProductFactory(with_default_splits=False)
             with pytest.raises(IntegrityError), transaction.atomic():
                 ProductRevenueSplit.objects.create(
                     product=product,
@@ -53,7 +53,7 @@ def describe_ProductRevenueSplit():
                 )
 
         def it_rejects_a_zero_percent(db):
-            product = ProductFactory()
+            product = ProductFactory(with_default_splits=False)
             with pytest.raises(IntegrityError), transaction.atomic():
                 ProductRevenueSplit.objects.create(
                     product=product,
@@ -63,7 +63,7 @@ def describe_ProductRevenueSplit():
                 )
 
         def it_rejects_a_percent_over_100(db):
-            product = ProductFactory()
+            product = ProductFactory(with_default_splits=False)
             with pytest.raises(IntegrityError), transaction.atomic():
                 ProductRevenueSplit.objects.create(
                     product=product,
@@ -74,7 +74,7 @@ def describe_ProductRevenueSplit():
 
     def describe_uniqueness():
         def it_rejects_two_admin_rows_on_the_same_product(db):
-            product = ProductFactory()
+            product = ProductFactory(with_default_splits=False)
             ProductRevenueSplit.objects.create(
                 product=product,
                 recipient_type=ProductRevenueSplit.RecipientType.ADMIN,
@@ -90,7 +90,7 @@ def describe_ProductRevenueSplit():
                 )
 
         def it_rejects_the_same_guild_twice_on_one_product(db):
-            product = ProductFactory()
+            product = ProductFactory(with_default_splits=False)
             guild = GuildFactory()
             ProductRevenueSplit.objects.create(
                 product=product,
@@ -108,8 +108,8 @@ def describe_ProductRevenueSplit():
 
         def it_allows_the_same_guild_on_different_products(db):
             guild = GuildFactory()
-            p1 = ProductFactory()
-            p2 = ProductFactory()
+            p1 = ProductFactory(with_default_splits=False)
+            p2 = ProductFactory(with_default_splits=False)
             ProductRevenueSplit.objects.create(
                 product=p1, recipient_type=ProductRevenueSplit.RecipientType.GUILD,
                 guild=guild, percent=Decimal("100"),
