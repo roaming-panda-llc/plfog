@@ -94,19 +94,6 @@ def describe_Tab():
             TabEntryFactory(tab=tab, amount=Decimal("75.00"))
             assert tab.remaining_limit == Decimal("125.00")
 
-    # TODO(splits): rewrite in Task 4 — Tab.add_entry() now requires a product
-    # (with splits) or an explicit splits=[...] payload. The old kwargs
-    # (guild=, admin_percent=, split_mode=) are gone. Task 4 reinstates all of
-    # these tests against the new signature.
-    # def describe_add_entry():
-    #     def it_creates_an_entry(): ...
-    #     def it_creates_self_service_entry(): ...
-    #     def it_raises_TabLockedError_when_locked(): ...
-    #     def it_allows_entry_without_a_saved_payment_method(): ...
-    #     def it_raises_TabLimitExceededError_when_over_limit(): ...
-    #     def it_allows_entry_at_exact_limit(): ...
-    #     def it_rejects_entry_one_cent_over_limit(): ...
-
     def describe_lock():
         def it_locks_the_tab():
             tab = TabFactory(is_locked=False)
@@ -199,3 +186,60 @@ def describe_Tab():
             with patch("billing.stripe_utils.detach_payment_method") as mock_detach:
                 tab.clear_payment_method()
             mock_detach.assert_not_called()
+
+
+def describe_Tab_add_entry_with_splits():
+    def it_pulls_splits_from_the_product_when_no_splits_kwarg(db):
+        from billing.models import TabEntrySplit
+        from tests.billing.factories import ProductFactory
+
+        product = ProductFactory()  # default 20% admin / 80% owning guild
+        tab = TabFactory()
+        entry = tab.add_entry(description="bag of clay", amount=Decimal("10.00"), product=product)
+        assert entry.splits.count() == 2
+        admin = entry.splits.get(recipient_type=TabEntrySplit.RecipientType.ADMIN)
+        guild_split = entry.splits.get(recipient_type=TabEntrySplit.RecipientType.GUILD)
+        assert admin.amount == Decimal("2.00")
+        assert guild_split.amount == Decimal("8.00")
+        assert guild_split.guild_id == product.guild_id
+
+    def it_uses_explicit_splits_kwarg_when_supplied(db):
+        from billing.models import TabEntrySplit
+
+        tab = TabFactory()
+        entry = tab.add_entry(
+            description="custom",
+            amount=Decimal("10.00"),
+            splits=[
+                {"recipient_type": "admin", "guild": None, "percent": Decimal("100")},
+            ],
+        )
+        assert entry.splits.count() == 1
+        only = entry.splits.first()
+        assert only.recipient_type == TabEntrySplit.RecipientType.ADMIN
+        assert only.amount == Decimal("10.00")
+
+    def it_raises_when_neither_product_nor_splits_supplied(db):
+        tab = TabFactory()
+        with pytest.raises(ValueError):
+            tab.add_entry(description="x", amount=Decimal("5.00"))
+
+    def it_snapshots_split_state_at_creation_time(db):
+        # If the product's splits are edited later, the entry's snapshot should not change.
+        from billing.models import ProductRevenueSplit
+        from tests.billing.factories import ProductFactory
+
+        product = ProductFactory()
+        tab = TabFactory()
+        entry = tab.add_entry(description="x", amount=Decimal("10.00"), product=product)
+
+        product.splits.all().delete()
+        ProductRevenueSplit.objects.create(
+            product=product,
+            recipient_type=ProductRevenueSplit.RecipientType.ADMIN,
+            guild=None,
+            percent=Decimal("100"),
+        )
+
+        entry.refresh_from_db()
+        assert entry.splits.count() == 2  # unchanged
