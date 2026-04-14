@@ -34,6 +34,50 @@ def describe_BillingSettings():
         settings = BillingSettingsFactory()
         assert str(settings) == "Billing Settings"
 
+    def describe_next_charge_at():
+        def it_returns_none_when_off():
+            settings = BillingSettingsFactory(charge_frequency=BillingSettings.ChargeFrequency.OFF)
+            assert settings.next_charge_at() is None
+
+        def it_returns_a_future_datetime_for_daily():
+            from django.utils import timezone as _tz
+
+            settings = BillingSettingsFactory(
+                charge_frequency=BillingSettings.ChargeFrequency.DAILY,
+                charge_time="23:00",
+            )
+            result = settings.next_charge_at()
+            assert result is not None
+            assert result > _tz.localtime()
+
+        def it_returns_a_future_datetime_for_weekly():
+            from django.utils import timezone as _tz
+
+            settings = BillingSettingsFactory(
+                charge_frequency=BillingSettings.ChargeFrequency.WEEKLY,
+                charge_day_of_week=0,
+                charge_day_of_month=None,
+                charge_time="12:00",
+            )
+            result = settings.next_charge_at()
+            assert result is not None
+            assert result > _tz.localtime()
+            assert result.weekday() == 0
+
+        def it_returns_a_future_datetime_for_monthly():
+            from django.utils import timezone as _tz
+
+            settings = BillingSettingsFactory(
+                charge_frequency=BillingSettings.ChargeFrequency.MONTHLY,
+                charge_day_of_month=15,
+                charge_day_of_week=None,
+                charge_time="09:00",
+            )
+            result = settings.next_charge_at()
+            assert result is not None
+            assert result > _tz.localtime()
+            assert result.day == 15
+
     def describe_charge_frequency():
         def it_defaults_to_monthly():
             settings = BillingSettings.load()

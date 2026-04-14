@@ -25,23 +25,18 @@ def describe_void_tab_entry():
 
     def it_voids_a_pending_entry(client: Client, setup):
         entry = setup["entry"]
-        response = client.post(
-            f"/tab/void/{entry.pk}/",
-            {"reason": "Made a mistake"},
-        )
+        response = client.post(f"/tab/void/{entry.pk}/")
         assert response.status_code == 204
         entry.refresh_from_db()
         assert entry.voided_at is not None
+        assert entry.voided_reason == "Removed by member"
 
     def it_returns_toast_on_success(client: Client, setup):
         entry = setup["entry"]
-        response = client.post(
-            f"/tab/void/{entry.pk}/",
-            {"reason": "Duplicate entry"},
-        )
+        response = client.post(f"/tab/void/{entry.pk}/")
         assert response.status_code == 204
         payload = json.loads(response["HX-Trigger"])
-        assert payload["showToast"]["message"] == "Charge voided."
+        assert payload["showToast"]["message"] == "Charge removed."
         assert payload["showToast"]["type"] == "success"
 
     def it_rejects_void_of_another_users_entry(client: Client, setup):
@@ -49,19 +44,13 @@ def describe_void_tab_entry():
         other_tab = TabFactory(member=other_user.member)
         other_entry = TabEntryFactory(tab=other_tab, amount=Decimal("5.00"))
 
-        response = client.post(
-            f"/tab/void/{other_entry.pk}/",
-            {"reason": "Should not work"},
-        )
+        response = client.post(f"/tab/void/{other_entry.pk}/")
         assert response.status_code == 404
 
     def it_requires_login(client: Client, setup):
         client.logout()
         entry = setup["entry"]
-        response = client.post(
-            f"/tab/void/{entry.pk}/",
-            {"reason": "test"},
-        )
+        response = client.post(f"/tab/void/{entry.pk}/")
         assert response.status_code == 302
         assert "/accounts/login/" in response.url
 
@@ -69,17 +58,7 @@ def describe_void_tab_entry():
         entry = setup["entry"]
         entry.void(user=setup["user"], reason="first void")
 
-        response = client.post(
-            f"/tab/void/{entry.pk}/",
-            {"reason": "second void"},
-        )
+        response = client.post(f"/tab/void/{entry.pk}/")
         assert response.status_code == 400
         payload = json.loads(response["HX-Trigger"])
         assert payload["showToast"]["type"] == "error"
-
-    def it_returns_error_when_reason_missing(client: Client, setup):
-        entry = setup["entry"]
-        response = client.post(f"/tab/void/{entry.pk}/", {"reason": ""})
-        assert response.status_code == 400
-        payload = json.loads(response["HX-Trigger"])
-        assert payload["showToast"]["message"] == "Reason is required."

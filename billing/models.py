@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import TYPE_CHECKING, Any
 
@@ -190,6 +191,48 @@ class BillingSettings(models.Model):
         """Load the singleton instance, creating it with defaults if needed."""
         obj, _created = cls.objects.get_or_create(pk=1)
         return obj
+
+    def next_charge_at(self) -> datetime | None:
+        """Return the next scheduled charge datetime in Pacific time.
+
+        Mirrors the schedule logic in ``bill_tabs._is_billing_time``. Returns
+        ``None`` when billing is turned off.
+        """
+        if self.charge_frequency == self.ChargeFrequency.OFF:
+            return None
+
+        now = timezone.localtime()
+        charge_time = self.charge_time
+        if isinstance(charge_time, str):
+            from datetime import time as _time
+
+            parts = charge_time.split(":")
+            charge_time = _time(int(parts[0]), int(parts[1]) if len(parts) > 1 else 0)
+        today_at_time = now.replace(
+            hour=charge_time.hour,
+            minute=charge_time.minute,
+            second=0,
+            microsecond=0,
+        )
+
+        if self.charge_frequency == self.ChargeFrequency.DAILY:
+            return today_at_time if today_at_time > now else today_at_time + timedelta(days=1)
+
+        if self.charge_frequency == self.ChargeFrequency.WEEKLY:
+            target_dow = self.charge_day_of_week if self.charge_day_of_week is not None else 0
+            days_until = (target_dow - now.weekday()) % 7
+            if days_until == 0 and today_at_time <= now:
+                days_until = 7
+            return today_at_time + timedelta(days=days_until)
+
+        # MONTHLY
+        target_dom = self.charge_day_of_month or 1
+        candidate = today_at_time.replace(day=target_dom)
+        if candidate > now:
+            return candidate
+        if candidate.month == 12:
+            return candidate.replace(year=candidate.year + 1, month=1)
+        return candidate.replace(month=candidate.month + 1)
 
 
 # ---------------------------------------------------------------------------

@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
-VERSION = "1.5.0"
+VERSION = "1.5.1"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.5.1",
+        "date": "2026-04-13",
+        "title": "My Tab Hotfixes",
+        "changes": [
+            "My Tab page now shows your saved payment method with a link to add, replace, or remove your card",
+            "My Tab page now tells you exactly when your tab will be processed by Stripe so there are no surprises",
+            "Removed the 'Add to Tab' form from the My Tab page — add items from guild pages instead",
+            "Removing a pending charge from your tab is now a single-click X button — no confirmation dialog",
+        ],
+    },
     {
         "version": "1.5.0",
         "date": "2026-04-11",

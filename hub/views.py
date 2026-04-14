@@ -15,8 +15,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST, require_http_methods
 
 from billing.exceptions import NoPaymentMethodError, TabLimitExceededError, TabLockedError
-from billing.forms import CONTEXT_MEMBER_TAB_PAGE, TabItemForm
-from billing.models import Product, Tab, TabCharge
+from billing.models import BillingSettings, Tab, TabCharge
 from hub.forms import BetaFeedbackForm, EmailPreferencesForm, ProfileSettingsForm, VotePreferenceForm
 from membership.cycle import get_cycle_context
 from membership.models import FundingSnapshot, Guild, Member, VotePreference
@@ -376,42 +375,18 @@ def beta_feedback(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+@require_http_methods(["GET"])
 def tab_detail(request: HttpRequest) -> HttpResponse:
-    """My Tab page — shows current balance, pending entries, and self-service add form."""
-    from billing.forms import VoidTabEntryForm
-
+    """My Tab page — shows current balance, pending entries, and saved payment method."""
     member = _get_member(request)
     ctx = _get_hub_context(request)
 
     if member is None:
         messages.info(request, "Your account is not linked to a membership.")
-        return render(request, "hub/tab_detail.html", {**ctx, "tab": None, "entries": [], "form": None})
+        return render(request, "hub/tab_detail.html", {**ctx, "tab": None, "entries": []})
 
     tab, _created = Tab.objects.get_or_create(member=member)
     entries = tab.entries.pending().select_related("product__guild").order_by("-created_at")
-    products = Product.objects.filter(is_active=True).select_related("guild").order_by("guild__name", "name")
-
-    if request.method == "POST":
-        form = TabItemForm(request.POST, context=CONTEXT_MEMBER_TAB_PAGE, user=request.user)
-        if form.is_valid():
-            try:
-                if not tab.can_add_entry:
-                    raise NoPaymentMethodError("You need a payment method on file before adding charges.")
-                form.apply_to_tab(
-                    tab,
-                    added_by=request.user,  # type: ignore[arg-type]  # @login_required guarantees User
-                    is_self_service=True,
-                )
-                messages.success(request, "Item added to your tab.")
-                return redirect("hub_tab_detail")
-            except NoPaymentMethodError:
-                messages.error(request, "You need a payment method on file before adding charges.")
-            except TabLockedError:
-                messages.error(request, "Your tab is locked. Please contact an admin.")
-            except TabLimitExceededError:
-                messages.error(request, "This item would exceed your tab limit.")
-    else:
-        form = TabItemForm(context=CONTEXT_MEMBER_TAB_PAGE, user=request.user)
 
     return render(
         request,
@@ -420,9 +395,7 @@ def tab_detail(request: HttpRequest) -> HttpResponse:
             **ctx,
             "tab": tab,
             "entries": entries,
-            "form": form,
-            "products": products,
-            "void_form": VoidTabEntryForm(),
+            "next_charge_at": BillingSettings.load().next_charge_at(),
         },
     )
 
@@ -430,8 +403,7 @@ def tab_detail(request: HttpRequest) -> HttpResponse:
 @login_required
 @require_POST
 def void_tab_entry(request: HttpRequest, entry_pk: int) -> HttpResponse:
-    """Void a pending tab entry. Only the owning member can void their own entries."""
-    from billing.forms import VoidTabEntryForm
+    """Remove a pending tab entry. Only the owning member can remove their own entries."""
     from billing.models import TabEntry as TabEntryModel
     from hub.toast import trigger_toast
 
@@ -441,20 +413,15 @@ def void_tab_entry(request: HttpRequest, entry_pk: int) -> HttpResponse:
 
     entry = get_object_or_404(TabEntryModel, pk=entry_pk, tab__member=member)
 
-    form = VoidTabEntryForm(request.POST)
-    if form.is_valid():
-        try:
-            entry.void(user=request.user, reason=form.cleaned_data["reason"])  # type: ignore[arg-type]
-            response = HttpResponse(status=204)
-            trigger_toast(response, "Charge voided.", "success")
-            return response
-        except ValueError as e:
-            response = HttpResponse(status=400)
-            trigger_toast(response, str(e), "error")
-            return response
+    try:
+        entry.void(user=request.user, reason="Removed by member")  # type: ignore[arg-type]
+    except ValueError as e:
+        response = HttpResponse(status=400)
+        trigger_toast(response, str(e), "error")
+        return response
 
-    response = HttpResponse(status=400)
-    trigger_toast(response, "Reason is required.", "error")
+    response = HttpResponse(status=204)
+    trigger_toast(response, "Charge removed.", "success")
     return response
 
 

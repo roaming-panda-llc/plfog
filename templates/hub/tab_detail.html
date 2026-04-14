@@ -36,9 +36,30 @@
     </div>
 </div>
 
+{# Payment method card #}
+<div class="hub-card">
+    <h2 class="tab-section-title">Payment Method</h2>
+    {% if tab.has_payment_method %}
+    <div class="tab-summary__row">
+        <span class="tab-summary__label">{{ tab.payment_method_brand|title }} ending in {{ tab.payment_method_last4 }}</span>
+        <a href="{% url 'billing_setup_payment_method' %}" class="tab-history-link">Manage card</a>
+    </div>
+    {% else %}
+    <div class="tab-summary__row">
+        <span class="tab-summary__label hub-text-muted">No card on file.</span>
+        <a href="{% url 'billing_setup_payment_method' %}" class="tab-history-link">Add a card</a>
+    </div>
+    {% endif %}
+</div>
+
 {# Pending entries #}
 <div class="hub-card">
     <h2 class="tab-section-title">Pending Charges</h2>
+    {% if next_charge_at %}
+    <p class="hub-text-muted" style="margin-top:-0.25rem;margin-bottom:1rem;font-size:0.875rem;">
+        Your tab will be processed by Stripe on {{ next_charge_at|date:"F jS" }} at {{ next_charge_at|date:"g:i A" }}.
+    </p>
+    {% endif %}
     {% if entries %}
     <table class="tab-table">
         <thead>
@@ -57,71 +78,24 @@
                 <td class="tab-table__date">{{ entry.created_at|date:"M j, Y" }}</td>
                 <td>
                     <button type="button"
-                            class="pl-btn pl-btn--secondary"
-                            style="padding:0.25rem 0.5rem;font-size:0.75rem;"
-                            @click="$dispatch('open-confirm', 'void-{{ entry.pk }}')">
-                        Void
+                            class="pl-btn pl-btn--secondary pl-btn--icon"
+                            aria-label="Remove {{ entry.description }} from tab"
+                            title="Remove from tab"
+                            hx-post="{% url 'hub_void_tab_entry' entry.pk %}"
+                            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                            hx-swap="none"
+                            @htmx:after-request="if (event.detail.successful) location.reload()">
+                        &times;
                     </button>
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
-    {% for entry in entries %}
-    <div x-data="{ open: false }"
-         x-show="open"
-         x-transition:enter="modal-enter"
-         x-transition:leave="modal-leave"
-         @open-confirm.window="if ($event.detail === 'void-{{ entry.pk }}') open = true"
-         @keydown.escape.window="open = false"
-         class="pl-modal-backdrop"
-         style="display: none;">
-        <div class="pl-modal pl-modal--sm" @click.outside="open = false">
-            <div class="pl-modal__header">
-                <h2 class="pl-modal__title">Void this charge?</h2>
-                <button type="button" @click="open = false" class="pl-modal__close">&times;</button>
-            </div>
-            <div class="pl-modal__body">
-                <p style="margin:0 0 1rem;">This will remove <strong>{{ entry.description }}</strong> (${{ entry.amount }}) from your tab.</p>
-                <form hx-post="{% url 'hub_void_tab_entry' entry.pk %}" hx-swap="none"
-                      @htmx:after-request="if (event.detail.successful) { open = false; location.reload(); }">
-                    {% csrf_token %}
-                    {% include "components/form_field.html" with field=void_form.reason field_label="Reason" field_hint="Brief reason for voiding this charge" %}
-                    <div class="pl-modal__actions" style="margin-top:1rem;">
-                        <button type="submit" class="pl-btn pl-btn--danger" style="flex:1;">Void Charge</button>
-                        <button type="button" @click="open = false" class="pl-btn pl-btn--secondary" style="flex:1;">Cancel</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    {% endfor %}
     {% else %}
     <p class="hub-text-muted">No pending charges.</p>
     {% endif %}
 </div>
-
-{# Self-service add form #}
-{% if tab.can_add_entry %}
-<div class="hub-card">
-    <h2 class="tab-section-title">Add to Tab</h2>
-    <form method="post" class="tab-add-form">
-        {% csrf_token %}
-        <div class="tab-add-form__fields">
-            <div class="tab-add-form__field">
-                {% include "components/form_field.html" with field=form.product %}
-            </div>
-            <div class="tab-add-form__field">
-                {% include "components/form_field.html" with field=form.description %}
-            </div>
-            <div class="tab-add-form__field tab-add-form__field--amount">
-                {% include "components/form_field.html" with field=form.amount %}
-            </div>
-            <button type="submit" class="tab-add-form__btn">Add Item</button>
-        </div>
-    </form>
-</div>
-{% endif %}
 
 {% endif %}
 {% endblock %}
