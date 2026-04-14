@@ -25,4 +25,19 @@ urlpatterns = [
         views.billing_save_connect_platform,
         name="billing_save_connect_platform",
     ),
+    path(
+        "admin/guild/<int:guild_pk>/products/create/",
+        views.admin_guild_create_product,
+        name="billing_admin_guild_create_product",
+    ),
+    path(
+        "admin/guild/<int:guild_pk>/products/<int:product_pk>/update/",
+        views.admin_guild_update_product,
+        name="billing_admin_guild_update_product",
+    ),
+    path(
+        "admin/guild/<int:guild_pk>/products/<int:product_pk>/delete/",
+        views.admin_guild_delete_product,
+        name="billing_admin_guild_delete_product",
+    ),
 ]

@@ -1229,53 +1229,90 @@ a:hover { color: var(--color-yellow-hover); }
 /* Guild detail — product card grid */
 .guild-product-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 0.875rem;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
 }
 .guild-product-card {
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    align-items: center;
+    justify-content: flex-start;
+    text-align: center;
     gap: 0.5rem;
-    padding: 1rem;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 10px;
-    transition: border-color 0.15s ease, background 0.15s ease;
-    min-height: 90px;
+    padding: 1.25rem 1rem 1.125rem;
+    background: #102538;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+    min-height: 150px;
+    font-family: inherit;
+    color: inherit;
+    /* neutralize button defaults when this class is on a <button> (EYOP) */
+    cursor: pointer;
+    text-align: center;
 }
 .guild-product-card:hover {
-    border-color: rgba(238, 180, 75, 0.4);
-    background: rgba(238, 180, 75, 0.05);
+    border-color: rgba(238, 180, 75, 0.35);
+    background: #13293f;
 }
 .guild-product-card__name {
-    font-size: 0.95rem;
-    font-weight: 600;
+    font-size: 0.9375rem;
+    font-weight: 700;
     color: var(--hub-text);
     line-height: 1.3;
+    letter-spacing: -0.005em;
 }
 .guild-product-card__price {
-    font-size: 1.25rem;
-    font-weight: 700;
+    font-size: 1.5rem;
+    font-weight: 800;
     color: var(--color-tuscan-yellow);
-}
-.guild-product-card__add-form {
-    margin-top: 0.5rem;
+    line-height: 1.1;
+    margin-top: 0.125rem;
 }
 .guild-product-card__add-btn {
     width: 100%;
-    padding: 0.4rem 0.6rem;
+    margin-top: auto;
+    padding: 0.5rem 0.75rem;
     background: var(--color-tuscan-yellow);
     color: #1a1a2e;
     border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    font-size: 0.8rem;
+    border-radius: 8px;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 0.8125rem;
+    letter-spacing: 0.01em;
     cursor: pointer;
     transition: background 0.15s ease;
 }
 .guild-product-card__add-btn:hover {
     background: var(--color-yellow-hover);
+}
+
+/* EYOP (Enter Your Own Price) card — circular + icon instead of price + button */
+.guild-product-card--eyop {
+    justify-content: space-between;
+}
+.guild-product-card__subtitle {
+    font-size: 0.8125rem;
+    color: var(--hub-text-muted);
+    margin-top: -0.125rem;
+}
+.guild-product-card__plus {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-tuscan-yellow);
+    color: #1a1a2e;
+    margin-top: auto;
+    margin-bottom: 0.125rem;
+    transition: background 0.15s ease, transform 0.15s ease;
+}
+.guild-product-card--eyop:hover .guild-product-card__plus {
+    background: var(--color-yellow-hover);
+    transform: scale(1.05);
 }
 
 /* Shared table */

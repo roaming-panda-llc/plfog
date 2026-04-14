@@ -119,8 +119,12 @@
             {% endif %}
             <div class="pl-topbar__spacer"></div>
             {% if tab_balance is not None %}
-            <a href="{% url 'hub_tab_detail' %}" class="pl-topbar__tab-pill{% if tab_is_locked %} pl-topbar__tab-pill--locked{% endif %}" title="My Tab">
-                ${{ tab_balance }}
+            <a href="{% url 'hub_tab_detail' %}"
+               class="pl-topbar__tab-pill{% if tab_is_locked %} pl-topbar__tab-pill--locked{% endif %}"
+               title="My Tab"
+               x-data="{ balance: '{{ tab_balance }}' }"
+               @tab-balance-updated.window="balance = $event.detail.balance">
+                $<span x-text="balance">{{ tab_balance }}</span>
             </a>
             {% endif %}
             <button class="pl-topbar__theme-toggle"

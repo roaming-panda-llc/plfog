@@ -208,6 +208,33 @@ def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
     if member is not None:
         tab, _created = Tab.objects.get_or_create(member=member)
 
+    from hub.permissions import can_manage_guild
+    from membership.models import Guild as _Guild
+
+    can_manage = can_manage_guild(request.user, guild)
+    manage_context: dict[str, Any] = {}
+    if can_manage:
+        products_json = []
+        for p in products.select_related("revenue_split"):
+            split_rows = []
+            if p.revenue_split_id is not None:
+                for r in p.revenue_split.recipients.order_by("pk"):
+                    split_rows.append({
+                        "entity": "admin" if r.guild_id is None else str(r.guild_id),
+                        "percent": str(r.percent),
+                    })
+            products_json.append({
+                "id": p.pk,
+                "name": p.name,
+                "description": p.description,
+                "price": str(p.price),
+                "recipients": split_rows,
+            })
+        manage_context = {
+            "active_guilds": list(_Guild.objects.filter(is_active=True).order_by("name").values("pk", "name")),
+            "products_json": json.dumps(products_json),
+        }
+
     return render(
         request,
         "hub/guild_detail.html",
@@ -216,8 +243,41 @@ def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "guild": guild,
             "products": products,
             "tab": tab,
+            "can_manage": can_manage,
+            **manage_context,
         },
     )
+
+
+@login_required
+@require_POST
+def guild_update(request: HttpRequest, pk: int) -> JsonResponse:
+    """Update a guild's name and/or about text. Admin/guild-lead only."""
+    from hub.permissions import can_manage_guild
+
+    guild = get_object_or_404(Guild, pk=pk)
+    if not can_manage_guild(request.user, guild):
+        return JsonResponse({"ok": False, "error": "You don't have permission to edit this guild."}, status=403)
+
+    try:
+        payload = json.loads(request.body or b"{}")
+    except json.JSONDecodeError as exc:
+        return JsonResponse({"ok": False, "error": f"Invalid JSON: {exc}"}, status=400)
+
+    name = (payload.get("name") or "").strip()
+    about = payload.get("about")
+    if about is None:
+        about = guild.about
+    about = (about or "").strip()
+
+    if not name:
+        return JsonResponse({"ok": False, "error": "Name is required."}, status=400)
+
+    guild.name = name
+    guild.about = about
+    guild.save(update_fields=["name", "about"])
+
+    return JsonResponse({"ok": True, "guild": {"pk": guild.pk, "name": guild.name, "about": guild.about}})
 
 
 @login_required
@@ -272,6 +332,13 @@ def guild_cart_confirm(request: HttpRequest, pk: int) -> HttpResponse:
     success_response = HttpResponse(status=204)
     item_word = "item" if entries_created == 1 else "items"
     trigger_toast(success_response, f"{entries_created} {item_word} added to your tab!", "success")
+
+    # Piggyback the updated tab balance on the HX-Trigger header so the cart
+    # JS can dispatch a window event and the header pill updates in place.
+    trigger_payload = json.loads(success_response["HX-Trigger"])
+    trigger_payload["tabBalanceUpdated"] = {"balance": str(tab.current_balance)}
+    success_response["HX-Trigger"] = json.dumps(trigger_payload)
+
     return success_response
 
 

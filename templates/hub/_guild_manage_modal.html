@@ -1,0 +1,304 @@
+{# Add Product modal for guild managers on the member-facing guild page.
+   Teleported to <body> to escape any ancestor stacking/transform contexts. #}
+
+<style>
+.guild-product-card__edit, .guild-product-card__remove { position: absolute; top: 0.5rem; width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.15); background: transparent; font-size: 0.75rem; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity 0.15s, background 0.15s; color: #F4EFDD; }
+.guild-product-card__edit { right: 2.25rem; }
+.guild-product-card__remove { right: 0.5rem; border-color: rgba(255, 120, 120, 0.3); color: #ff7a7a; font-size: 1rem; }
+.guild-product-card:hover .guild-product-card__edit,
+.guild-product-card:hover .guild-product-card__remove { opacity: 1; }
+.guild-product-card__edit:hover { background: rgba(238, 180, 75, 0.12); border-color: #EEB44B; color: #EEB44B; }
+.guild-product-card__remove:hover { background: rgba(255, 80, 80, 0.12); }
+
+/* Inline guild info editor */
+.gi-edit-btn { background: transparent; border: 1px solid rgba(255,255,255,0.15); color: #96ACBB; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 0.875rem; transition: background 0.15s, color 0.15s; }
+.gi-edit-btn:hover { color: #EEB44B; background: rgba(238,180,75,0.08); border-color: rgba(238,180,75,0.4); }
+.gi-edit-row { display: flex; gap: 0.5rem; align-items: center; margin: 0.25rem 0; }
+.gi-input, .gi-textarea { flex: 1; padding: 0.55rem 0.75rem; background: #092E4C; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #F4EFDD; font-size: 1rem; font-family: inherit; box-sizing: border-box; }
+.gi-input:focus, .gi-textarea:focus { outline: none; border-color: #EEB44B; }
+.gi-textarea { min-height: 5rem; resize: vertical; margin-bottom: 0.5rem; }
+.gi-btn { padding: 0.5rem 1rem; border-radius: 6px; border: none; cursor: pointer; font-family: inherit; font-size: 0.8125rem; font-weight: 700; transition: background 0.15s; }
+.gi-btn--primary { background: #EEB44B; color: #092E4C; }
+.gi-btn--primary:hover { background: #f0c166; }
+.gi-btn--primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.gi-btn--ghost { background: transparent; color: #F4EFDD; border: 1px solid rgba(255,255,255,0.15); }
+.gi-btn--ghost:hover { background: rgba(255,255,255,0.06); }
+
+.gm-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 9999; display: flex; align-items: flex-start; justify-content: center; padding: 4rem 1rem; overflow-y: auto; }
+.gm-modal { background: #0a1929; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; width: 100%; max-width: 640px; box-shadow: 0 40px 80px rgba(0,0,0,0.5); color: #F4EFDD; font-family: 'Inter', system-ui, sans-serif; }
+.gm-modal__header { padding: 1.5rem 1.75rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.gm-modal__title { font-size: 1.25rem; font-weight: 700; margin: 0; }
+.gm-modal__subtitle { font-size: 0.8125rem; color: #96ACBB; margin: 0.35rem 0 0; }
+.gm-modal__subtitle strong { color: #EEB44B; font-weight: 600; }
+.gm-modal__body { padding: 1.5rem 1.75rem; }
+.gm-modal__footer { padding: 1rem 1.75rem; border-top: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: flex-end; gap: 0.75rem; }
+
+.gm-section { margin-bottom: 1.25rem; background: #081b2e; border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 1rem 1.25rem 1.125rem; }
+.gm-section:last-child { margin-bottom: 0; }
+.gm-section__heading { display: flex; align-items: center; gap: 0.5rem; font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.1em; color: #EEB44B; font-weight: 700; margin: 0 0 1rem; padding-bottom: 0.625rem; border-bottom: 1px solid rgba(238,180,75,0.15); }
+.gm-section__heading::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #EEB44B; }
+
+.gm-field { margin-bottom: 0.875rem; }
+.gm-field:last-child { margin-bottom: 0; }
+.gm-label { display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: #96ACBB; font-weight: 600; margin-bottom: 0.35rem; }
+.gm-input, .gm-select, .gm-textarea { width: 100%; padding: 0.55rem 0.75rem; background: #092E4C; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: #F4EFDD; font-size: 0.9375rem; font-family: inherit; box-sizing: border-box; }
+.gm-input:focus, .gm-select:focus, .gm-textarea:focus { outline: none; border-color: #EEB44B; }
+.gm-textarea { min-height: 4rem; resize: vertical; }
+
+.gm-recipient-row { display: grid; grid-template-columns: 2fr 1fr auto; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
+.gm-recipient-row .gm-remove { background: transparent; border: none; color: #ff7a7a; cursor: pointer; font-size: 1.25rem; padding: 0 0.5rem; }
+.gm-recipient-row .gm-remove:hover { color: #ff5050; }
+.gm-split-total { padding: 0.5rem 0 0; font-size: 0.8125rem; font-weight: 700; }
+.gm-split-total--ok { color: #6ee797; }
+.gm-split-total--bad { color: #ff7a7a; }
+
+.gm-btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.55rem 1.1rem; border-radius: 6px; border: none; cursor: pointer; font-family: inherit; font-size: 0.875rem; font-weight: 700; text-decoration: none; transition: background 0.15s; }
+.gm-btn--primary { background: #EEB44B; color: #092E4C; }
+.gm-btn--primary:hover { background: #f0c166; }
+.gm-btn--primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.gm-btn--ghost { background: transparent; color: #F4EFDD; border: 1px solid rgba(255,255,255,0.15); }
+.gm-btn--ghost:hover { background: rgba(255,255,255,0.06); }
+
+.gm-error { color: #ff7a7a; font-size: 0.8125rem; margin-top: 0.5rem; }
+</style>
+
+<template x-teleport="body">
+<div class="gm-modal-backdrop" x-show="adding" x-cloak
+     @keydown.escape.window.prevent="/* explicit cancel required — no escape */">
+    <div class="gm-modal" @click.stop>
+        <div class="gm-modal__header">
+            <h2 class="gm-modal__title" x-text="mode === 'edit' ? 'Edit product' : 'Add product'"></h2>
+            <p class="gm-modal__subtitle">For <strong x-text="guildName"></strong></p>
+        </div>
+
+        <div class="gm-modal__body">
+            <div class="gm-section">
+                <h4 class="gm-section__heading">Product info</h4>
+                <div class="gm-field">
+                    <label class="gm-label">Name</label>
+                    <input type="text" class="gm-input" x-model="draft.name"
+                           placeholder="e.g. 1 lb clay" @keydown.enter.prevent>
+                </div>
+                <div class="gm-field">
+                    <label class="gm-label">Description</label>
+                    <textarea class="gm-textarea" x-model="draft.description"
+                              placeholder="Optional — shown to members"></textarea>
+                </div>
+            </div>
+
+            <div class="gm-section">
+                <h4 class="gm-section__heading">Financial info</h4>
+                <div class="gm-field">
+                    <label class="gm-label">Price ($)</label>
+                    <input type="number" step="0.01" min="0.01" class="gm-input"
+                           x-model="draft.price" placeholder="0.00" style="max-width: 12rem;">
+                </div>
+
+                <label class="gm-label" style="margin-top:0.75rem;margin-bottom:0.5rem;">Revenue split — must sum to 100%</label>
+                <template x-for="(row, idx) in draft.recipients" :key="idx">
+                    <div class="gm-recipient-row">
+                        <select class="gm-select" x-model="row.entity">
+                            <option value="admin">Past Lives admin</option>
+                            {% for g in active_guilds %}
+                            <option value="{{ g.pk }}">{{ g.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="number" step="0.01" min="0.01" max="100"
+                               class="gm-input" x-model="row.percent" placeholder="%"
+                               @blur="formatPercent(idx)">
+                        <button type="button" class="gm-remove"
+                                @click.prevent="removeRecipient(idx)"
+                                :disabled="draft.recipients.length <= 1">×</button>
+                    </div>
+                </template>
+                <button type="button" class="gm-btn gm-btn--ghost"
+                        @click.prevent="addRecipient()" style="margin-top:0.25rem;font-weight:600;">
+                    + Add recipient
+                </button>
+                <div class="gm-split-total"
+                     :class="splitTotal() === 100 ? 'gm-split-total--ok' : 'gm-split-total--bad'"
+                     x-text="'Total: ' + splitTotal().toFixed(2) + '%'"></div>
+            </div>
+
+            <div class="gm-error" x-show="error" x-text="error" x-cloak></div>
+        </div>
+
+        <div class="gm-modal__footer">
+            <button type="button" class="gm-btn gm-btn--ghost" @click.prevent="cancelAdding()">Cancel</button>
+            <button type="button" class="gm-btn gm-btn--primary"
+                    :disabled="!canSave() || saving"
+                    @click.prevent="save()"
+                    x-text="saving ? 'Saving…' : (mode === 'edit' ? 'Save changes' : 'Save product')"></button>
+        </div>
+    </div>
+</div>
+</template>
+
+<script>
+function guildManager(cfg) {
+    return {
+        ...cfg,
+        adding: false,
+        saving: false,
+        error: '',
+        mode: 'add',         // 'add' | 'edit'
+        editingId: null,
+        draft: { name: '', description: '', price: '', is_active: true, recipients: [] },
+
+        startAdding() {
+            this.adding = true;
+            this.mode = 'add';
+            this.editingId = null;
+            this.error = '';
+            this.draft = {
+                name: '',
+                description: '',
+                price: '',
+                is_active: true,
+                recipients: [
+                    { entity: 'admin', percent: '20.00' },
+                    { entity: String(this.guildId), percent: '80.00' },
+                ],
+            };
+            document.body.style.overflow = 'hidden';
+        },
+        startEditing(productId) {
+            const p = this.products.find(x => x.id === productId);
+            if (!p) return;
+            this.adding = true;
+            this.mode = 'edit';
+            this.editingId = productId;
+            this.error = '';
+            this.draft = {
+                name: p.name,
+                description: p.description || '',
+                price: p.price,
+                is_active: true,
+                recipients: p.recipients.length
+                    ? p.recipients.map(r => ({ entity: r.entity, percent: r.percent }))
+                    : [{ entity: 'admin', percent: '100.00' }],
+            };
+            document.body.style.overflow = 'hidden';
+        },
+        cancelAdding() {
+            this.adding = false;
+            this.error = '';
+            document.body.style.overflow = '';
+        },
+        addRecipient() { this.draft.recipients.push({ entity: 'admin', percent: '' }); },
+        removeRecipient(idx) {
+            if (this.draft.recipients.length > 1) this.draft.recipients.splice(idx, 1);
+        },
+        formatPercent(idx) {
+            const n = parseFloat(this.draft.recipients[idx].percent);
+            if (!isNaN(n)) this.draft.recipients[idx].percent = n.toFixed(2);
+        },
+        splitTotal() {
+            const sum = this.draft.recipients.reduce((acc, r) => acc + (parseFloat(r.percent) || 0), 0);
+            return Number(sum.toFixed(2));
+        },
+        canSave() {
+            return (
+                this.draft.name.trim() &&
+                parseFloat(this.draft.price) > 0 &&
+                this.splitTotal() === 100 &&
+                this.draft.recipients.every(r => r.entity && parseFloat(r.percent) > 0)
+            );
+        },
+        async save() {
+            this.saving = true;
+            this.error = '';
+            const url = this.mode === 'edit'
+                ? this.updateUrlTpl.replace('__pk__', this.editingId)
+                : this.createUrl;
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': this.csrfToken },
+                    body: JSON.stringify({
+                        name: this.draft.name.trim(),
+                        description: this.draft.description.trim(),
+                        price: this.draft.price,
+                        is_active: true,
+                        recipients: this.draft.recipients,
+                    }),
+                });
+                const data = await res.json();
+                if (!data.ok) { this.error = data.error || 'Something went wrong.'; return; }
+                window.location.reload();
+            } catch (e) {
+                this.error = 'Network error: ' + e.message;
+            } finally {
+                this.saving = false;
+            }
+        },
+        async deleteProduct(p) {
+            if (!confirm(`Remove "${p.name}"? This cannot be undone.`)) return;
+            const url = this.deleteUrlTpl.replace('__pk__', p.id);
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': this.csrfToken },
+                });
+                const data = await res.json();
+                if (data.ok) { window.location.reload(); }
+                else { alert(data.error || 'Failed to remove product.'); }
+            } catch (e) { alert('Network error: ' + e.message); }
+        },
+    };
+}
+
+function guildInfoEditor(cfg) {
+    return {
+        ...cfg,
+        name: cfg.initialName,
+        about: cfg.initialAbout,
+        draftName: cfg.initialName,
+        draftAbout: cfg.initialAbout,
+        editingName: false,
+        editingAbout: false,
+        savingName: false,
+        savingAbout: false,
+
+        async saveName() {
+            const name = this.draftName.trim();
+            if (!name) return;
+            this.savingName = true;
+            try {
+                const res = await this._post({ name, about: this.about });
+                if (res.ok) {
+                    this.name = res.guild.name;
+                    this.editingName = false;
+                    document.title = res.guild.name;
+                } else {
+                    alert(res.error || 'Failed to save name.');
+                }
+            } catch (e) { alert('Network error: ' + e.message); }
+            finally { this.savingName = false; }
+        },
+
+        async saveAbout() {
+            this.savingAbout = true;
+            try {
+                const res = await this._post({ name: this.name, about: this.draftAbout });
+                if (res.ok) {
+                    this.about = res.guild.about;
+                    this.editingAbout = false;
+                } else {
+                    alert(res.error || 'Failed to save about.');
+                }
+            } catch (e) { alert('Network error: ' + e.message); }
+            finally { this.savingAbout = false; }
+        },
+
+        async _post(body) {
+            const r = await fetch(this.updateUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': this.csrfToken },
+                body: JSON.stringify(body),
+            });
+            return r.json();
+        },
+    };
+}
+</script>

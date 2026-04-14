@@ -6,14 +6,53 @@
 <div x-data="guildCart({{ guild.pk }})">
 
 {# Guild info card #}
-<div class="hub-card">
+<div class="hub-card"
+     {% if can_manage %}x-data="guildInfoEditor({
+        guildId: {{ guild.pk }},
+        updateUrl: '{% url 'hub_guild_update' guild.pk %}',
+        csrfToken: document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+        initialName: '{{ guild.name|escapejs }}',
+        initialAbout: '{{ guild.about|default:''|escapejs }}',
+     })"{% endif %}>
+    {% if can_manage %}
+    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;" x-show="!editingName">
+        <h1 class="hub-page-title" style="margin:0;" x-text="name"></h1>
+        <button type="button" class="gi-edit-btn" @click="editingName = true; draftName = name" title="Edit name">✎</button>
+    </div>
+    <div class="gi-edit-row" x-show="editingName" x-cloak>
+        <input type="text" class="gi-input" x-model="draftName" @keydown.enter="saveName()">
+        <button type="button" class="gi-btn gi-btn--primary" @click="saveName()" :disabled="!draftName.trim() || savingName">Save</button>
+        <button type="button" class="gi-btn gi-btn--ghost" @click="editingName = false">Cancel</button>
+    </div>
+    {% else %}
     <h1 class="hub-page-title">{{ guild.name }}</h1>
+    {% endif %}
+
     <div class="hub-detail-section">
-        <h3 class="hub-detail-label">About</h3>
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+            <h3 class="hub-detail-label" style="margin:0;">About</h3>
+            {% if can_manage %}
+            <button type="button" class="gi-edit-btn" @click="editingAbout = true; draftAbout = about" x-show="!editingAbout" title="Edit about">✎</button>
+            {% endif %}
+        </div>
+        {% if can_manage %}
+        <div x-show="!editingAbout">
+            <p x-show="about" x-text="about" style="white-space:pre-wrap;"></p>
+            <p class="hub-text-muted" x-show="!about">Nothing here yet.</p>
+        </div>
+        <div class="gi-edit-row" x-show="editingAbout" x-cloak style="flex-direction:column;align-items:stretch;">
+            <textarea class="gi-textarea" x-model="draftAbout" placeholder="Tell members what this guild is about…"></textarea>
+            <div style="display:flex;gap:0.5rem;">
+                <button type="button" class="gi-btn gi-btn--primary" @click="saveAbout()" :disabled="savingAbout">Save</button>
+                <button type="button" class="gi-btn gi-btn--ghost" @click="editingAbout = false">Cancel</button>
+            </div>
+        </div>
+        {% else %}
         {% if guild.about %}
         <p>{{ guild.about|linebreaksbr }}</p>
         {% else %}
         <p class="hub-text-muted">Nothing here yet.</p>
+        {% endif %}
         {% endif %}
     </div>
     {% if guild.guild_lead %}
@@ -97,27 +136,51 @@
 </div>
 
 {# Products card #}
-<div class="hub-card" style="margin-top:1.5rem;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+<div class="hub-card" style="margin-top:1.5rem;"
+     {% if can_manage %}x-data="guildManager({
+        guildId: {{ guild.pk }},
+        guildName: '{{ guild.name|escapejs }}',
+        createUrl: '{% url 'billing_admin_guild_create_product' guild.pk %}',
+        updateUrlTpl: '/billing/admin/guild/{{ guild.pk }}/products/__pk__/update/',
+        deleteUrlTpl: '/billing/admin/guild/{{ guild.pk }}/products/__pk__/delete/',
+        csrfToken: document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+        products: {{ products_json|safe }},
+     })"{% endif %}>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:0 0 1rem;">
         <h3 class="hub-detail-label" style="margin:0;">Products</h3>
-        {% if tab and tab.can_add_entry %}
-        <button
-            class="pl-btn pl-btn--icon pl-btn--secondary"
-            @click="$dispatch('open-modal', 'eyop-modal')"
-            hx-get="{% url 'hub_guild_eyop_form' guild.pk %}"
-            hx-target="#eyop-modal-body"
-            hx-swap="innerHTML"
-            title="Enter Your Own Price">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 5v14"/><path d="M5 12h14"/>
-            </svg>
-        </button>
+        {% if can_manage %}
+        <button type="button" class="pl-btn pl-btn--primary" style="font-size:0.8125rem;padding:0.4rem 0.85rem;"
+                @click.prevent="startAdding()">+ Add product</button>
         {% endif %}
     </div>
-    {% if products %}
+
+    {% if products or tab and tab.can_add_entry %}
     <div class="guild-product-grid">
+        {% if tab and tab.can_add_entry %}
+        {# "Enter Your Own Price" card — always first #}
+        <button type="button"
+                class="guild-product-card guild-product-card--eyop"
+                @click="$dispatch('open-modal', 'eyop-modal')"
+                hx-get="{% url 'hub_guild_eyop_form' guild.pk %}"
+                hx-target="#eyop-modal-body"
+                hx-swap="innerHTML">
+            <div class="guild-product-card__name">General Consumables</div>
+            <div class="guild-product-card__subtitle">Enter Custom Price</div>
+            <div class="guild-product-card__plus">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            </div>
+        </button>
+        {% endif %}
         {% for product in products %}
-        <div class="guild-product-card">
+        <div class="guild-product-card" {% if can_manage %}style="position:relative;"{% endif %}>
+            {% if can_manage %}
+            <button type="button" class="guild-product-card__edit"
+                    @click.prevent="startEditing({{ product.pk }})"
+                    title="Edit product">✎</button>
+            <button type="button" class="guild-product-card__remove"
+                    @click.prevent="deleteProduct({id: {{ product.pk }}, name: '{{ product.name|escapejs }}'})"
+                    title="Remove product">×</button>
+            {% endif %}
             <div class="guild-product-card__name">{{ product.name }}</div>
             <div class="guild-product-card__price">${{ product.price }}</div>
             {% if tab and tab.can_add_entry %}
@@ -132,6 +195,10 @@
     </div>
     {% else %}
     <p class="hub-text-muted">No products listed yet.</p>
+    {% endif %}
+
+    {% if can_manage %}
+    {% include "hub/_guild_manage_modal.html" %}
     {% endif %}
 </div>
 
@@ -285,6 +352,11 @@ function guildCart(guildPk) {
                             var data = JSON.parse(trigger);
                             if (data.showToast) {
                                 window.dispatchEvent(new CustomEvent('show-toast', {detail: data.showToast}));
+                            }
+                            if (data.tabBalanceUpdated) {
+                                window.dispatchEvent(new CustomEvent('tab-balance-updated', {
+                                    detail: data.tabBalanceUpdated
+                                }));
                             }
                         } catch(e) {}
                     }

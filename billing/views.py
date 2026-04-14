@@ -462,3 +462,223 @@ def billing_save_connect_platform(request: HttpRequest) -> HttpResponse:
             for error in errors:
                 django_messages.error(request, f"{field}: {error}")
     return redirect("/billing/admin/dashboard/?tab=stripe")
+
+
+@login_required
+@require_POST
+def admin_guild_create_product(request: HttpRequest, guild_pk: int) -> JsonResponse:
+    """Create a Product (with its RevenueSplit) for a guild.
+
+    Permission: admins and the guild's lead (guild officer) can call this —
+    see ``hub.permissions.can_manage_guild``.
+
+    Accepts JSON payload:
+        {
+            "name": str,
+            "description": str,
+            "price": str (decimal),
+            "is_active": bool,
+            "recipients": [{"entity": "admin" | "<guild_pk>", "percent": str}, ...]
+        }
+    """
+    import json
+
+    from billing.models import Product, RevenueSplit, SplitRecipient
+    from hub.permissions import can_manage_guild
+    from membership.models import Guild
+
+    guild = Guild.objects.filter(pk=guild_pk).first()
+    if guild is None:
+        return JsonResponse({"ok": False, "error": "Guild not found."}, status=404)
+    if not can_manage_guild(request.user, guild):
+        return JsonResponse({"ok": False, "error": "You don't have permission to manage this guild."}, status=403)
+
+    try:
+        payload = json.loads(request.body or b"{}")
+    except json.JSONDecodeError as exc:
+        return JsonResponse({"ok": False, "error": f"Invalid JSON: {exc}"}, status=400)
+
+    name = (payload.get("name") or "").strip()
+    description = (payload.get("description") or "").strip()
+    price_raw = payload.get("price")
+    is_active = bool(payload.get("is_active", True))
+    recipients_raw = payload.get("recipients") or []
+
+    if not name:
+        return JsonResponse({"ok": False, "error": "Name is required."}, status=400)
+    try:
+        price = Decimal(str(price_raw))
+    except (TypeError, ValueError):
+        return JsonResponse({"ok": False, "error": "Price must be a number."}, status=400)
+    if price <= 0:
+        return JsonResponse({"ok": False, "error": "Price must be greater than 0."}, status=400)
+
+    # Parse + validate recipients
+    parsed: list[tuple[int | None, Decimal]] = []
+    seen: set[str] = set()
+    total = Decimal("0")
+    for row in recipients_raw:
+        entity = (row.get("entity") or "").strip()
+        percent_raw = row.get("percent")
+        if not entity or percent_raw in (None, ""):
+            continue
+        try:
+            percent = Decimal(str(percent_raw))
+        except (TypeError, ValueError):
+            return JsonResponse({"ok": False, "error": "Percent must be a number."}, status=400)
+        if percent <= 0:
+            return JsonResponse({"ok": False, "error": "Percent must be greater than 0."}, status=400)
+        if entity in seen:
+            return JsonResponse({"ok": False, "error": f"Duplicate recipient: {entity}"}, status=400)
+        seen.add(entity)
+        if entity == "admin":
+            parsed.append((None, percent))
+        else:
+            try:
+                parsed.append((int(entity), percent))
+            except ValueError:
+                return JsonResponse({"ok": False, "error": f"Invalid recipient: {entity}"}, status=400)
+        total += percent
+
+    if not parsed:
+        return JsonResponse({"ok": False, "error": "At least one recipient is required."}, status=400)
+    if total != Decimal("100"):
+        return JsonResponse({"ok": False, "error": f"Recipients must sum to 100% (got {total}%)."}, status=400)
+
+    split = RevenueSplit.objects.create()
+    for guild_pk_or_none, percent in parsed:
+        SplitRecipient.objects.create(split=split, guild_id=guild_pk_or_none, percent=percent)
+
+    product = Product.objects.create(
+        name=name,
+        description=description,
+        price=price,
+        guild=guild,
+        is_active=is_active,
+        revenue_split=split,
+    )
+
+    return JsonResponse({
+        "ok": True,
+        "product": {
+            "id": product.pk,
+            "name": product.name,
+            "price": str(product.price),
+            "is_active": product.is_active,
+        },
+    })
+
+
+@login_required
+@require_POST
+def admin_guild_update_product(request: HttpRequest, guild_pk: int, product_pk: int) -> JsonResponse:
+    """Update an existing product (and rebuild its revenue split) in place.
+
+    Same payload shape as ``admin_guild_create_product``. Permission: admins
+    and guild leads via ``hub.permissions.can_manage_guild``.
+    """
+    import json
+
+    from billing.models import Product, SplitRecipient
+    from hub.permissions import can_manage_guild
+    from membership.models import Guild
+
+    guild = Guild.objects.filter(pk=guild_pk).first()
+    if guild is None:
+        return JsonResponse({"ok": False, "error": "Guild not found."}, status=404)
+    if not can_manage_guild(request.user, guild):
+        return JsonResponse({"ok": False, "error": "You don't have permission to manage this guild."}, status=403)
+
+    product = Product.objects.filter(pk=product_pk, guild_id=guild_pk).first()
+    if product is None:
+        return JsonResponse({"ok": False, "error": "Product not found."}, status=404)
+
+    try:
+        payload = json.loads(request.body or b"{}")
+    except json.JSONDecodeError as exc:
+        return JsonResponse({"ok": False, "error": f"Invalid JSON: {exc}"}, status=400)
+
+    name = (payload.get("name") or "").strip()
+    description = (payload.get("description") or "").strip()
+    price_raw = payload.get("price")
+    recipients_raw = payload.get("recipients") or []
+
+    if not name:
+        return JsonResponse({"ok": False, "error": "Name is required."}, status=400)
+    try:
+        price = Decimal(str(price_raw))
+    except (TypeError, ValueError):
+        return JsonResponse({"ok": False, "error": "Price must be a number."}, status=400)
+    if price <= 0:
+        return JsonResponse({"ok": False, "error": "Price must be greater than 0."}, status=400)
+
+    parsed: list[tuple[int | None, Decimal]] = []
+    seen: set[str] = set()
+    total = Decimal("0")
+    for row in recipients_raw:
+        entity = (row.get("entity") or "").strip()
+        percent_raw = row.get("percent")
+        if not entity or percent_raw in (None, ""):
+            continue
+        try:
+            percent = Decimal(str(percent_raw))
+        except (TypeError, ValueError):
+            return JsonResponse({"ok": False, "error": "Percent must be a number."}, status=400)
+        if percent <= 0:
+            return JsonResponse({"ok": False, "error": "Percent must be greater than 0."}, status=400)
+        if entity in seen:
+            return JsonResponse({"ok": False, "error": f"Duplicate recipient: {entity}"}, status=400)
+        seen.add(entity)
+        if entity == "admin":
+            parsed.append((None, percent))
+        else:
+            try:
+                parsed.append((int(entity), percent))
+            except ValueError:
+                return JsonResponse({"ok": False, "error": f"Invalid recipient: {entity}"}, status=400)
+        total += percent
+
+    if not parsed:
+        return JsonResponse({"ok": False, "error": "At least one recipient is required."}, status=400)
+    if total != Decimal("100"):
+        return JsonResponse({"ok": False, "error": f"Recipients must sum to 100% (got {total}%)."}, status=400)
+
+    product.name = name
+    product.description = description
+    product.price = price
+    product.save(update_fields=["name", "description", "price"])
+
+    product.revenue_split.recipients.all().delete()
+    for guild_pk_or_none, percent in parsed:
+        SplitRecipient.objects.create(split=product.revenue_split, guild_id=guild_pk_or_none, percent=percent)
+
+    return JsonResponse({
+        "ok": True,
+        "product": {
+            "id": product.pk,
+            "name": product.name,
+            "price": str(product.price),
+            "is_active": product.is_active,
+        },
+    })
+
+
+@login_required
+@require_POST
+def admin_guild_delete_product(request: HttpRequest, guild_pk: int, product_pk: int) -> JsonResponse:
+    """Delete a product from a guild. Admin/guild-lead only — see hub.permissions."""
+    from billing.models import Product
+    from hub.permissions import can_manage_guild
+    from membership.models import Guild
+
+    guild = Guild.objects.filter(pk=guild_pk).first()
+    if guild is None:
+        return JsonResponse({"ok": False, "error": "Guild not found."}, status=404)
+    if not can_manage_guild(request.user, guild):
+        return JsonResponse({"ok": False, "error": "You don't have permission to manage this guild."}, status=403)
+
+    product = Product.objects.filter(pk=product_pk, guild_id=guild_pk).first()
+    if product is None:
+        return JsonResponse({"ok": False, "error": "Product not found."}, status=404)
+    product.delete()
+    return JsonResponse({"ok": True})

@@ -1,153 +1,322 @@
-{% load i18n admin_urls %}
+{% load i18n guild_admin_extras %}
+{% active_guilds as guild_entity_choices %}
 
-<div class="js-inline-admin-formset inline-group" id="{{ inline_admin_formset.formset.prefix }}-group" data-inline-type="tabular" data-inline-formset="{{ inline_admin_formset.inline_formset_data }}">
-    {{ inline_admin_formset.formset.management_form }}
-    {{ inline_admin_formset.formset.non_form_errors }}
+{# Inline product management for the guild admin change page.
+   Alpine.js handles the UI state; a small JSON API (billing.views.admin_guild_create_product)
+   handles persistence. Add form is a modal — only Save or Cancel dismisses it. #}
 
-    {# Hidden existing-row forms — Django needs these to process saves/deletes #}
-    {% for inline_admin_form in inline_admin_formset %}
-        {% if inline_admin_form.original %}
-            {% for fieldset in inline_admin_form %}
-                {% for line in fieldset %}
-                    {% for field in line %}
-                        {% if field.field.is_hidden %}{{ field.field }}{% endif %}
-                    {% endfor %}
-                {% endfor %}
-            {% endfor %}
-            {{ inline_admin_form.pk_field.field }}
-        {% endif %}
-    {% endfor %}
+<div class="pl-products-section" id="pl-products-section"
+     x-data="guildProducts({
+        guildId: {{ inline_admin_formset.formset.instance.pk|default:'null' }},
+        guildName: '{{ inline_admin_formset.formset.instance.name|escapejs }}',
+        createUrl: '{% url 'billing_admin_guild_create_product' inline_admin_formset.formset.instance.pk|default:0 %}',
+        deleteUrlTpl: '/billing/admin/guild/{{ inline_admin_formset.formset.instance.pk|default:0 }}/products/__pk__/delete/',
+        csrfToken: document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+        existing: [
+          {% for p in inline_admin_formset.formset.instance.products.all %}
+            {id: {{ p.pk }}, name: '{{ p.name|escapejs }}', price: '{{ p.price }}', active: {{ p.is_active|yesno:'true,false' }}}{% if not forloop.last %},{% endif %}
+          {% endfor %}
+        ],
+     })">
+    <style>
+        .plg { color: #F4EFDD; font-family: 'Inter', system-ui, sans-serif; }
+        .plg-title { font-size: 1.25rem; font-weight: 700; margin: 0 0 0.25rem; }
+        .plg-subtitle { color: #96ACBB; font-size: 0.875rem; margin: 0 0 1.25rem; }
+        .plg-card { background: #0a1929; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+        .plg-table { width: 100%; border-collapse: collapse; }
+        .plg-table th { text-align: left; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: #96ACBB; font-weight: 600; padding: 0.5rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.08); }
+        .plg-table td { padding: 0.75rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.9375rem; }
+        .plg-table tr:last-child td { border-bottom: none; }
+        .plg-empty { color: #96ACBB; font-style: italic; padding: 0.75rem 0.5rem; }
+        .plg-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+        .plg-pill--active { background: rgba(80, 200, 120, 0.15); color: #6ee797; }
+        .plg-pill--inactive { background: rgba(255,255,255,0.08); color: #96ACBB; }
+        .plg-btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; border-radius: 6px; border: none; cursor: pointer; font-family: inherit; font-size: 0.875rem; font-weight: 600; text-decoration: none; transition: background 0.15s; }
+        .plg-btn--primary { background: #EEB44B; color: #092E4C; }
+        .plg-btn--primary:hover { background: #f0c166; }
+        .plg-btn--primary:disabled { opacity: 0.4; cursor: not-allowed; }
+        .plg-btn--ghost { background: transparent; color: #F4EFDD; border: 1px solid rgba(255,255,255,0.15); }
+        .plg-btn--ghost:hover { background: rgba(255,255,255,0.06); }
+        .plg-btn--danger { background: transparent; color: #ff7a7a; border: 1px solid rgba(255, 120, 120, 0.3); font-size: 0.75rem; padding: 0.25rem 0.6rem; }
+        .plg-btn--danger:hover { background: rgba(255, 80, 80, 0.1); }
 
-    <div class="pl-products-section" id="pl-products-section">
-        <h3 class="pl-products-title">Products</h3>
+        /* Modal */
+        .plg-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.65); backdrop-filter: blur(2px); z-index: 9999; display: flex; align-items: flex-start; justify-content: center; padding: 4rem 1rem; overflow-y: auto; }
+        .plg-modal { background: #0a1929; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; width: 100%; max-width: 620px; box-shadow: 0 30px 60px rgba(0,0,0,0.5); color: #F4EFDD; font-family: 'Inter', system-ui, sans-serif; }
+        .plg-modal__header { padding: 1.25rem 1.5rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .plg-modal__title { font-size: 1.125rem; font-weight: 700; margin: 0; }
+        .plg-modal__body { padding: 1.25rem 1.5rem; }
+        .plg-modal__footer { padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: flex-end; gap: 0.75rem; }
 
-        {# Products table #}
-        <div class="pl-products-table-wrap">
-            <table class="pl-products-table" id="pl-products-table">
+        .plg-modal__subtitle { font-size: 0.8125rem; color: #96ACBB; margin: 0.25rem 0 0; }
+        .plg-modal__subtitle strong { color: #EEB44B; font-weight: 600; }
+
+        .plg-section { margin-bottom: 1.25rem; background: #081b2e; border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 1rem 1.25rem 1.125rem; position: relative; }
+        .plg-section:last-child { margin-bottom: 0; }
+        .plg-section-heading { display: flex; align-items: center; gap: 0.5rem; font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.1em; color: #EEB44B; font-weight: 700; margin: 0 0 1rem; padding-bottom: 0.625rem; border-bottom: 1px solid rgba(238,180,75,0.15); }
+        .plg-section-heading::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #EEB44B; }
+
+        .plg-form-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 0.75rem 1rem; }
+        .plg-form-grid--full { grid-column: 1 / -1; }
+        .plg-label { display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: #96ACBB; font-weight: 600; margin-bottom: 0.25rem; }
+        .plg-input, .plg-select, .plg-textarea { width: 100%; padding: 0.5rem 0.75rem; background: #092E4C; border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: #F4EFDD; font-size: 0.9375rem; font-family: inherit; box-sizing: border-box; }
+        .plg-input:focus, .plg-select:focus, .plg-textarea:focus { outline: none; border-color: #EEB44B; }
+        .plg-textarea { min-height: 3.5rem; resize: vertical; }
+
+        .plg-recipient-row { display: grid; grid-template-columns: 2fr 1fr auto; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
+        .plg-recipient-row .plg-remove { background: transparent; border: none; color: #ff7a7a; cursor: pointer; font-size: 1.25rem; padding: 0 0.5rem; }
+        .plg-recipient-row .plg-remove:hover { color: #ff5050; }
+        .plg-split-total { padding: 0.5rem 0 0; font-size: 0.8125rem; font-weight: 600; }
+        .plg-split-total--ok { color: #6ee797; }
+        .plg-split-total--bad { color: #ff7a7a; }
+
+        .plg-error { color: #ff7a7a; font-size: 0.8125rem; margin-top: 0.5rem; }
+    </style>
+
+    <div class="plg">
+        <h3 class="plg-title">Products</h3>
+        <p class="plg-subtitle">
+            Products listed on <span x-text="guildName"></span>'s page. Each has its own revenue split.
+        </p>
+
+        {# ───── existing products table ───── #}
+        <div class="plg-card">
+            <table class="plg-table">
                 <thead>
                     <tr>
                         <th>Name</th>
-                        <th>Price</th>
-                        <th>Active</th>
+                        <th style="text-align:right;">Price</th>
+                        <th>Status</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for inline_admin_form in inline_admin_formset %}
-                        {% if inline_admin_form.original %}
-                        <tr class="pl-product-row" id="pl-product-row-{{ inline_admin_form.original.pk }}" data-prefix="{{ inline_admin_formset.formset.prefix }}-{{ forloop.counter0 }}">
-                            <td class="pl-product-name">{{ inline_admin_form.original.name }}</td>
-                            <td class="pl-product-price">${{ inline_admin_form.original.price }}</td>
-                            <td class="pl-product-active">
-                                {% if inline_admin_form.original.is_active %}
-                                <span class="pl-product-badge pl-product-badge--active">Active</span>
-                                {% else %}
-                                <span class="pl-product-badge pl-product-badge--inactive">Inactive</span>
-                                {% endif %}
+                    <template x-for="p in existing" :key="p.id">
+                        <tr>
+                            <td x-text="p.name"></td>
+                            <td style="text-align:right;" x-text="'$' + p.price"></td>
+                            <td>
+                                <span class="plg-pill"
+                                      :class="p.active ? 'plg-pill--active' : 'plg-pill--inactive'"
+                                      x-text="p.active ? 'Active' : 'Inactive'"></span>
                             </td>
-                            <td class="pl-product-actions">
-                                {% url 'admin:billing_product_change' inline_admin_form.original.pk as edit_url %}
-                                <a href="{{ edit_url }}" class="pl-product-btn pl-product-btn--edit">Edit</a>
-                                <button type="button" class="pl-product-btn pl-product-btn--delete"
-                                    @click="$dispatch('open-product-delete', {name: '{{ inline_admin_form.original.name|escapejs }}', prefix: '{{ inline_admin_formset.formset.prefix }}-{{ forloop.counter0 }}'})">
-                                    Delete
-                                </button>
-                                {# Hidden delete checkbox — checked by JS when user confirms #}
-                                <div style="display:none;">
-                                    {% for fieldset in inline_admin_form %}
-                                        {% for line in fieldset %}
-                                            {% for field in line %}
-                                                {% if not field.field.is_hidden %}{{ field.field }}{% endif %}
-                                            {% endfor %}
-                                        {% endfor %}
-                                    {% endfor %}
-                                    {{ inline_admin_form.deletion_field.field }}
-                                </div>
+                            <td style="text-align:right;">
+                                <button type="button" class="plg-btn plg-btn--danger"
+                                        @click.prevent="deleteProduct(p)">Remove</button>
                             </td>
                         </tr>
-                        {% endif %}
-                    {% endfor %}
+                    </template>
+                    <tr x-show="existing.length === 0">
+                        <td colspan="4" class="plg-empty">No products yet.</td>
+                    </tr>
                 </tbody>
             </table>
-            {% if not inline_admin_formset.formset.initial_forms %}
-            <p class="pl-products-empty">No products yet. Add one below.</p>
-            {% endif %}
         </div>
 
-        {# Add product button — opens modal #}
-        <button type="button" @click="$dispatch('open-modal', 'add-product')" class="pl-product-btn pl-product-btn--add" style="margin-top:1rem;">
-            + Add Product
+        <button type="button" class="plg-btn plg-btn--primary" @click.prevent="startAdding()">
+            + Add product
         </button>
 
-        {# Add product modal — fields stay inside the parent admin form so save works #}
-        <div x-data="{ open: false }"
-             x-show="open"
-             x-transition:enter="modal-enter"
-             x-transition:leave="modal-leave"
-             @open-modal.window="if ($event.detail === 'add-product') open = true"
-             @close-modal.window="if ($event.detail === 'add-product') open = false"
-             @keydown.escape.window="open = false"
-             class="pl-modal-backdrop"
-             style="display: none;"
-             role="dialog"
-             aria-modal="true">
-            <div class="pl-modal pl-modal--sm" @click.outside="open = false">
-                <div class="pl-modal__header">
-                    <h2 class="pl-modal__title">Add Product</h2>
-                    <button type="button" @click="open = false" class="pl-modal__close" aria-label="Close">&times;</button>
+        {# ───── add product modal (teleported to <body> so admin layout can't clip it) ───── #}
+        <template x-teleport="body">
+        <div class="plg-modal-backdrop" x-show="adding" x-cloak
+             @keydown.escape.window.prevent="/* explicit cancel required — no escape */">
+            <div class="plg-modal" @click.stop>
+                <div class="plg-modal__header">
+                    <h2 class="plg-modal__title">Add product</h2>
+                    <p class="plg-modal__subtitle">
+                        For <strong x-text="guildName"></strong>
+                    </p>
                 </div>
-                <div class="pl-modal__body">
-                    {% for inline_admin_form in inline_admin_formset %}
-                        {% if not inline_admin_form.original and not forloop.last %}
-                            {% for fieldset in inline_admin_form %}
-                                {% for line in fieldset %}
-                                    {% for field in line %}
-                                        {% if not field.field.is_hidden %}
-                                        <div style="margin-bottom:1rem;">
-                                            {% if field.field.field.widget.input_type == "checkbox" %}
-                                            {% include "components/toggle.html" with field=field.field toggle_label=field.field.label %}
-                                            {% else %}
-                                            {% include "components/form_field.html" with field=field.field %}
-                                            {% endif %}
-                                        </div>
-                                        {% endif %}
+
+                <div class="plg-modal__body">
+                    {# ─── Product info ─── #}
+                    <div class="plg-section">
+                        <h4 class="plg-section-heading">Product info</h4>
+                        <div class="plg-form-grid">
+                            <div class="plg-form-grid--full">
+                                <label class="plg-label">Name</label>
+                                <input type="text" class="plg-input" x-model="draft.name"
+                                       placeholder="e.g. 1 lb clay" @keydown.enter.prevent>
+                            </div>
+                            <div class="plg-form-grid--full">
+                                <label class="plg-label">Description</label>
+                                <textarea class="plg-textarea" x-model="draft.description"
+                                          placeholder="Optional — shown to members"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    {# ─── Financial info ─── #}
+                    <div class="plg-section">
+                        <h4 class="plg-section-heading">Financial info</h4>
+                        <div style="margin-bottom: 1rem;">
+                            <label class="plg-label">Price ($)</label>
+                            <input type="number" step="0.01" min="0.01" class="plg-input"
+                                   x-model="draft.price" placeholder="0.00" style="max-width: 12rem;">
+                        </div>
+
+                        <label class="plg-label" style="margin-bottom: 0.5rem;">Revenue split — must sum to 100%</label>
+                        <template x-for="(row, idx) in draft.recipients" :key="idx">
+                            <div class="plg-recipient-row">
+                                <select class="plg-select" x-model="row.entity">
+                                    <option value="admin">Past Lives admin</option>
+                                    {% for g in guild_entity_choices %}
+                                    <option value="{{ g.pk }}">{{ g.name }}</option>
                                     {% endfor %}
-                                {% endfor %}
-                            {% endfor %}
-                        {% endif %}
-                    {% endfor %}
-                    <button type="submit" name="_save" class="pl-btn pl-btn--primary" style="width:100%;margin-top:0.5rem;">Add Product</button>
+                                </select>
+                                <input type="number" step="0.01" min="0.01" max="100"
+                                       class="plg-input" x-model="row.percent" placeholder="%"
+                                       @blur="formatPercent(idx)">
+                                <button type="button" class="plg-remove"
+                                        @click.prevent="removeRecipient(idx)"
+                                        :disabled="draft.recipients.length <= 1">×</button>
+                            </div>
+                        </template>
+                        <button type="button" class="plg-btn plg-btn--ghost"
+                                @click.prevent="addRecipient()" style="margin-top: 0.25rem;">
+                            + Add recipient
+                        </button>
+                        <div class="plg-split-total"
+                             :class="splitTotal() === 100 ? 'plg-split-total--ok' : 'plg-split-total--bad'"
+                             x-text="'Total: ' + splitTotal().toFixed(2) + '%'"></div>
+                    </div>
+
+                    <div class="plg-error" x-show="error" x-text="error" x-cloak></div>
+                </div>
+
+                <div class="plg-modal__footer">
+                    <button type="button" class="plg-btn plg-btn--ghost"
+                            @click.prevent="cancelAdding()">Cancel</button>
+                    <button type="button" class="plg-btn plg-btn--primary"
+                            :disabled="!canSave() || saving"
+                            @click.prevent="save()"
+                            x-text="saving ? 'Saving…' : 'Save product'"></button>
                 </div>
             </div>
         </div>
+        </template>
     </div>
 </div>
 
-{# Delete confirmation modal — uses pl-modal component styles #}
-<div x-data="{ open: false, productName: '', deletePrefix: '' }"
-     x-show="open"
-     x-transition:enter="modal-enter"
-     x-transition:leave="modal-leave"
-     @open-product-delete.window="open = true; productName = $event.detail.name; deletePrefix = $event.detail.prefix"
-     @keydown.escape.window="open = false"
-     class="pl-modal-backdrop"
-     style="display: none;"
-     role="dialog"
-     aria-modal="true">
-    <div class="pl-modal pl-modal--sm" @click.outside="open = false">
-        <div class="pl-modal__header">
-            <h2 class="pl-modal__title">Delete product?</h2>
-            <button type="button" @click="open = false" class="pl-modal__close" aria-label="Close">&times;</button>
-        </div>
-        <div class="pl-modal__body">
-            <p style="margin:0 0 1.5rem;">Are you sure you want to delete <strong x-text="productName"></strong>? This cannot be undone.</p>
-            <div class="pl-modal__actions">
-                <button type="submit" name="_save" class="pl-btn pl-btn--danger" style="flex:1;"
-                    @click="var input = document.querySelector('[name=\'' + deletePrefix + '-DELETE\']'); if (input) input.checked = true; open = false;">
-                    Yes, delete
-                </button>
-                <button type="button" @click="open = false" class="pl-btn pl-btn--secondary" style="flex:1;">Cancel</button>
-            </div>
-        </div>
-    </div>
-</div>
+<script>
+function guildProducts(cfg) {
+    return {
+        ...cfg,
+        adding: false,
+        saving: false,
+        error: '',
+        draft: { name: '', description: '', price: '', is_active: true, recipients: [] },
+
+        startAdding() {
+            this.adding = true;
+            this.error = '';
+            this.draft = {
+                name: '',
+                description: '',
+                price: '',
+                is_active: true,
+                recipients: [
+                    { entity: 'admin', percent: '20.00' },
+                    { entity: String(this.guildId), percent: '80.00' },
+                ],
+            };
+            document.body.style.overflow = 'hidden';
+        },
+
+        cancelAdding() {
+            this.adding = false;
+            this.error = '';
+            document.body.style.overflow = '';
+        },
+
+        addRecipient() {
+            this.draft.recipients.push({ entity: 'admin', percent: '' });
+        },
+
+        removeRecipient(idx) {
+            if (this.draft.recipients.length > 1) {
+                this.draft.recipients.splice(idx, 1);
+            }
+        },
+
+        formatPercent(idx) {
+            const raw = this.draft.recipients[idx].percent;
+            const n = parseFloat(raw);
+            if (!isNaN(n)) {
+                this.draft.recipients[idx].percent = n.toFixed(2);
+            }
+        },
+
+        splitTotal() {
+            const sum = this.draft.recipients.reduce((acc, r) => {
+                const n = parseFloat(r.percent);
+                return acc + (isNaN(n) ? 0 : n);
+            }, 0);
+            return Number(sum.toFixed(2));
+        },
+
+        canSave() {
+            return (
+                this.draft.name.trim() &&
+                parseFloat(this.draft.price) > 0 &&
+                this.splitTotal() === 100 &&
+                this.draft.recipients.every(r => r.entity && parseFloat(r.percent) > 0)
+            );
+        },
+
+        async save() {
+            this.saving = true;
+            this.error = '';
+            try {
+                const res = await fetch(this.createUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': this.csrfToken,
+                    },
+                    body: JSON.stringify({
+                        name: this.draft.name.trim(),
+                        description: this.draft.description.trim(),
+                        price: this.draft.price,
+                        is_active: this.draft.is_active,
+                        recipients: this.draft.recipients,
+                    }),
+                });
+                const data = await res.json();
+                if (!data.ok) {
+                    this.error = data.error || 'Something went wrong.';
+                    return; // keep the modal open
+                }
+                this.existing.push(data.product);
+                this.adding = false;
+                document.body.style.overflow = '';
+            } catch (e) {
+                this.error = 'Network error: ' + e.message;
+                // keep modal open
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        async deleteProduct(p) {
+            if (!confirm(`Remove "${p.name}"? This cannot be undone.`)) return;
+            const url = this.deleteUrlTpl.replace('__pk__', p.id);
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': this.csrfToken },
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    this.existing = this.existing.filter(x => x.id !== p.id);
+                } else {
+                    alert(data.error || 'Failed to remove product.');
+                }
+            } catch (e) {
+                alert('Network error: ' + e.message);
+            }
+        },
+    };
+}
+</script>
