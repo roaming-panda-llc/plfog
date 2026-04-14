@@ -383,13 +383,8 @@ class Tab(models.Model):
         Raises:
             TabLockedError, TabLimitExceededError, ValueError: see body.
         """
-        if splits is None:
-            if product is None:
-                raise ValueError("Either product or splits must be supplied.")
-            splits = [
-                {"recipient_type": s.recipient_type, "guild": s.guild, "percent": s.percent}
-                for s in product.splits.all()
-            ]
+        if splits is None and product is None:
+            raise ValueError("Either product or splits must be supplied.")
 
         with transaction.atomic():
             locked_self = Tab.objects.select_for_update().get(pk=self.pk)
@@ -401,6 +396,11 @@ class Tab(models.Model):
                     f"Entry of ${amount} would exceed tab limit "
                     f"(balance: ${current}, limit: ${locked_self.effective_tab_limit})."
                 )
+            if splits is None:
+                splits = [
+                    {"recipient_type": s.recipient_type, "guild": s.guild, "percent": s.percent}
+                    for s in product.splits.all()
+                ]
             entry = TabEntry.objects.create(
                 tab=self,
                 description=description,
