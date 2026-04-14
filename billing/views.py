@@ -11,10 +11,11 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.http import HttpRequest, HttpResponse, JsonResponse, StreamingHttpResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 
 from billing import stripe_utils, webhook_handlers
 from billing.exceptions import TabLimitExceededError, TabLockedError
@@ -462,3 +463,54 @@ def billing_save_connect_platform(request: HttpRequest) -> HttpResponse:
             for error in errors:
                 django_messages.error(request, f"{field}: {error}")
     return redirect("/billing/admin/dashboard/?tab=stripe")
+
+
+@staff_member_required
+@require_http_methods(["POST"])
+def admin_add_product_for_guild(request: HttpRequest, guild_id: int) -> HttpResponse:
+    """POST-only — accepts product fields + splits formset, redirects back to the guild change page."""
+    from billing.forms import ProductForm, build_product_split_formset
+    from billing.models import Product
+    from membership.models import Guild
+
+    guild = get_object_or_404(Guild, pk=guild_id)
+    form = ProductForm(data=request.POST)
+    formset = build_product_split_formset(data=request.POST, instance=Product())
+
+    if form.is_valid() and formset.is_valid():
+        product = form.save(commit=False)
+        product.guild = guild  # always force to the page's guild
+        product.save()
+        formset.instance = product
+        formset.save()
+        django_messages.success(request, f"Added product '{product.name}'.")
+    else:
+        # Surface errors via messages; Task 11 will polish per-field error redisplay.
+        if form.errors:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    django_messages.error(request, f"{field}: {error}")
+        for non_form_error in formset.non_form_errors():
+            django_messages.error(request, f"Splits: {non_form_error}")
+        for idx, form_errors in enumerate(formset.errors):
+            for field, errors in form_errors.items():
+                for error in errors:
+                    django_messages.error(request, f"Split row {idx + 1} ({field}): {error}")
+        if not (form.errors or formset.non_form_errors() or any(formset.errors)):
+            django_messages.error(request, "Could not add product — see errors below.")
+
+    return redirect(reverse("admin:membership_guild_change", args=[guild_id]))
+
+
+@staff_member_required
+@require_http_methods(["POST"])
+def admin_delete_product(request: HttpRequest, product_id: int) -> HttpResponse:
+    """Delete a Product (and its splits via CASCADE). Redirect back to the guild change page."""
+    from billing.models import Product
+
+    product = get_object_or_404(Product, pk=product_id)
+    guild_id = product.guild_id
+    name = product.name
+    product.delete()
+    django_messages.success(request, f"Deleted product '{name}'.")
+    return redirect(reverse("admin:membership_guild_change", args=[guild_id]))

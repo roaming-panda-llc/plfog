@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-from django import forms
 from django.contrib import admin
-from django.db import models
 from django.db.models import QuerySet
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.utils import timezone
 from django.utils.safestring import mark_safe
-from django.http import HttpResponseRedirect
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.decorators import action
 
@@ -257,24 +254,9 @@ class MemberAdmin(ModelAdmin):
 # ---------------------------------------------------------------------------
 
 
-class GuildProductInline(TabularInline):
-    # TODO(splits): Task 6 restores the splits editor on this inline.
-    model = Product
-    fields = ["name", "price"]
-    extra = 1
-    show_change_link = False
-    template = "admin/membership/guild_product_inline.html"
-
-    def formfield_for_dbfield(  # type: ignore[override]
-        self, db_field: models.Field, request: HttpRequest | None = None, **kwargs: object
-    ) -> forms.Field | None:
-        field = super().formfield_for_dbfield(db_field, request, **kwargs)
-        return field
-
-
 @admin.register(Guild)
 class GuildAdmin(ModelAdmin):
-    inlines = [GuildProductInline]
+    change_form_template = "admin/membership/guild/change_form.html"
     list_display = ["name", "guild_lead", "notes_preview"]
     search_fields = ["name"]
     autocomplete_fields = ["guild_lead"]
@@ -283,6 +265,26 @@ class GuildAdmin(ModelAdmin):
     @action(description="View Guild Page", icon="open_in_new")
     def view_guild_page(self, request: HttpRequest, object_id: int) -> HttpResponseRedirect:
         return HttpResponseRedirect(f"/guilds/{object_id}/")
+
+    def change_view(
+        self,
+        request: HttpRequest,
+        object_id: str,
+        form_url: str = "",
+        extra_context: dict | None = None,
+    ) -> HttpResponse:
+        """Inject products context for the custom change_form template."""
+        extra_context = extra_context or {}
+        guild = self.get_object(request, object_id)
+        if guild is not None:
+            extra_context["existing_products"] = (
+                Product.objects.filter(guild=guild)
+                .prefetch_related("splits__guild")
+                .order_by("name")
+            )
+            extra_context["all_guilds"] = type(guild).objects.order_by("name")
+            extra_context["editing_guild"] = guild
+        return super().change_view(request, object_id, form_url, extra_context)
 
     def formfield_for_foreignkey(self, db_field: object, request: HttpRequest, **kwargs: object) -> object:  # type: ignore[override]
         if db_field.name == "guild_lead":  # type: ignore[attr-defined]

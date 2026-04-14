@@ -1,0 +1,59 @@
+{% extends "admin/change_form.html" %}
+{% load i18n admin_urls %}
+
+{#
+    Custom Guild change form — replaces the old GuildProductInline (modal).
+
+    Design constraint: HTML forbids nested <form> elements. The admin change
+    view wraps everything in a single <form id="guild_form">. To render the
+    "Add a product" standalone <form> (which POSTs to our own view), we must
+    place it OUTSIDE the admin form. We do that by overriding the content
+    block and appending our content AFTER block.super — since block.super
+    emits the entire wrapping <form>...</form>, anything written after it
+    lands in the document flow but outside the admin form. Verified by View
+    Source in the browser.
+#}
+{% block content %}{{ block.super }}
+    {% if editing_guild %}
+    <div class="pl-products-section" id="pl-products-section">
+        <h2 class="pl-products-title">Products</h2>
+
+        {% if existing_products %}
+        <table class="pl-products-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Price</th>
+                    <th>Revenue split</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in existing_products %}
+                <tr>
+                    <td>{{ product.name }}</td>
+                    <td>${{ product.price }}</td>
+                    <td>
+                        {% for split in product.splits.all %}
+                            {% if split.recipient_type == "admin" %}Admin{% else %}{{ split.guild.name }}{% endif %} {{ split.percent }}%{% if not forloop.last %} &middot; {% endif %}
+                        {% endfor %}
+                    </td>
+                    <td>
+                        <form method="post" action="{% url 'billing_admin_delete_product' product.pk %}" style="display:inline;" onsubmit="return confirm('Delete {{ product.name|escapejs }}?');">
+                            {% csrf_token %}
+                            <button type="submit" class="pl-product-btn pl-product-btn--delete">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="pl-products-empty">No products yet. Add one below.</p>
+        {% endif %}
+
+        {# Add product form — standalone <form>, MUST live outside the admin form. #}
+        {% include "admin/billing/_inline_product_form.html" with guild=editing_guild all_guilds=all_guilds %}
+    </div>
+    {% endif %}
+{% endblock %}
