@@ -296,7 +296,7 @@ def guild_eyop_form(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method == "POST":
         form = TabItemForm(request.POST, context=CONTEXT_MEMBER_GUILD_PAGE, user=request.user, guild=guild)
         if form.is_valid():
-            quantity = form.cleaned_data.get("quantity", 1)
+            quantity = form.cleaned_data["quantity"]
             try:
                 if not tab.can_add_entry:
                     raise NoPaymentMethodError("Payment method required.")
