@@ -958,3 +958,146 @@ class TabCharge(models.Model):
             self.failure_reason = "Stripe charge failed"
             self.save(update_fields=["status", "failure_reason"])
             return False
+
+
+# ---------------------------------------------------------------------------
+# Revenue splits — flexible N-recipient model (replaces SplitMode)
+# ---------------------------------------------------------------------------
+
+
+class ProductRevenueSplit(models.Model):
+    """One recipient row in a Product's revenue split.
+
+    A product's splits collectively must sum to 100% — enforced in
+    ``ProductForm.clean()`` (cross-row, not portable as a DB constraint).
+    """
+
+    class RecipientType(models.TextChoices):
+        ADMIN = "admin", "Admin"
+        GUILD = "guild", "Guild"
+
+    product = models.ForeignKey(
+        "Product",
+        on_delete=models.CASCADE,
+        related_name="splits",
+        help_text="The product this split row belongs to.",
+    )
+    recipient_type = models.CharField(
+        max_length=10,
+        choices=RecipientType.choices,
+        help_text="Whether this row pays the admin or a specific guild.",
+    )
+    guild = models.ForeignKey(
+        "membership.Guild",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="product_revenue_splits",
+        help_text="The guild this row pays. Required for GUILD rows, must be NULL for ADMIN rows.",
+    )
+    percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        help_text="Percentage of the product price this recipient receives. 0 < percent <= 100.",
+    )
+
+    class Meta:
+        verbose_name = "Product Revenue Split"
+        verbose_name_plural = "Product Revenue Splits"
+        ordering = ["product_id", "recipient_type", "guild_id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(percent__gt=0) & Q(percent__lte=100),
+                name="prodrevsplit_percent_range",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    (Q(recipient_type="guild") & Q(guild__isnull=False))
+                    | (Q(recipient_type="admin") & Q(guild__isnull=True))
+                ),
+                name="prodrevsplit_recipient_guild_consistent",
+            ),
+            models.UniqueConstraint(
+                fields=["product"],
+                condition=Q(recipient_type="admin"),
+                name="uq_prodrevsplit_admin_per_product",
+            ),
+            models.UniqueConstraint(
+                fields=["product", "guild"],
+                condition=Q(recipient_type="guild"),
+                name="uq_prodrevsplit_guild_per_product",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        if self.recipient_type == self.RecipientType.ADMIN:
+            return f"Admin {self.percent}%"
+        return f"{self.guild.name if self.guild_id else 'Guild?'} {self.percent}%"
+
+
+class TabEntrySplit(models.Model):
+    """Frozen snapshot of one recipient's share of a TabEntry.
+
+    Created in ``TabEntry.snapshot_splits()`` at entry-creation time. Reports
+    SELECT directly from this table — never recomputed.
+    """
+
+    class RecipientType(models.TextChoices):
+        ADMIN = "admin", "Admin"
+        GUILD = "guild", "Guild"
+
+    entry = models.ForeignKey(
+        "TabEntry",
+        on_delete=models.CASCADE,
+        related_name="splits",
+        help_text="The tab entry this split row belongs to.",
+    )
+    recipient_type = models.CharField(
+        max_length=10,
+        choices=RecipientType.choices,
+        help_text="Whether this row paid the admin or a specific guild.",
+    )
+    guild = models.ForeignKey(
+        "membership.Guild",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="tab_entry_splits",
+        help_text="The guild this row paid (snapshot). Required for GUILD rows, NULL for ADMIN rows.",
+    )
+    percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        help_text="Percentage of the entry amount paid to this recipient at snapshot time.",
+    )
+    amount = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        help_text="Dollar amount paid to this recipient. Computed at snapshot time.",
+    )
+
+    class Meta:
+        verbose_name = "Tab Entry Split"
+        verbose_name_plural = "Tab Entry Splits"
+        ordering = ["entry_id", "recipient_type", "guild_id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(percent__gt=0) & Q(percent__lte=100),
+                name="tabentrysplit_percent_range",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    (Q(recipient_type="guild") & Q(guild__isnull=False))
+                    | (Q(recipient_type="admin") & Q(guild__isnull=True))
+                ),
+                name="tabentrysplit_recipient_guild_consistent",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        recipient = (
+            "Admin"
+            if self.recipient_type == self.RecipientType.ADMIN
+            else (self.guild.name if self.guild_id else "Guild?")
+        )
+        return f"{recipient} ${self.amount} ({self.percent}%)"
