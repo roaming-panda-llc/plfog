@@ -721,6 +721,66 @@ class TabEntry(models.Model):
         self.voided_reason = reason
         self.save(update_fields=["voided_at", "voided_by", "voided_reason"])
 
+    def snapshot_splits(self, splits: list[dict[str, Any]]) -> list[TabEntrySplit]:
+        """Freeze the revenue split for this entry into TabEntrySplit rows.
+
+        Args:
+            splits: List of dicts with keys: ``recipient_type`` (str: 'admin' or
+                'guild'), ``guild`` (Guild instance or None), ``percent`` (Decimal).
+                The percents must sum to exactly 100. The caller (form layer) is
+                responsible for validating this before calling.
+
+        Returns:
+            The list of created TabEntrySplit instances.
+
+        Rounding rule:
+            Each row's amount is computed as
+            ``quantize(self.amount * percent / 100, '0.01', ROUND_HALF_UP)``. The
+            row with the largest percent absorbs the +/-1c remainder so the
+            children sum exactly to ``self.amount``. Ties on largest percent are
+            broken by the order rows are passed in (lowest creation id wins,
+            because the largest is rebound after creation).
+
+        Raises:
+            AssertionError: If the inputs don't sum to exactly 100% or if the
+                rounded splits cannot be reconciled to the entry total.
+        """
+        total_percent = sum((Decimal(str(s["percent"])) for s in splits), Decimal("0"))
+        assert total_percent == _HUNDRED, f"splits must sum to 100, got {total_percent}"
+
+        created: list[TabEntrySplit] = []
+        raw_total = _ZERO
+        largest_idx = 0
+        largest_pct = Decimal("-1")
+        for i, s in enumerate(splits):
+            pct = Decimal(str(s["percent"]))
+            amt = (self.amount * pct / _HUNDRED).quantize(_CENTS, rounding=ROUND_HALF_UP)
+            raw_total += amt
+            if pct > largest_pct:
+                largest_pct = pct
+                largest_idx = i
+            created.append(
+                TabEntrySplit.objects.create(
+                    entry=self,
+                    recipient_type=s["recipient_type"],
+                    guild=s["guild"],
+                    percent=pct,
+                    amount=amt,
+                )
+            )
+
+        drift = self.amount - raw_total
+        if drift != _ZERO:
+            # Adjust the largest-percent row by the drift (+/- 1c typically)
+            adj_row = created[largest_idx]
+            adj_row.amount = adj_row.amount + drift
+            adj_row.save(update_fields=["amount"])
+
+        final_total = sum((s.amount for s in TabEntrySplit.objects.filter(entry=self)), _ZERO)
+        assert final_total == self.amount, f"split sum {final_total} != entry {self.amount}"
+
+        return list(self.splits.all())
+
     def compute_splits(self) -> list[EntrySplit]:
         """Return the per-guild breakdown for this entry.
 
