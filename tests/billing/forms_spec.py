@@ -157,12 +157,13 @@ def describe_TabItemForm_member_guild_page():
         BillingSettingsFactory()
         guild = GuildFactory()
         form = TabItemForm(
-            data={"description": "Donation", "amount": "5.00"},
+            data={"description": "Donation", "amount": "5.00", "quantity": "1"},
             context=CONTEXT_MEMBER_GUILD_PAGE,
             guild=guild,
         )
         assert form.is_valid(), form.errors
         assert form.cleaned_data["guild"] == guild
+        assert form.cleaned_data["quantity"] == 1
 
     def it_requires_description_and_amount():
         guild = GuildFactory()
@@ -212,7 +213,7 @@ def describe_TabItemForm_apply_to_tab():
         tab = TabFactory()
         guild = GuildFactory()
         form = TabItemForm(
-            data={"description": "Clay", "amount": "4.00"},
+            data={"description": "Clay", "amount": "4.00", "quantity": "1"},
             context=CONTEXT_MEMBER_GUILD_PAGE,
             guild=guild,
         )

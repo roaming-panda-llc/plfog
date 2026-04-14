@@ -134,6 +134,14 @@ class TabItemForm(forms.Form):
                 raise ValueError("member_guild_page context requires guild=<Guild>")
             self.fields["description"].required = True
             self.fields["amount"].required = True
+            self.fields["quantity"] = forms.IntegerField(
+                min_value=1,
+                max_value=99,
+                initial=1,
+                required=True,
+                widget=forms.NumberInput(attrs={"step": "1", "value": "1"}),
+                label="Quantity",
+            )
 
         # Role gating — members can't change the admin % or the split mode
         if not _user_can_edit_split(user):

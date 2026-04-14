@@ -11,7 +11,7 @@ from django.test import Client
 
 from billing.models import TabCharge
 from membership.signals import ensure_user_has_member
-from tests.billing.factories import BillingSettingsFactory, TabChargeFactory, TabEntryFactory, TabFactory
+from tests.billing.factories import TabChargeFactory, TabEntryFactory, TabFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -55,75 +55,60 @@ def describe_tab_detail():
         assert len(response.context["entries"]) == 1
         assert b"Laser cutter" in response.content
 
-    def describe_add_entry_form():
-        @pytest.fixture()
-        def setup(client: Client):
-            BillingSettingsFactory(default_tab_limit=Decimal("200.00"))
-            user = User.objects.create_user(username="adder", password="pass")
-            tab = TabFactory(member=user.member, stripe_payment_method_id="pm_test_123")
-            client.login(username="adder", password="pass")
-            return tab
+    def describe_payment_method_section():
+        def it_shows_add_card_link_when_no_method_on_file(client: Client):
+            User.objects.create_user(username="no_card", password="pass")
+            client.login(username="no_card", password="pass")
 
-        def it_adds_entry_on_valid_post(client: Client, setup):
-            response = client.post(
-                "/tab/",
-                {"description": "Wood glue", "amount": "5.50"},
-            )
-
-            assert response.status_code == 302
-            assert response.url == "/tab/"
-            assert setup.entries.count() == 1
-
-        def it_rejects_empty_description(client: Client, setup):
-            response = client.post("/tab/", {"description": "", "amount": "5.50"})
+            response = client.get("/tab/")
 
             assert response.status_code == 200
-            assert setup.entries.count() == 0
+            assert b"No card on file" in response.content
+            assert b"/billing/payment-method/setup/" in response.content
 
-        def it_rejects_zero_amount(client: Client, setup):
-            response = client.post("/tab/", {"description": "Test", "amount": "0.00"})
-
-            assert response.status_code == 200
-            assert setup.entries.count() == 0
-
-        def it_shows_error_when_tab_locked(client: Client):
-            from unittest.mock import patch
-
-            from billing.exceptions import TabLockedError
-
-            BillingSettingsFactory(default_tab_limit=Decimal("200.00"))
-            user = User.objects.create_user(username="locked_user", password="pass")
+        def it_shows_saved_card_and_manage_link_when_method_on_file(client: Client):
+            user = User.objects.create_user(username="has_card", password="pass")
             TabFactory(
                 member=user.member,
-                stripe_payment_method_id="pm_test",
+                stripe_payment_method_id="pm_test_123",
+                payment_method_brand="visa",
+                payment_method_last4="4242",
             )
-            client.login(username="locked_user", password="pass")
+            client.login(username="has_card", password="pass")
 
-            with patch("billing.models.Tab.add_entry", side_effect=TabLockedError("locked")):
-                response = client.post("/tab/", {"description": "Test", "amount": "10.00"}, follow=True)
+            response = client.get("/tab/")
 
-            assert b"locked" in response.content.lower()
+            assert response.status_code == 200
+            assert b"Visa" in response.content
+            assert b"4242" in response.content
+            assert b"Manage card" in response.content
+            assert b"/billing/payment-method/setup/" in response.content
 
-        def it_shows_error_when_no_payment_method(client: Client):
-            BillingSettingsFactory(default_tab_limit=Decimal("200.00"))
-            user = User.objects.create_user(username="no_pm", password="pass")
-            TabFactory(member=user.member, stripe_payment_method_id="")
-            client.login(username="no_pm", password="pass")
+    def it_rejects_post_requests(client: Client):
+        """Tab detail is GET-only — adding items happens from guild pages, not here."""
+        User.objects.create_user(username="poster", password="pass")
+        client.login(username="poster", password="pass")
 
-            response = client.post("/tab/", {"description": "Test", "amount": "10.00"}, follow=True)
+        response = client.post("/tab/", {"description": "Test", "amount": "10.00"})
 
-            assert b"payment method" in response.content.lower()
+        assert response.status_code == 405
 
-        def it_shows_error_when_limit_exceeded(client: Client):
-            BillingSettingsFactory(default_tab_limit=Decimal("20.00"))
-            user = User.objects.create_user(username="over_limit", password="pass")
-            tab = TabFactory(member=user.member, tab_limit=None, stripe_payment_method_id="pm_test")
-            TabEntryFactory(tab=tab, amount=Decimal("15.00"))
-            client.login(username="over_limit", password="pass")
+    def it_does_not_render_add_to_tab_section(client: Client):
+        user = User.objects.create_user(username="viewer", password="pass")
+        TabFactory(member=user.member, stripe_payment_method_id="pm_test")
+        client.login(username="viewer", password="pass")
 
-            response = client.post("/tab/", {"description": "Big item", "amount": "10.00"}, follow=True)
+        response = client.get("/tab/")
 
-            assert b"tab limit" in response.content.lower()
+        assert response.status_code == 200
+        import re
+
+        # Strip the base template's <head>/<title> metadata — only the page body matters
+        body = response.content
+        body = re.sub(rb"<head\b.*?</head>", b"", body, flags=re.DOTALL)
+        assert b"Add Item" not in body
+        # No self-service form heading or button in the page body
+        assert b"tab-add-form" not in body
 
 
 def describe_tab_history():

@@ -98,24 +98,23 @@
 
 {# Products card #}
 <div class="hub-card" style="margin-top:1.5rem;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
-        <h3 class="hub-detail-label" style="margin:0;">Products</h3>
-        {% if tab and tab.can_add_entry %}
-        <button
-            class="pl-btn pl-btn--icon pl-btn--secondary"
-            @click="$dispatch('open-modal', 'eyop-modal')"
-            hx-get="{% url 'hub_guild_eyop_form' guild.pk %}"
-            hx-target="#eyop-modal-body"
-            hx-swap="innerHTML"
-            title="Enter Your Own Price">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 5v14"/><path d="M5 12h14"/>
-            </svg>
-        </button>
-        {% endif %}
-    </div>
-    {% if products %}
+    <h3 class="hub-detail-label" style="margin:0 0 1rem;">Products</h3>
     <div class="guild-product-grid">
+        {% if tab and tab.can_add_entry %}
+        <div class="guild-product-card guild-product-card--eyop">
+            <div class="guild-product-card__name">General Consumables</div>
+            <div class="guild-product-card__subtext">Enter Custom Price</div>
+            <button type="button"
+                    class="guild-product-card__eyop-plus"
+                    aria-label="Add general consumables"
+                    title="Add general consumables"
+                    @click="$dispatch('open-modal', 'eyop-modal')">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 5v14"/><path d="M5 12h14"/>
+                </svg>
+            </button>
+        </div>
+        {% endif %}
         {% for product in products %}
         <div class="guild-product-card">
             <div class="guild-product-card__name">{{ product.name }}</div>
@@ -130,7 +129,7 @@
         </div>
         {% endfor %}
     </div>
-    {% else %}
+    {% if not products and not tab.can_add_entry %}
     <p class="hub-text-muted">No products listed yet.</p>
     {% endif %}
 </div>
@@ -207,8 +206,31 @@
 </div>
 {% endif %}
 
-{# EYOP modal — content loaded via HTMX #}
-{% include "components/modal.html" with modal_id="eyop-modal" modal_title="Enter Your Own Price" modal_size="sm" %}
+{# EYOP modal — form is server-rendered; after-submit re-renders the form partial in place #}
+{% if tab and tab.can_add_entry %}
+<div x-data="{ open: false }"
+     x-show="open"
+     x-transition:enter="modal-enter"
+     x-transition:leave="modal-leave"
+     @open-modal.window="if ($event.detail === 'eyop-modal') open = true"
+     @close-modal.window="if ($event.detail === 'eyop-modal') open = false"
+     @keydown.escape.window="open = false"
+     @htmx:after-request.window="if (event.detail.successful && event.detail.xhr.status === 204) open = false"
+     class="pl-modal-backdrop"
+     style="display: none;"
+     role="dialog"
+     aria-modal="true">
+    <div class="pl-modal pl-modal--sm" @click.outside="open = false">
+        <div class="pl-modal__header">
+            <h2 class="pl-modal__title">General Consumables</h2>
+            <button type="button" @click="open = false" class="pl-modal__close" aria-label="Close">&times;</button>
+        </div>
+        <div class="pl-modal__body" id="eyop-modal-body">
+            {% include "hub/partials/eyop_form.html" %}
+        </div>
+    </div>
+</div>
+{% endif %}
 
 </div>{# /x-data guildCart #}
 {% endblock %}

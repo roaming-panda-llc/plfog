@@ -1278,6 +1278,65 @@ a:hover { color: var(--color-yellow-hover); }
     background: var(--color-yellow-hover);
 }
 
+/* Enter-Your-Own-Price card — first card in the product grid */
+.guild-product-card--eyop {
+    align-items: center;
+    text-align: center;
+    border-style: dashed;
+    border-color: rgba(238, 180, 75, 0.4);
+}
+.guild-product-card--eyop:hover {
+    border-color: rgba(238, 180, 75, 0.8);
+    background: rgba(238, 180, 75, 0.08);
+}
+.guild-product-card__subtext {
+    font-size: 0.8125rem;
+    color: var(--hub-text-muted);
+    margin-top: -0.25rem;
+}
+.guild-product-card__eyop-plus {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    margin: 0.25rem auto 0.25rem;
+    background: var(--color-tuscan-yellow);
+    border: none;
+    border-radius: 50%;
+    color: #1a1a2e;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.15s ease;
+}
+.guild-product-card__eyop-plus:hover {
+    background: var(--color-yellow-hover);
+    transform: scale(1.05);
+}
+
+/* Trash-can remove button on the My Tab table */
+.tab-table__remove {
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    line-height: 1;
+    color: #dc2626;
+    transition: color 0.15s ease, transform 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.tab-table__remove svg {
+    stroke: #dc2626;
+}
+.tab-table__remove:hover {
+    color: #ef4444;
+    transform: scale(1.15);
+}
+.tab-table__remove:hover svg {
+    stroke: #ef4444;
+}
+
 /* Shared table */
 .tab-section-title {
     font-size: 1rem;
@@ -1299,7 +1358,8 @@ a:hover { color: var(--color-yellow-hover); }
 .tab-table td {
     padding: 0.5rem 0.75rem;
 }
-.tab-table__right { text-align: right; }
+.tab-table th.tab-table__right,
+.tab-table td.tab-table__right { text-align: right; }
 .tab-table__date {
     font-size: 0.8rem;
     color: var(--hub-text-muted);

@@ -2,9 +2,24 @@
 
 from __future__ import annotations
 
-VERSION = "1.5.0"
+VERSION = "1.5.1"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.5.1",
+        "date": "2026-04-13",
+        "title": "My Tab & Guild Page Hotfixes",
+        "changes": [
+            "My Tab page redesigned: Current Balance and Pending Charges are combined into one card, and Payment Method now lives at the bottom",
+            "My Tab page now shows your saved card with a link to add, replace, or remove it",
+            "My Tab page tells you when your tab will be processed by Stripe so there are no surprises",
+            "Removing a pending charge from your tab is now a one-click trash button — no confirmation dialog",
+            "Removed the 'Add to Tab' form from the My Tab page — add items from guild pages instead",
+            "Guild pages now have a 'General Consumables' card with a quantity picker so you can add custom-priced items directly to your tab",
+            "Fixed a bug where one action would show two toast notifications at once",
+            "Cleaner spacing between cards on the My Tab page and the payment-method setup page",
+        ],
+    },
     {
         "version": "1.5.0",
         "date": "2026-04-11",
