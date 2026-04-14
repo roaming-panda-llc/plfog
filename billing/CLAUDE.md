@@ -7,20 +7,26 @@ Stripe tab billing system. Members accumulate charges on a tab; a management com
 | Model | Key fields | Notes |
 |-------|-----------|-------|
 | `BillingSettings` | charge_frequency, charge_time, default_tab_limit, default_admin_percent, max_retry_attempts, connect_platform_* | Singleton (pk=1); load via `BillingSettings.load()` |
-| `Product` | name, price, guild FK, admin_percent_override, split_mode, is_active | Purchasable item offered by a guild |
+| `Product` | name, price, guild FK (nullable, display-only), revenue_split O2O, is_active | Purchasable item. `guild` controls which guild page the product appears on; revenue is split per `revenue_split`. |
+| `RevenueSplit` | name, created_at | Reusable container for a set of payout recipients. Attached 1:1 to a Product. Must sum to exactly 100%. |
+| `SplitRecipient` | split FK, guild FK (nullable=Admin), percent | One row in a RevenueSplit. `guild=None` means the Admin (Past Lives) share. |
 | `Tab` | member 1:1, stripe_customer_id, stripe_payment_method_id, is_locked | One per member; accumulates entries |
-| `TabEntry` | tab FK, tab_charge FK (null=pending), amount, voided_at, **admin_percent, split_mode, guild, split_guild_ids** | Single line item with a frozen split snapshot |
+| `TabEntry` | tab FK, tab_charge FK (null=pending), amount, voided_at, **split_snapshot** | Single line item. `split_snapshot` is a JSON list of `{guild_id, percent}` frozen at creation time in `Tab.add_entry()`. |
 | `TabCharge` | tab FK, status, amount, stripe_payment_intent_id | Batched charge — one per tab per billing cycle |
 
-**Snapshot fields on TabEntry** (`admin_percent`, `split_mode`, `guild`, `split_guild_ids`) are frozen at creation time in `Tab.add_entry()`. Never recomputed at read time — reports stay stable when `Product.admin_percent_override` or guild activation changes later.
+**TabEntry.split_snapshot** is frozen at creation time from the product's `RevenueSplit`. Never recomputed at read time — historical reports stay stable when the underlying RevenueSplit changes later.
 
 ## Revenue split
 
-Every line item is split between admin and guild based on `TabEntry.admin_percent` (default 20%). `TabEntry.compute_splits()` returns the per-guild breakdown as a list of `EntrySplit` tuples:
+Every product has its own private `RevenueSplit` with a list of `SplitRecipient` rows. Each recipient is either the Admin (guild=None) or a specific Guild, with a percent share. Recipients must sum to exactly 100%.
 
-- `SINGLE_GUILD` → one row for the owning guild with `(admin_share, guild_total)`
-- `SPLIT_EQUALLY` → one row per guild in `split_guild_ids`; `floor(guild_total_cents / n)` each, with the remainder distributed one cent at a time to the first R sorted guild IDs. Admin share sits on the first row only.
-- No guild + SINGLE_GUILD → admin-only row (everything goes to admin)
+Owning guild (`Product.guild`) is **independent** from the revenue split — a product owned by Glass Guild can pay out to any combination of Admin + guilds. The owning guild only controls which guild page the product appears on.
+
+`TabEntry.compute_splits()` walks `split_snapshot` in order and assigns each recipient `floor(entry_amount_cents * percent / 100)` cents, then distributes any rounding remainder one cent at a time to recipients in snapshot order. This is deterministic and always sums exactly to `entry.amount`. Returns a list of `EntrySplit(guild_id, amount)` where `guild_id=None` means the Admin row.
+
+Manual (product-less) entries fall back to an implicit `[{guild_id: None, percent: 100}]` split — 100% to Admin.
+
+New products auto-provision a default split via `Product.save()`: `BillingSettings.default_admin_percent` to Admin, remainder to the owning guild (if set), else 100% to Admin. Admins can then refine the split in the RevenueSplit admin page.
 
 Guild payouts are reconciled manually via the admin Reports page; no automated Stripe Connect payouts (yet).
 

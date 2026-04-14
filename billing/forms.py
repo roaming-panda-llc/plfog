@@ -47,17 +47,18 @@ def _user_can_edit_split(user: UserLike) -> bool:
 class TabItemForm(forms.Form):
     """Unified tab-item entry form used in three contexts:
 
-    1. ``member_guild_page`` — member quick-adds a charge on /guilds/<pk>/; guild
-       is fixed to the current guild, no pickers.
+    1. ``member_guild_page`` — member quick-adds a charge on /guilds/<pk>/;
+       guild is fixed to the current guild, no pickers.
     2. ``member_tab_page`` — member quick-adds on /tab/; product picker plus an
        optional manual entry path.
     3. ``admin_dashboard`` — admin quick-adds to any member's tab from
        /billing/admin/add-entry/; adds a member picker.
 
-    Field visibility and editability is driven by the ``context`` and ``user``
-    constructor kwargs. Members see ``admin_percent`` as disabled (Django honors
-    ``disabled=True`` by using the field's initial value and ignoring the POSTed
-    value entirely), so they cannot override the guild's default split.
+    Revenue splits live entirely on ``Product.revenue_split`` now. A manual
+    (product-less) entry falls back to the implicit 100%-Admin split in
+    ``Tab.add_entry``. The form no longer lets members tweak admin_percent
+    or pick between SINGLE_GUILD/SPLIT_EQUALLY — that configuration happens
+    once, per product, on the admin Product change page.
     """
 
     description = forms.CharField(
@@ -73,20 +74,6 @@ class TabItemForm(forms.Form):
         min_value=Decimal("0.01"),
         widget=forms.NumberInput(attrs={"placeholder": "0.00", "step": "0.01"}),
         label="Amount ($)",
-    )
-    admin_percent = forms.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        required=False,
-        min_value=Decimal("0"),
-        max_value=Decimal("100"),
-        widget=forms.NumberInput(attrs={"step": "0.01"}),
-        label="Admin %",
-        help_text="Percentage kept by Past Lives admin. Rest goes to the guild.",
-    )
-    split_equally = forms.BooleanField(
-        required=False,
-        label="Split guild share equally across all active guilds",
     )
 
     def __init__(
@@ -116,12 +103,6 @@ class TabItemForm(forms.Form):
                 empty_label="— Manual entry —",
                 label="Product",
             )
-            self.fields["guild"] = forms.ModelChoiceField(
-                queryset=Guild.objects.filter(is_active=True).order_by("name"),
-                required=False,
-                empty_label="— Auto (from product) —",
-                label="Guild",
-            )
         elif context == CONTEXT_MEMBER_TAB_PAGE:
             self.fields["product"] = forms.ModelChoiceField(
                 queryset=Product.objects.filter(is_active=True).select_related("guild"),
@@ -135,58 +116,16 @@ class TabItemForm(forms.Form):
             self.fields["description"].required = True
             self.fields["amount"].required = True
 
-        # Role gating — members can't change the admin % or the split mode
-        if not _user_can_edit_split(user):
-            self.fields["admin_percent"].disabled = True
-            self.fields["split_equally"].disabled = True
-            self.fields["admin_percent"].widget.attrs.pop("step", None)
-
     def clean(self) -> dict[str, Any]:
         cleaned = super().clean() or {}
         product = cleaned.get("product")
-        self._fill_from_product(cleaned, product)
-        self._resolve_guild(cleaned, product)
-        cleaned["split_mode"] = self._resolve_split_mode(cleaned, product)
-        cleaned["admin_percent"] = self._resolve_admin_percent(cleaned, product)
-        return cleaned
-
-    def _fill_from_product(self, cleaned: dict[str, Any], product: Product | None) -> None:
         if product is not None:
             cleaned["description"] = product.name
             cleaned["amount"] = product.price
-            return
-        if self.context == CONTEXT_MEMBER_GUILD_PAGE:
-            return
-        if not cleaned.get("description") or not cleaned.get("amount"):
-            raise forms.ValidationError("Either select a product or enter a description and amount.")
-
-    def _resolve_guild(self, cleaned: dict[str, Any], product: Product | None) -> None:
-        if self.context == CONTEXT_MEMBER_GUILD_PAGE:
-            cleaned["guild"] = self.fixed_guild
-        elif self.context == CONTEXT_ADMIN_DASHBOARD:
-            if not cleaned.get("guild") and product is not None:
-                cleaned["guild"] = product.guild
-        else:  # CONTEXT_MEMBER_TAB_PAGE
-            cleaned["guild"] = product.guild if product is not None else None
-
-    @staticmethod
-    def _resolve_split_mode(cleaned: dict[str, Any], product: Product | None) -> str:
-        if cleaned.get("split_equally"):
-            return Product.SplitMode.SPLIT_EQUALLY
-        if product is not None:
-            return product.split_mode
-        return Product.SplitMode.SINGLE_GUILD
-
-    @staticmethod
-    def _resolve_admin_percent(cleaned: dict[str, Any], product: Product | None) -> Decimal:
-        submitted = cleaned.get("admin_percent")
-        if isinstance(submitted, Decimal):
-            return submitted
-        if submitted not in (None, ""):
-            return Decimal(str(submitted))
-        if product is not None and product.admin_percent_override is not None:
-            return product.admin_percent_override
-        return BillingSettings.load().default_admin_percent
+        elif self.context != CONTEXT_MEMBER_GUILD_PAGE:
+            if not cleaned.get("description") or not cleaned.get("amount"):
+                raise forms.ValidationError("Either select a product or enter a description and amount.")
+        return cleaned
 
     def apply_to_tab(
         self,
@@ -195,7 +134,7 @@ class TabItemForm(forms.Form):
         added_by: "UserLike",
         is_self_service: bool,
     ) -> TabEntry:
-        """Add the entry to the tab using ``Tab.add_entry`` with the resolved kwargs.
+        """Add the entry to the tab using ``Tab.add_entry``.
 
         Raises ``TabLockedError`` or ``TabLimitExceededError`` — caller should
         catch and render.
@@ -205,12 +144,9 @@ class TabItemForm(forms.Form):
         return tab.add_entry(
             description=self.cleaned_data["description"],
             amount=self.cleaned_data["amount"],
-            added_by=added_by,  # type: ignore[arg-type]  # views gate on @login_required
+            added_by=added_by,  # type: ignore[arg-type]
             is_self_service=is_self_service,
             product=self.cleaned_data.get("product"),
-            guild=self.cleaned_data.get("guild"),
-            admin_percent=self.cleaned_data["admin_percent"],
-            split_mode=self.cleaned_data["split_mode"],
         )
 
 

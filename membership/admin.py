@@ -258,20 +258,26 @@ class MemberAdmin(ModelAdmin):
 
 
 class GuildProductInline(TabularInline):
+    """Read-only product list for the guild change page.
+
+    The actual product add/edit flow happens on the full Product admin page.
+    This inline only renders a simple table + an "Add product" button via its
+    custom template — it doesn't need an editable formset.
+    """
+
     model = Product
-    fields = ["name", "price", "admin_percent_override", "split_mode", "is_active"]
-    extra = 1
+    fields = ["name"]
+    extra = 0
+    max_num = 0
+    can_delete = False
     show_change_link = False
     template = "admin/membership/guild_product_inline.html"
 
-    def formfield_for_dbfield(  # type: ignore[override]
-        self, db_field: models.Field, request: HttpRequest | None = None, **kwargs: object
-    ) -> forms.Field | None:
-        field = super().formfield_for_dbfield(db_field, request, **kwargs)
-        if db_field.name == "admin_percent_override" and field is not None:
-            field.label = "Admin %"
-            field.widget.attrs["placeholder"] = "20 (default)"  # type: ignore[union-attr]
-        return field
+    def has_add_permission(self, request: HttpRequest, obj: object = None) -> bool:
+        return False
+
+    def has_change_permission(self, request: HttpRequest, obj: object = None) -> bool:
+        return False
 
 
 @admin.register(Guild)

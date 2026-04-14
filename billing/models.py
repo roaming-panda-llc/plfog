@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
@@ -20,8 +20,6 @@ from .fields import EncryptedCharField
 if TYPE_CHECKING:
     from django.contrib.auth.models import User
 
-    from membership.models import Guild
-
 
 _CENTS = Decimal("0.01")
 _ZERO = Decimal("0.00")
@@ -30,12 +28,18 @@ _HUNDRED = Decimal("100")
 
 @dataclass(frozen=True)
 class EntrySplit:
-    """One row of a TabEntry's revenue breakdown — see TabEntry.compute_splits()."""
+    """One row of a TabEntry's revenue breakdown — see TabEntry.compute_splits().
+
+    ``guild_id`` of ``None`` means the Admin recipient (Past Lives Makerspace
+    itself). Every other row is a guild payout.
+    """
 
     guild_id: int | None
-    admin_amount: Decimal
-    guild_amount: Decimal
-    is_admin_only: bool = False
+    amount: Decimal
+
+    @property
+    def is_admin(self) -> bool:
+        return self.guild_id is None
 
 
 # ---------------------------------------------------------------------------
@@ -193,20 +197,127 @@ class BillingSettings(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# RevenueSplit + SplitRecipient
+# ---------------------------------------------------------------------------
+
+
+class RevenueSplit(models.Model):
+    """A reusable container for a set of payout recipients.
+
+    Attached 1:1 to a Product (and, eventually, to other billable objects like
+    class registrations or shelf rentals). Recipients must sum to exactly 100%.
+    """
+
+    name = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Optional label for this split (e.g. 'Default glass guild split'). Blank for private per-product splits.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, help_text="When this split was created.")
+
+    class Meta:
+        verbose_name = "Revenue Split"
+        verbose_name_plural = "Revenue Splits"
+
+    def __str__(self) -> str:
+        return self.name or f"Split #{self.pk}"
+
+    def clean(self) -> None:
+        """Enforce sum-to-100 across child recipients. No-op until recipients exist."""
+        super().clean()
+        if self.pk is None:
+            return
+        total = self.recipients.aggregate(total=Coalesce(Sum("percent"), Value(_ZERO), output_field=DecimalField()))[
+            "total"
+        ]
+        if self.recipients.exists() and total != _HUNDRED:
+            raise ValidationError(f"Revenue split recipients must sum to 100% (got {total}%).")
+
+    def snapshot(self) -> list[dict[str, Any]]:
+        """Return the current recipients as a frozen JSON-serializable list.
+
+        Stored on TabEntry.split_snapshot so historical reports stay stable
+        when the underlying split changes later.
+        """
+        return [
+            {"guild_id": r.guild_id, "percent": str(r.percent)}
+            for r in self.recipients.order_by("pk").all()
+        ]
+
+
+class SplitRecipient(models.Model):
+    """One payout row in a RevenueSplit. ``guild=None`` means Admin."""
+
+    split = models.ForeignKey(
+        RevenueSplit,
+        on_delete=models.CASCADE,
+        related_name="recipients",
+        help_text="The parent revenue split.",
+    )
+    guild = models.ForeignKey(
+        "membership.Guild",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="split_recipients",
+        help_text="Payout recipient. Null means the Admin (Past Lives) share.",
+    )
+    percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01")), MaxValueValidator(Decimal("100"))],
+        help_text="Share of the charged amount (0 < p ≤ 100).",
+    )
+
+    class Meta:
+        verbose_name = "Split Recipient"
+        verbose_name_plural = "Split Recipients"
+        ordering = ["pk"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(Q(percent__gt=0) & Q(percent__lte=100)),
+                name="split_recipient_percent_range",
+            ),
+            models.UniqueConstraint(
+                fields=["split", "guild"],
+                name="uq_split_recipient_split_guild",
+                condition=Q(guild__isnull=False),
+            ),
+            models.UniqueConstraint(
+                fields=["split"],
+                name="uq_split_recipient_split_admin",
+                condition=Q(guild__isnull=True),
+            ),
+        ]
+
+    def __str__(self) -> str:
+        target = self.guild.name if self.guild_id is not None else "Admin"
+        return f"{target}: {self.percent}%"
+
+
+# ---------------------------------------------------------------------------
 # Product
 # ---------------------------------------------------------------------------
 
 
 class Product(models.Model):
-    """A purchasable product offered by a guild."""
-
-    class SplitMode(models.TextChoices):
-        SINGLE_GUILD = "single_guild", "Guild share to owning guild"
-        SPLIT_EQUALLY = "split_equally", "Guild share split equally across all active guilds"
+    """A purchasable product. Revenue is split per its attached RevenueSplit."""
 
     name = models.CharField(
         max_length=255,
         help_text="Display name of the product.",
+    )
+    description = models.TextField(
+        blank=True,
+        default="",
+        help_text="What this product is. Shown to members on the guild page.",
+    )
+    photo = models.ImageField(
+        upload_to="products/",
+        blank=True,
+        null=True,
+        help_text="Optional product image.",
     )
     price = models.DecimalField(
         max_digits=8,
@@ -215,26 +326,21 @@ class Product(models.Model):
     )
     guild = models.ForeignKey(
         "membership.Guild",
-        on_delete=models.CASCADE,
-        related_name="products",
-        help_text="The guild that offers this product.",
-    )
-    admin_percent_override = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        validators=[MinValueValidator(Decimal("0")), MaxValueValidator(Decimal("100"))],
+        related_name="products",
         help_text=(
-            "Admin percent for this product (0-100). Overrides BillingSettings.default_admin_percent "
-            "when set. Null uses the site default."
+            "Owning guild — controls which guild page the product appears on. "
+            "Independent from the revenue split (a product owned by one guild can "
+            "pay out to any combination of Admin + guilds). Null means gallery/unattributed."
         ),
     )
-    split_mode = models.CharField(
-        max_length=20,
-        choices=SplitMode.choices,
-        default=SplitMode.SINGLE_GUILD,
-        help_text="How the guild portion of this product's charges is allocated.",
+    revenue_split = models.OneToOneField(
+        RevenueSplit,
+        on_delete=models.PROTECT,
+        related_name="product",
+        help_text="How this product's revenue is split between Admin and guilds.",
     )
     is_active = models.BooleanField(
         default=True,
@@ -255,24 +361,36 @@ class Product(models.Model):
         ordering = ["guild__name", "name"]
         constraints = [
             models.CheckConstraint(condition=Q(price__gt=0), name="product_price_positive"),
-            models.CheckConstraint(
-                condition=(
-                    Q(admin_percent_override__isnull=True)
-                    | (Q(admin_percent_override__gte=0) & Q(admin_percent_override__lte=100))
-                ),
-                name="product_admin_percent_override_range",
-            ),
         ]
 
     def __str__(self) -> str:
         return self.name
 
-    @property
-    def effective_admin_percent(self) -> Decimal:
-        """Resolve the admin percent for this product (override or site default)."""
-        if self.admin_percent_override is not None:
-            return self.admin_percent_override
-        return BillingSettings.load().default_admin_percent
+    def clean(self) -> None:
+        super().clean()
+        if self.revenue_split_id is not None:
+            self.revenue_split.clean()
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        """Auto-provision a default RevenueSplit on first save if none is set.
+
+        Default shape: site default_admin_percent to Admin, remainder to
+        ``self.guild`` (if set), else 100% to Admin. This keeps the inline
+        product creation flow ergonomic — the admin can refine the split
+        afterward on the Product change page.
+        """
+        if self.revenue_split_id is None:
+            admin_percent = BillingSettings.load().default_admin_percent
+            split = RevenueSplit.objects.create()
+            if self.guild_id is not None and admin_percent < _HUNDRED:
+                guild_percent = _HUNDRED - admin_percent
+                if admin_percent > _ZERO:
+                    SplitRecipient.objects.create(split=split, guild=None, percent=admin_percent)
+                SplitRecipient.objects.create(split=split, guild_id=self.guild_id, percent=guild_percent)
+            else:
+                SplitRecipient.objects.create(split=split, guild=None, percent=_HUNDRED)
+            self.revenue_split = split
+        super().save(*args, **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -377,55 +495,35 @@ class Tab(models.Model):
         added_by: User | None = None,
         is_self_service: bool = False,
         product: Product | None = None,
-        guild: Guild | None = None,
-        admin_percent: Decimal | None = None,
-        split_mode: str | None = None,
+        revenue_split: RevenueSplit | None = None,
     ) -> TabEntry:
         """Add a line item to this tab with race-condition protection.
 
         Uses select_for_update() inside transaction.atomic() to prevent
-        concurrent requests from both passing the limit check. Snapshots the
-        revenue split (guild, admin_percent, split_mode, split_guild_ids) onto
-        the entry at creation time so historical reports stay stable when
-        Product config or guild activation changes later.
+        concurrent requests from both passing the limit check. Resolves the
+        revenue split and snapshots it onto the entry's ``split_snapshot``
+        JSON so historical reports stay stable when the underlying
+        RevenueSplit changes later.
 
-        Resolution order for each split field:
-          - guild: explicit `guild` kwarg > product.guild > None
-          - admin_percent: explicit kwarg > product.admin_percent_override > site default
-          - split_mode: explicit kwarg > product.split_mode > SINGLE_GUILD
+        Resolution: explicit ``revenue_split`` kwarg > ``product.revenue_split``
+        > implicit 100%-Admin (for unattributed manual entries).
 
         Raises:
             TabLockedError: If the tab is locked.
             TabLimitExceededError: If the entry would exceed the tab limit.
         """
-        from membership.models import Guild as _Guild
-
-        # Resolve snapshot fields outside the lock — these don't depend on the tab
-        resolved_guild = guild if guild is not None else (product.guild if product else None)
-        if admin_percent is not None:
-            resolved_percent = admin_percent
-        elif product is not None and product.admin_percent_override is not None:
-            resolved_percent = product.admin_percent_override
+        resolved_split = revenue_split if revenue_split is not None else (product.revenue_split if product else None)
+        if resolved_split is not None:
+            snapshot = resolved_split.snapshot()
         else:
-            resolved_percent = BillingSettings.load().default_admin_percent
-
-        resolved_split_mode = split_mode or (product.split_mode if product else Product.SplitMode.SINGLE_GUILD)
-
-        if resolved_split_mode == Product.SplitMode.SPLIT_EQUALLY:
-            resolved_split_guild_ids = list(
-                _Guild.objects.filter(is_active=True).order_by("pk").values_list("pk", flat=True)
-            )
-        else:
-            resolved_split_guild_ids = []
+            snapshot = [{"guild_id": None, "percent": "100.00"}]
 
         with transaction.atomic():
-            # Lock this tab row for the duration of the transaction
             locked_self = Tab.objects.select_for_update().get(pk=self.pk)
 
             if locked_self.is_locked:
                 raise TabLockedError(f"Tab is locked: {locked_self.locked_reason}")
 
-            # Compute current balance under the lock
             current = locked_self.current_balance
             if current + amount > locked_self.effective_tab_limit:
                 raise TabLimitExceededError(
@@ -440,10 +538,7 @@ class Tab(models.Model):
                 added_by=added_by,
                 is_self_service=is_self_service,
                 product=product,
-                guild=resolved_guild,
-                admin_percent=resolved_percent,
-                split_mode=resolved_split_mode,
-                split_guild_ids=resolved_split_guild_ids,
+                split_snapshot=snapshot,
             )
 
     def lock(self, reason: str) -> None:
@@ -568,40 +663,16 @@ class TabEntry(models.Model):
         decimal_places=2,
         help_text="Amount in USD. Must be positive.",
     )
-    # ---- Snapshot split fields (frozen at entry creation) ----
-    # See Tab.add_entry() — these are never recomputed at read time, so historical
-    # reports stay stable when Product.admin_percent_override changes or guilds
-    # activate/deactivate later.
-    admin_percent = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        validators=[MinValueValidator(Decimal("0")), MaxValueValidator(Decimal("100"))],
-        help_text=(
-            "Admin percentage applied to this entry at the time it was created. "
-            "Guild share = amount * (1 - admin_percent/100)."
-        ),
-    )
-    split_mode = models.CharField(
-        max_length=20,
-        choices=Product.SplitMode.choices,
-        default=Product.SplitMode.SINGLE_GUILD,
-        help_text="How the guild portion of this entry is allocated among guilds.",
-    )
-    guild = models.ForeignKey(
-        "membership.Guild",
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True,
-        related_name="tab_entries",
-        help_text=("Owning guild for this entry, snapshotted at creation time. Null for manual/unattributed entries."),
-    )
-    split_guild_ids = models.JSONField(
+    # ---- Snapshot split (frozen at entry creation) ----
+    # See Tab.add_entry(). Never recomputed at read time so historical reports
+    # stay stable if the product's RevenueSplit changes later.
+    #
+    # Format: list[{"guild_id": int | None, "percent": "20.00"}]
+    # A guild_id of None means the Admin (Past Lives) share.
+    split_snapshot = models.JSONField(
         default=list,
         blank=True,
-        help_text=(
-            "Snapshot of active guild IDs at entry creation, used for SPLIT_EQUALLY entries. "
-            "Empty list for SINGLE_GUILD entries."
-        ),
+        help_text="Frozen list of payout recipients resolved from the product's RevenueSplit at creation time.",
     )
     entry_type = models.CharField(
         max_length=20,
@@ -679,69 +750,38 @@ class TabEntry(models.Model):
         self.save(update_fields=["voided_at", "voided_by", "voided_reason"])
 
     def compute_splits(self) -> list[EntrySplit]:
-        """Return the per-guild breakdown for this entry.
+        """Return the per-recipient breakdown for this entry.
 
-        Rules:
-          - admin_share = round(amount * admin_percent / 100, 2) (ROUND_HALF_UP)
-          - guild_total = amount - admin_share  (eliminates rounding drift)
-          - SINGLE_GUILD → one EntrySplit for self.guild with (admin_share, guild_total)
-          - SINGLE_GUILD with self.guild is None → one admin-only row (everything to admin)
-          - SPLIT_EQUALLY → one row per id in sorted(self.split_guild_ids):
-              * each guild gets floor(guild_total_cents / n) cents
-              * the remainder (guild_total_cents % n) is distributed one cent at a
-                time to the first R sorted guild IDs (stable, deterministic)
-              * admin_amount is placed on the FIRST row only; remaining rows have 0
-          - SPLIT_EQUALLY with empty split_guild_ids → falls back to admin-only
+        Walks ``split_snapshot`` in order and assigns each recipient
+        ``floor(amount_cents * percent / 100)`` cents, then distributes any
+        rounding remainder one cent at a time to recipients in snapshot order.
+        This is deterministic and always sums exactly to ``self.amount``.
+
+        Empty snapshot falls back to a single Admin row for the full amount.
         """
-        admin_percent = self.admin_percent or _ZERO
-        admin_share = (self.amount * admin_percent / _HUNDRED).quantize(_CENTS, rounding=ROUND_HALF_UP)
-        guild_total = self.amount - admin_share
+        snapshot = self.split_snapshot or []
+        if not snapshot:
+            return [EntrySplit(guild_id=None, amount=self.amount)]
 
-        if self.split_mode == Product.SplitMode.SINGLE_GUILD:
-            if self.guild_id is None:
-                # Unattributed — everything goes to admin
-                return [
-                    EntrySplit(
-                        guild_id=None,
-                        admin_amount=self.amount,
-                        guild_amount=_ZERO,
-                        is_admin_only=True,
-                    )
-                ]
-            return [
-                EntrySplit(
-                    guild_id=self.guild_id,
-                    admin_amount=admin_share,
-                    guild_amount=guild_total,
-                )
-            ]
+        total_cents = int((self.amount * _HUNDRED).to_integral_value(rounding=ROUND_HALF_UP))
+        raw_cents: list[int] = []
+        for row in snapshot:
+            percent = Decimal(str(row["percent"]))
+            raw_cents.append(int((Decimal(total_cents) * percent / _HUNDRED).to_integral_value(rounding=ROUND_DOWN)))
 
-        # SPLIT_EQUALLY
-        ids = sorted(self.split_guild_ids or [])
-        if not ids:
-            return [
-                EntrySplit(
-                    guild_id=None,
-                    admin_amount=self.amount,
-                    guild_amount=_ZERO,
-                    is_admin_only=True,
-                )
-            ]
+        # Deterministic remainder distribution — one cent at a time to recipients
+        # in snapshot order. Always nets exactly to total_cents.
+        remainder = total_cents - sum(raw_cents)
+        for i in range(remainder):
+            raw_cents[i % len(raw_cents)] += 1
 
-        total_cents = int((guild_total * _HUNDRED).to_integral_value(rounding=ROUND_HALF_UP))
-        n = len(ids)
-        base_cents, remainder = divmod(total_cents, n)
-        splits: list[EntrySplit] = []
-        for i, gid in enumerate(ids):
-            g_cents = base_cents + (1 if i < remainder else 0)
-            splits.append(
-                EntrySplit(
-                    guild_id=gid,
-                    admin_amount=admin_share if i == 0 else _ZERO,
-                    guild_amount=(Decimal(g_cents) / _HUNDRED).quantize(_CENTS),
-                )
+        return [
+            EntrySplit(
+                guild_id=row["guild_id"],
+                amount=(Decimal(cents) / _HUNDRED).quantize(_CENTS),
             )
-        return splits
+            for row, cents in zip(snapshot, raw_cents)
+        ]
 
 
 # ---------------------------------------------------------------------------
