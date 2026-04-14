@@ -6,7 +6,7 @@
 
 **Architecture:** Docker Compose runs PostgreSQL locally. A management command pulls the production database via `pg_dump`/`psql`. The allauth adapter shows the login code in the Django messages banner when `DEBUG=True`. A Makefile and `.env.example` standardize the developer workflow.
 
-**Tech Stack:** Docker Compose, PostgreSQL 16, Django management commands, allauth adapter override, Make
+**Tech Stack:** Docker Compose, PostgreSQL 18, Django management commands, allauth adapter override, Make
 
 ---
 
@@ -20,7 +20,7 @@
 ```yaml
 services:
   db:
-    image: postgres:16
+    image: postgres:18
     environment:
       POSTGRES_DB: plfog
       POSTGRES_USER: plfog
@@ -28,7 +28,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
 
 volumes:
   pgdata:

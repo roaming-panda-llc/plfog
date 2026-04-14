@@ -14,7 +14,7 @@ Local dev currently uses SQLite with no seed data. Developers can't test against
 
 | Component | What it does |
 |-----------|-------------|
-| `docker-compose.yml` | Runs PostgreSQL 16 locally (nothing else in Docker) |
+| `docker-compose.yml` | Runs PostgreSQL 18 locally (nothing else in Docker) |
 | `.env.example` | Documents every env var with sensible local defaults |
 | `Makefile` | Standardized commands: `make setup`, `make server`, `make db-pull-prod`, etc. |
 | `pull_prod_db` management command | Downloads the Render production database into local Postgres |
@@ -27,7 +27,7 @@ A minimal `docker-compose.yml` at the project root. Only Postgres — the Django
 ```yaml
 services:
   db:
-    image: postgres:16
+    image: postgres:18
     environment:
       POSTGRES_DB: plfog
       POSTGRES_USER: plfog
@@ -35,7 +35,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
 
 volumes:
   pgdata:
@@ -257,7 +257,7 @@ This is minimal, safe (only fires in DEBUG), and doesn't modify any allauth inte
 
 | File | Action | Description |
 |------|--------|-------------|
-| `docker-compose.yml` | Create | PostgreSQL 16 service |
+| `docker-compose.yml` | Create | PostgreSQL 18 service |
 | `.env.example` | Create | All env vars with local defaults and comments |
 | `Makefile` | Create | Developer commands |
 | `core/management/commands/pull_prod_db.py` | Create | Prod DB download command |
