@@ -694,6 +694,17 @@ def describe_AdminRedirectAccountAdapter():
 
             assert not hasattr(request, "_dev_login_code")
 
+        def it_handles_missing_request_in_context(settings):
+            from plfog.adapters import AdminRedirectAccountAdapter
+
+            settings.DEBUG = True
+            adapter = AdminRedirectAccountAdapter()
+            context = {"code": "123456"}  # no "request" key
+
+            with patch.object(AdminRedirectAccountAdapter.__bases__[0], "send_mail"):
+                adapter.send_mail("account/email/login_code", "user@example.com", context)
+            # Should not raise — just doesn't stash anything
+
     def describe_add_message():
         def it_appends_dev_code_message_when_code_is_stashed(rf, settings):
             from django.contrib.messages import get_messages

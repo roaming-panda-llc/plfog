@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from io import StringIO
-from unittest.mock import ANY, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 from django.core.management import CommandError, call_command
@@ -38,6 +38,23 @@ def describe_pull_prod_db():
             out = StringIO()
             call_command("pull_prod_db", stdout=out)
             assert "Aborted" in out.getvalue()
+
+        @patch.dict(
+            "os.environ",
+            {"PROD_DATABASE_URL": "postgres://user:pass@host:5432/proddb"},
+            clear=False,
+        )
+        @patch("core.management.commands.pull_prod_db.call_command")
+        @patch("subprocess.run")
+        @patch("builtins.input", return_value="y")
+        def it_proceeds_when_user_confirms(mock_input, mock_run, mock_call_command, settings):
+            settings.DEBUG = True
+            settings.DATABASES = {"default": {"ENGINE": "django.db.backends.postgresql", "NAME": "localdb"}}
+            mock_run.return_value.returncode = 0
+
+            out = StringIO()
+            call_command("pull_prod_db", stdout=out)
+            assert "Done" in out.getvalue()
 
     def describe_successful_pull():
         @patch.dict(
@@ -78,4 +95,22 @@ def describe_pull_prod_db():
             mock_run.return_value.stderr = "connection refused"
 
             with pytest.raises(CommandError, match="pg_dump failed"):
+                call_command("pull_prod_db", "--no-input", stdout=StringIO())
+
+        @patch.dict(
+            "os.environ",
+            {"PROD_DATABASE_URL": "postgres://user:pass@host:5432/proddb"},
+            clear=False,
+        )
+        @patch("core.management.commands.pull_prod_db.call_command")
+        @patch("subprocess.run")
+        def it_fails_gracefully_on_psql_error(mock_run, mock_call_command, settings):
+            settings.DEBUG = True
+            settings.DATABASES = {"default": {"ENGINE": "django.db.backends.postgresql", "NAME": "localdb"}}
+            # pg_dump succeeds, psql fails
+            success = MagicMock(returncode=0)
+            failure = MagicMock(returncode=1, stderr="permission denied")
+            mock_run.side_effect = [success, failure]
+
+            with pytest.raises(CommandError, match="psql failed"):
                 call_command("pull_prod_db", "--no-input", stdout=StringIO())
