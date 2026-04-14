@@ -13,6 +13,7 @@ Requires:
 
 from __future__ import annotations
 
+import argparse
 import os
 import subprocess
 import tempfile
@@ -25,7 +26,7 @@ from django.core.management.base import BaseCommand, CommandError
 class Command(BaseCommand):
     help = "Download the production database into your local PostgreSQL."
 
-    def add_arguments(self, parser: object) -> None:
+    def add_arguments(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--no-input", action="store_true", help="Skip confirmation prompt")
 
     def handle(self, *args: object, **options: object) -> None:
