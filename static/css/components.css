@@ -140,6 +140,19 @@
     color: var(--hub-text, #F4EFDD);
 }
 
+.pl-toast-container--center {
+    top: 4rem;
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    align-items: center;
+}
+
+.pl-toast-container--center .pl-toast {
+    text-align: center;
+    justify-content: center;
+}
+
 /* Toast transitions */
 .toast-enter {
     transition: all 0.3s ease;

@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
-VERSION = "1.5.1"
+VERSION = "1.6.0"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.6.0",
+        "date": "2026-04-14",
+        "title": "Local Dev Setup & Cart Toast Fix",
+        "changes": [
+            "New developer setup: clone the repo, run make setup, make db-up, make server — and you're running locally with PostgreSQL",
+            "New 'make db-pull-prod' command downloads a copy of the production database for local testing",
+            "Login codes now appear directly on screen during local development — no more checking the terminal",
+            "The 'added to cart' notification now appears in the center of the screen instead of covering the tab balance",
+        ],
+    },
     {
         "version": "1.5.1",
         "date": "2026-04-13",

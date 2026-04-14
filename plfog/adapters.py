@@ -91,6 +91,31 @@ class AdminRedirectAccountAdapter(DefaultAccountAdapter):
             return reverse("admin:index")
         return reverse("hub_guild_voting")
 
+    def send_mail(self, template_prefix: str, email: str, context: dict) -> None:
+        """In DEBUG mode, stash the login code on the request for display in the UI."""
+        if settings.DEBUG and template_prefix == "account/email/login_code" and "code" in context:
+            request = context.get("request")
+            if request:
+                request._dev_login_code = context["code"]
+        super().send_mail(template_prefix, email, context)
+
+    def add_message(
+        self,
+        request: HttpRequest,
+        level: int,
+        message_template: str | None = None,
+        message_context: dict | None = None,
+        extra_tags: str = "",
+        message: str | None = None,
+    ) -> None:
+        """In DEBUG mode, append the login code to the 'code sent' message."""
+        super().add_message(request, level, message_template, message_context, extra_tags=extra_tags, message=message)
+        if settings.DEBUG and hasattr(request, "_dev_login_code"):
+            from django.contrib import messages
+
+            messages.success(request, f"[DEV] Your login code is: {request._dev_login_code}")
+            del request._dev_login_code
+
     def _sync_permissions(self, user: object) -> None:
         """Sync is_staff/is_superuser from the user's Member fog_role.
 

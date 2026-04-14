@@ -5,16 +5,31 @@ Triggered by:
   1. Server-side: HX-Trigger header with showToast event (via hub.toast.trigger_toast)
   2. Client-side: $dispatch('show-toast', {message: '...', type: 'success'})
 {% endcomment %}
-<div x-data="plToastManager()" @show-toast.window="add($event.detail)" class="pl-toast-container" aria-live="polite">
-    <template x-for="toast in toasts" :key="toast.id">
-        <div class="pl-toast" :class="'pl-toast--' + toast.type"
-             x-show="toast.visible"
-             x-transition:enter="toast-enter"
-             x-transition:leave="toast-leave">
-            <span x-text="toast.message"></span>
-            <button @click="dismiss(toast.id)" class="pl-toast__close" aria-label="Dismiss">&times;</button>
-        </div>
-    </template>
+<div x-data="plToastManager()" @show-toast.window="add($event.detail)" aria-live="polite">
+    {% comment %} Top-right toasts (default) {% endcomment %}
+    <div class="pl-toast-container">
+        <template x-for="toast in toasts.filter(t => t.position !== 'center')" :key="toast.id">
+            <div class="pl-toast" :class="'pl-toast--' + toast.type"
+                 x-show="toast.visible"
+                 x-transition:enter="toast-enter"
+                 x-transition:leave="toast-leave">
+                <span x-text="toast.message"></span>
+                <button @click="dismiss(toast.id)" class="pl-toast__close" aria-label="Dismiss">&times;</button>
+            </div>
+        </template>
+    </div>
+    {% comment %} Center toasts {% endcomment %}
+    <div class="pl-toast-container pl-toast-container--center">
+        <template x-for="toast in toasts.filter(t => t.position === 'center')" :key="toast.id">
+            <div class="pl-toast" :class="'pl-toast--' + toast.type"
+                 x-show="toast.visible"
+                 x-transition:enter="toast-enter"
+                 x-transition:leave="toast-leave">
+                <span x-text="toast.message"></span>
+                <button @click="dismiss(toast.id)" class="pl-toast__close" aria-label="Dismiss">&times;</button>
+            </div>
+        </template>
+    </div>
 </div>
 
 <script>
@@ -24,7 +39,13 @@ function plToastManager() {
         toasts: [],
         add(detail) {
             var id = ++_nextId;
-            this.toasts.push({id: id, message: detail.message, type: detail.type || 'success', visible: true});
+            this.toasts.push({
+                id: id,
+                message: detail.message,
+                type: detail.type || 'success',
+                position: detail.position || 'top-right',
+                visible: true
+            });
             var self = this;
             setTimeout(function() { self.dismiss(id); }, 4000);
         },
