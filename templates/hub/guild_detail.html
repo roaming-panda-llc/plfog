@@ -265,7 +265,7 @@ function guildCart(guildPk) {
             }
             this.addModalOpen = false;
             window.dispatchEvent(new CustomEvent('show-toast', {
-                detail: {message: this.addModalProduct.name + ' x' + this.addModalQty + ' added to cart', type: 'success'}
+                detail: {message: this.addModalProduct.name + ' x' + this.addModalQty + ' added to cart', type: 'success', position: 'center'}
             }));
         },
 
