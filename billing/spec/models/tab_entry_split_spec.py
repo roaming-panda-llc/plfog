@@ -71,9 +71,9 @@ def describe_TabEntry_snapshot_splits():
         assert only.percent == Decimal("100")
         assert only.guild_id == g.pk
 
-    def it_breaks_largest_percent_ties_by_lowest_id(db):
-        # 50/50 split: both rows are equally largest. Penny remainder
-        # (if any) should go to the row created first (lowest id).
+    def it_breaks_largest_percent_ties_by_input_order(db):
+        # 50/50 split: both rows are equally largest. The row passed first
+        # in the input list absorbs the penny adjustment.
         entry = TabEntryFactory(amount=Decimal("0.03"))
         g = GuildFactory()
         entry.snapshot_splits([
@@ -82,12 +82,11 @@ def describe_TabEntry_snapshot_splits():
         ])
         admin_split = entry.splits.get(recipient_type="admin")
         guild_split = entry.splits.get(recipient_type="guild")
-        # 0.03 * 0.5 = 0.015 -> rounds half-up to 0.02 each = 0.04 (overshoot by 0.01)
-        # OR 0.015 floors to 0.01 each = 0.02 (undershoot by 0.01).
-        # Either way one row absorbs +/-0.01 to make total exactly 0.03.
-        # Lowest id (admin, created first) absorbs the adjustment.
-        assert admin_split.amount + guild_split.amount == Decimal("0.03")
-        assert admin_split.id < guild_split.id
+        # 0.03 * 0.5 = 0.015 -> ROUND_HALF_UP -> 0.02 each, raw sum 0.04.
+        # Drift = 0.03 - 0.04 = -0.01. The first-in-list row (admin) absorbs
+        # the drift: admin = 0.02 + (-0.01) = 0.01, guild stays at 0.02.
+        assert admin_split.amount == Decimal("0.01")
+        assert guild_split.amount == Decimal("0.02")
 
     def it_raises_if_inputs_dont_cover_full_amount_after_rounding(db):
         # Sanity check: snapshot_splits should not be callable with bad inputs.

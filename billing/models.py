@@ -738,8 +738,7 @@ class TabEntry(models.Model):
             ``quantize(self.amount * percent / 100, '0.01', ROUND_HALF_UP)``. The
             row with the largest percent absorbs the +/-1c remainder so the
             children sum exactly to ``self.amount``. Ties on largest percent are
-            broken by the order rows are passed in (lowest creation id wins,
-            because the largest is rebound after creation).
+            broken by input order — the first row in the list wins.
 
         Raises:
             AssertionError: If the inputs don't sum to exactly 100% or if the
@@ -776,10 +775,10 @@ class TabEntry(models.Model):
             adj_row.amount = adj_row.amount + drift
             adj_row.save(update_fields=["amount"])
 
-        final_total = sum((s.amount for s in TabEntrySplit.objects.filter(entry=self)), _ZERO)
+        final_total = sum((s.amount for s in created), _ZERO)
         assert final_total == self.amount, f"split sum {final_total} != entry {self.amount}"
 
-        return list(self.splits.all())
+        return created
 
     def compute_splits(self) -> list[EntrySplit]:
         """Return the per-guild breakdown for this entry.
