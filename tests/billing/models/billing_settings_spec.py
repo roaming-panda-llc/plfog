@@ -78,6 +78,89 @@ def describe_BillingSettings():
             assert result > _tz.localtime()
             assert result.day == 15
 
+        def it_handles_an_already_parsed_time_object():
+            from datetime import time as _time
+
+            settings = BillingSettingsFactory(
+                charge_frequency=BillingSettings.ChargeFrequency.DAILY,
+                charge_time="23:00",
+            )
+            # Force the in-memory field to a time object (what comes back after a DB round-trip)
+            settings.charge_time = _time(23, 0)
+            result = settings.next_charge_at()
+            assert result is not None
+
+        def it_returns_today_when_weekly_target_is_today_and_time_is_future():
+            from datetime import time as _time
+            from unittest.mock import patch
+
+            from django.utils import timezone as _tz
+
+            now = _tz.localtime()
+            settings = BillingSettingsFactory(
+                charge_frequency=BillingSettings.ChargeFrequency.WEEKLY,
+                charge_day_of_week=now.weekday(),
+                charge_day_of_month=None,
+                charge_time="23:00",
+            )
+            settings.charge_time = _time(23, 0)
+
+            # Freeze now at 00:00 so today's 23:00 is still in the future
+            fake_now = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            with patch("billing.models.timezone.localtime", return_value=fake_now):
+                result = settings.next_charge_at()
+            assert result is not None
+            assert result.date() == fake_now.date()
+
+        def it_skips_a_week_when_weekly_target_already_passed_today():
+            from datetime import time as _time
+            from unittest.mock import patch
+
+            from django.utils import timezone as _tz
+
+            now = _tz.localtime()
+            # Pick weekly target = today, charge_time earlier than now so days_until=0 path hits 7
+            settings = BillingSettingsFactory(
+                charge_frequency=BillingSettings.ChargeFrequency.WEEKLY,
+                charge_day_of_week=now.weekday(),
+                charge_day_of_month=None,
+                charge_time="00:00",
+            )
+            settings.charge_time = _time(0, 0)
+
+            fake_now = now.replace(hour=23, minute=59, second=0, microsecond=0)
+            with patch("billing.models.timezone.localtime", return_value=fake_now):
+                result = settings.next_charge_at()
+            assert result is not None
+            assert (result.date() - fake_now.date()).days == 7
+
+        def it_wraps_to_january_when_monthly_candidate_is_december():
+            from datetime import time as _time
+            from unittest.mock import patch
+
+            from django.utils import timezone as _tz
+
+            # Force "now" into December so the monthly candidate lands there
+            current_year = _tz.localtime().year
+            dec_31 = _tz.localtime().replace(
+                year=current_year, month=12, day=31, hour=23, minute=59, second=0, microsecond=0
+            )
+
+            settings = BillingSettingsFactory(
+                charge_frequency=BillingSettings.ChargeFrequency.MONTHLY,
+                charge_day_of_month=15,
+                charge_day_of_week=None,
+                charge_time="09:00",
+            )
+            settings.charge_time = _time(9, 0)
+
+            with patch("billing.models.timezone.localtime", return_value=dec_31):
+                result = settings.next_charge_at()
+            assert result is not None
+            assert result.year == current_year + 1
+            assert result.month == 1
+            assert result.day == 15
+
     def describe_charge_frequency():
         def it_defaults_to_monthly():
             settings = BillingSettings.load()
