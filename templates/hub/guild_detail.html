@@ -140,16 +140,11 @@
         {% for product in products %}
         <div class="guild-product-card">
             {% if can_edit_this_guild %}
-            <form method="post"
-                  action="{% url 'hub_guild_product_delete' guild.pk product.pk %}"
-                  class="guild-product-card__delete-form"
-                  onsubmit="return confirm('Delete {{ product.name|escapejs }}?');">
-                {% csrf_token %}
-                <button type="submit"
-                        class="guild-product-card__delete-btn"
-                        aria-label="Delete {{ product.name|escapejs }}"
-                        title="Delete">&times;</button>
-            </form>
+            <button type="button"
+                    class="guild-product-card__delete-btn"
+                    aria-label="Delete {{ product.name|escapejs }}"
+                    title="Delete"
+                    @click="openDeleteModal({{ product.pk }}, '{{ product.name|escapejs }}', '{% url 'hub_guild_product_delete' guild.pk product.pk %}')">&times;</button>
             {% endif %}
             <div class="guild-product-card__name">{{ product.name }}</div>
             <div class="guild-product-card__price">${{ product.price }}</div>
@@ -270,6 +265,36 @@
     </div>
 </div>
 
+{# Delete Product confirmation modal #}
+<div x-show="deleteModalOpen"
+     x-transition:enter="modal-enter"
+     x-transition:leave="modal-leave"
+     @keydown.escape.window="deleteModalOpen = false"
+     class="pl-modal-backdrop"
+     style="display: none;"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="delete-product-title">
+    <div class="pl-modal pl-modal--sm" @click.outside="deleteModalOpen = false">
+        <div class="pl-modal__header">
+            <h2 class="pl-modal__title" id="delete-product-title">Delete product?</h2>
+            <button type="button" @click="deleteModalOpen = false" class="pl-modal__close" aria-label="Close">&times;</button>
+        </div>
+        <div class="pl-modal__body">
+            <p style="margin:0 0 1.5rem;color:var(--hub-text, #F4EFDD);">
+                Delete <strong x-text="deleteTarget.name"></strong>? This can&rsquo;t be undone.
+            </p>
+            <form method="post" :action="deleteTarget.url" hx-boost="false" style="display:flex;gap:0.5rem;justify-content:flex-end;">
+                {% csrf_token %}
+                <button type="button"
+                        class="pl-btn pl-btn--secondary"
+                        @click="deleteModalOpen = false">Cancel</button>
+                <button type="submit" class="pl-btn pl-btn--danger">Delete</button>
+            </form>
+        </div>
+    </div>
+</div>
+
 {# Add Product modal #}
 <div x-data="{ open: false }"
      x-show="open"
@@ -333,11 +358,18 @@ function guildCart(guildPk) {
         addModalProduct: {pk: 0, name: '', price: 0},
         addModalQty: 1,
         submitting: false,
+        deleteModalOpen: false,
+        deleteTarget: {pk: 0, name: '', url: ''},
 
         openAddModal(pk, name, price) {
             this.addModalProduct = {pk: pk, name: name, price: parseFloat(price)};
             this.addModalQty = 1;
             this.addModalOpen = true;
+        },
+
+        openDeleteModal(pk, name, url) {
+            this.deleteTarget = {pk: pk, name: name, url: url};
+            this.deleteModalOpen = true;
         },
 
         addToCart() {
