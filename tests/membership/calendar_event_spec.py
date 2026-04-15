@@ -32,6 +32,12 @@ def describe_SiteConfiguration_calendar_fields():
         config = SiteConfiguration.load()
         assert config.general_calendar_color == "#EEB44B"
 
+    def it_has_default_classes_calendar_color():
+        from core.models import SiteConfiguration
+
+        config = SiteConfiguration.load()
+        assert config.classes_calendar_color == "#7C5CBF"
+
     def it_general_calendar_url_defaults_to_blank():
         from core.models import SiteConfiguration
 
@@ -103,6 +109,56 @@ def describe_CalendarEvent():
         )
         titles = list(CalendarEvent.objects.values_list("title", flat=True))
         assert titles == ["A", "B"]
+
+    def describe_source_key():
+        def it_returns_guild_id_string_for_guild_events():
+            from django.utils import timezone
+            from membership.models import CalendarEvent
+
+            guild = GuildFactory()
+            now = timezone.now()
+            event = CalendarEvent.objects.create(
+                guild=guild,
+                source=CalendarEvent.Source.GUILD,
+                uid="guild-key-test",
+                title="Guild Event",
+                start_dt=now,
+                end_dt=now,
+                fetched_at=now,
+            )
+            assert event.source_key == str(guild.pk)
+
+        def it_returns_general_for_general_events():
+            from django.utils import timezone
+            from membership.models import CalendarEvent
+
+            now = timezone.now()
+            event = CalendarEvent.objects.create(
+                guild=None,
+                source=CalendarEvent.Source.GENERAL,
+                uid="general-key-test",
+                title="General Event",
+                start_dt=now,
+                end_dt=now,
+                fetched_at=now,
+            )
+            assert event.source_key == "general"
+
+        def it_returns_classes_for_classes_events():
+            from django.utils import timezone
+            from membership.models import CalendarEvent
+
+            now = timezone.now()
+            event = CalendarEvent.objects.create(
+                guild=None,
+                source=CalendarEvent.Source.CLASSES,
+                uid="classes-key-test",
+                title="Classes Event",
+                start_dt=now,
+                end_dt=now,
+                fetched_at=now,
+            )
+            assert event.source_key == "classes"
 
     def describe_upcoming():
         def it_returns_events_whose_end_time_is_in_the_future():

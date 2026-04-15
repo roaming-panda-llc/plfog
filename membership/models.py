@@ -923,13 +923,24 @@ class CalendarEvent(models.Model):
     Treat as a read-through cache — do not edit records directly; re-sync from the source.
     """
 
+    class Source(models.TextChoices):
+        GUILD = "guild", "Guild Calendar"
+        GENERAL = "general", "General Calendar"
+        CLASSES = "classes", "Classes (classes.pastlives.space)"
+
     guild = models.ForeignKey(
         "Guild",
         null=True,
         blank=True,
         on_delete=models.CASCADE,
         related_name="calendar_events",
-        help_text="Guild this event belongs to. Null for general makerspace events.",
+        help_text="Guild this event belongs to. Null for general or classes events.",
+    )
+    source = models.CharField(
+        max_length=20,
+        choices=Source.choices,
+        default=Source.GUILD,
+        help_text="Origin of this event: guild iCal, general makerspace iCal, or classes.pastlives.space.",
     )
     uid = models.CharField(max_length=500, db_index=True, help_text="iCal UID, unique within a source.")
     title = models.CharField(max_length=500, help_text="Event title from iCal SUMMARY field.")
@@ -956,3 +967,10 @@ class CalendarEvent(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+    @property
+    def source_key(self) -> str:
+        """Key used to look up this event's display color in the source_colors dict."""
+        if self.source == self.Source.GUILD and self.guild_id:
+            return str(self.guild_id)
+        return self.source

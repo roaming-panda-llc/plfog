@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
-VERSION = "1.6.0"
+VERSION = "1.6.1"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.6.1",
+        "date": "2026-04-15",
+        "title": "Calendar: Classes sync, configurable colors & pagination",
+        "changes": [
+            "Classes from classes.pastlives.space now show up on the Community Calendar — click the title to go straight to the registration page",
+            "Classes have their own color on the calendar, separate from General events — customize it in Site Settings",
+            "The event list now shows 10 events per page with prev/next arrows so the page doesn't get overwhelmed",
+            "Admins can configure the Classes color in Site Settings → Community Calendar alongside the existing General color",
+        ],
+    },
     {
         "version": "1.6.0",
         "date": "2026-04-15",

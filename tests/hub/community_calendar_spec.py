@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import textwrap
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -125,6 +126,14 @@ def describe_calendar_service():
             titles = set(events.values_list("title", flat=True))
             assert titles == {"Open Studio Hours", "Woodshop Safety Class"}
 
+        def it_sets_source_to_guild():
+            from hub.calendar_service import sync_guild_calendar
+
+            guild = GuildFactory(calendar_url="https://calendar.google.com/calendar/ical/test.ics")
+            with patch("hub.calendar_service.urllib.request.urlopen", side_effect=_fake_urlopen):
+                sync_guild_calendar(guild)
+            assert CalendarEvent.objects.filter(guild=guild, source="guild").count() == 2
+
         def it_updates_existing_events_on_resync():
             from hub.calendar_service import sync_guild_calendar
 
@@ -197,6 +206,17 @@ def describe_calendar_service():
                 count = sync_general_calendar()
             assert count == 2
             assert CalendarEvent.objects.filter(guild__isnull=True).count() == 2
+
+        def it_sets_source_to_general():
+            from core.models import SiteConfiguration
+            from hub.calendar_service import sync_general_calendar
+
+            config = SiteConfiguration.load()
+            config.general_calendar_url = "https://calendar.google.com/calendar/ical/general.ics"
+            config.save()
+            with patch("hub.calendar_service.urllib.request.urlopen", side_effect=_fake_urlopen):
+                sync_general_calendar()
+            assert CalendarEvent.objects.filter(source="general").count() == 2
 
         def it_returns_zero_when_no_general_calendar_configured():
             from hub.calendar_service import sync_general_calendar
@@ -370,6 +390,19 @@ def describe_community_calendar_view():
         assert "Ceramics Guild" in names
         assert "Woodshop" not in names
 
+    def it_includes_classes_color_in_context(client: Client):
+        from core.models import SiteConfiguration
+
+        _logged_in_user(client, username="caluser_classes")
+        config = SiteConfiguration.load()
+        config.sync_classes_enabled = True
+        config.classes_calendar_color = "#AA33BB"
+        config.save()
+        response = client.get("/calendar/")
+        assert response.status_code == 200
+        assert response.context["classes_enabled"] is True
+        assert response.context["classes_color"] == "#AA33BB"
+
 
 def describe_calendar_events_partial_view():
     def it_returns_200_and_calls_refresh(client: Client):
@@ -380,22 +413,62 @@ def describe_calendar_events_partial_view():
         mock_refresh.assert_called_once()
 
     def it_renders_upcoming_events(client: Client):
-        from datetime import timedelta as td
-
         _logged_in_user(client, username="caluser4")
         guild = GuildFactory(name="Art Guild", calendar_url="https://example.com/cal.ics")
         now = timezone.now()
+        # Create event in current week (tomorrow is always within the current week if today ≤ Thursday)
         CalendarEvent.objects.create(
             guild=guild,
             uid="test-001",
             title="Life Drawing Session",
-            start_dt=now + td(days=1),
-            end_dt=now + td(days=1, hours=2),
+            start_dt=now + timedelta(days=1),
+            end_dt=now + timedelta(days=1, hours=2),
             fetched_at=now,
         )
         with patch("hub.views.refresh_stale_sources"):
             response = client.get("/calendar/events/")
         assert b"Life Drawing Session" in response.content
+
+    def it_paginates_month_events_to_max_10_per_page(client: Client):
+        _logged_in_user(client, username="caluser_page")
+        guild = GuildFactory(name="Pagination Guild", calendar_url="https://example.com/pag.ics")
+        now = timezone.now()
+        # Place 15 events in the first 15 days of next month to avoid end-of-month spillover
+        next_month_first = (now.replace(day=1) + timedelta(days=32)).replace(day=1, hour=10, minute=0, second=0, microsecond=0)
+        for i in range(15):
+            event_dt = next_month_first + timedelta(days=i)
+            CalendarEvent.objects.create(
+                guild=guild,
+                uid=f"page-event-{i}",
+                title=f"Event {i:02d}",
+                start_dt=event_dt,
+                end_dt=event_dt + timedelta(hours=1),
+                fetched_at=now,
+            )
+        with patch("hub.views.refresh_stale_sources"):
+            response = client.get("/calendar/events/?month_offset=1")
+        assert response.context["event_total_pages"] == 2
+        assert len(response.context["month_events"]) == 10
+
+    def it_returns_month_page_2_when_requested(client: Client):
+        _logged_in_user(client, username="caluser_page2")
+        guild = GuildFactory(name="Page2 Guild", calendar_url="https://example.com/pag2.ics")
+        now = timezone.now()
+        next_month_first = (now.replace(day=1) + timedelta(days=32)).replace(day=1, hour=10, minute=0, second=0, microsecond=0)
+        for i in range(15):
+            event_dt = next_month_first + timedelta(days=i)
+            CalendarEvent.objects.create(
+                guild=guild,
+                uid=f"p2-event-{i}",
+                title=f"Page2 Event {i:02d}",
+                start_dt=event_dt,
+                end_dt=event_dt + timedelta(hours=1),
+                fetched_at=now,
+            )
+        with patch("hub.views.refresh_stale_sources"):
+            response = client.get("/calendar/events/?month_offset=1&page=2")
+        assert response.context["event_page"] == 2
+        assert len(response.context["month_events"]) == 5
 
 
 def describe_calendar_export_ics_view():

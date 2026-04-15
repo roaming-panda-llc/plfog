@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import urllib.request
 from datetime import date as date_type
 from datetime import datetime, timedelta
@@ -9,9 +10,13 @@ from datetime import timezone as dt_timezone
 from typing import Any
 
 from django.utils import timezone
+from django.utils.html import strip_tags
 
 from core.models import SiteConfiguration
 from membership.models import CalendarEvent, Guild
+
+CLASSES_API_BASE = "https://classes.pastlives.space"
+CLASSES_API_URL = f"{CLASSES_API_BASE}/jsonapi/node/class"
 
 DEFAULT_MAX_AGE_SECONDS = 900  # 15 minutes
 
@@ -75,7 +80,7 @@ def _fetch_and_parse(url: str) -> list[dict[str, Any]]:
     return _parse_ical_events(raw)
 
 
-def _upsert_events(events: list[dict[str, Any]], guild: Guild | None) -> int:
+def _upsert_events(events: list[dict[str, Any]], guild: Guild | None, source: str) -> int:
     """Insert or update CalendarEvent records for the given source."""
     now = timezone.now()
     for evt in events:
@@ -83,6 +88,7 @@ def _upsert_events(events: list[dict[str, Any]], guild: Guild | None) -> int:
             guild=guild,
             uid=evt["uid"],
             defaults={
+                "source": source,
                 "title": evt["title"],
                 "description": evt["description"],
                 "location": evt["location"],
@@ -101,7 +107,7 @@ def sync_guild_calendar(guild: Guild) -> int:
     if not guild.calendar_url:
         return 0
     events = _fetch_and_parse(guild.calendar_url)
-    count = _upsert_events(events, guild=guild)
+    count = _upsert_events(events, guild=guild, source="guild")
     guild.calendar_last_fetched_at = timezone.now()
     guild.save(update_fields=["calendar_last_fetched_at"])
     return count
@@ -113,10 +119,90 @@ def sync_general_calendar() -> int:
     if not config.general_calendar_url:
         return 0
     events = _fetch_and_parse(config.general_calendar_url)
-    count = _upsert_events(events, guild=None)
+    count = _upsert_events(events, guild=None, source="general")
     config.general_calendar_last_fetched_at = timezone.now()
     config.save(update_fields=["general_calendar_last_fetched_at"])
     return count
+
+
+def _fetch_json(url: str) -> dict[str, Any]:
+    """Fetch a JSON:API URL and return the parsed response."""
+    req = urllib.request.Request(url, headers={"Accept": "application/vnd.api+json"})
+    with urllib.request.urlopen(req, timeout=15) as response:
+        return json.loads(response.read())
+
+
+def sync_classes_calendar() -> int:
+    """Sync upcoming classes from classes.pastlives.space. Returns number of events upserted.
+
+    Each class session becomes a CalendarEvent with guild=None and source="classes".
+    The event URL points to the registration page on classes.pastlives.space.
+    """
+    config = SiteConfiguration.load()
+    if not config.sync_classes_enabled:
+        return 0
+
+    now = timezone.now()
+    total = 0
+
+    next_url: str | None = CLASSES_API_URL
+    while next_url:
+        data = _fetch_json(next_url)
+
+        for item in data.get("data", []):
+            attrs = item.get("attributes") or {}
+
+            dates = attrs.get("field_dates") or []
+            if not dates:
+                continue
+
+            # Registration URL
+            path_alias = (attrs.get("path") or {}).get("alias", "")
+            event_url = f"{CLASSES_API_BASE}{path_alias}" if path_alias else ""
+
+            # Description: strip HTML from body
+            body = attrs.get("body") or {}
+            description = strip_tags(body.get("value") or body.get("summary") or "")[:500]
+
+            title = attrs.get("title") or "(No title)"
+
+            # One CalendarEvent per session date
+            for i, session in enumerate(dates):
+                start_str = session.get("value")
+                end_str = session.get("end_value") or start_str
+                if not start_str:
+                    continue
+
+                start_dt = datetime.fromisoformat(start_str)
+                end_dt = datetime.fromisoformat(end_str)
+
+                uid = f"classes-{item['id']}-{i}"
+
+                # Remove any old record that was stored with a guild (pre-migration data)
+                CalendarEvent.objects.filter(uid=uid).exclude(guild=None).delete()
+
+                CalendarEvent.objects.update_or_create(
+                    guild=None,
+                    uid=uid,
+                    defaults={
+                        "source": "classes",
+                        "title": title,
+                        "description": description,
+                        "location": "",
+                        "url": event_url,
+                        "start_dt": start_dt,
+                        "end_dt": end_dt,
+                        "all_day": False,
+                        "fetched_at": now,
+                    },
+                )
+                total += 1
+
+        next_url = ((data.get("links") or {}).get("next") or {}).get("href")
+
+    config.classes_last_synced_at = now
+    config.save(update_fields=["classes_last_synced_at"])
+    return total
 
 
 def refresh_stale_sources(max_age_seconds: int = DEFAULT_MAX_AGE_SECONDS) -> None:
@@ -147,5 +233,13 @@ def refresh_stale_sources(max_age_seconds: int = DEFAULT_MAX_AGE_SECONDS) -> Non
         if general_stale:
             try:
                 sync_general_calendar()
+            except Exception:  # noqa: BLE001
+                pass
+
+    if config.sync_classes_enabled:
+        classes_stale = config.classes_last_synced_at is None or config.classes_last_synced_at < cutoff
+        if classes_stale:
+            try:
+                sync_classes_calendar()
             except Exception:  # noqa: BLE001
                 pass

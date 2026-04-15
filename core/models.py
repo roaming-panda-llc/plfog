@@ -58,6 +58,23 @@ class SiteConfiguration(models.Model):
         blank=True,
         help_text="When the general calendar was last synced. Set by the calendar service.",
     )
+    sync_classes_enabled = models.BooleanField(
+        default=False,
+        verbose_name="Sync classes from classes.pastlives.space",
+        help_text="When enabled, upcoming classes are imported into the Community Calendar with links to register.",
+    )
+    classes_calendar_color = models.CharField(
+        max_length=7,
+        blank=True,
+        default="#7C5CBF",
+        verbose_name="Classes Calendar Color",
+        help_text="Hex color for classes from classes.pastlives.space on the Community Calendar (e.g. #7C5CBF).",
+    )
+    classes_last_synced_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When classes were last synced from classes.pastlives.space. Set by the calendar service.",
+    )
 
     class Meta:
         verbose_name = "Site Settings"
