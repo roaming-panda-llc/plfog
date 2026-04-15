@@ -5,20 +5,35 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('membership', '0026_calendarevent_unique_guild_uid'),
+        ("membership", "0026_calendarevent_unique_guild_uid"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='calendarevent',
-            name='source',
-            field=models.CharField(choices=[('guild', 'Guild Calendar'), ('general', 'General Calendar'), ('classes', 'Classes (classes.pastlives.space)')], default='guild', help_text='Origin of this event: guild iCal, general makerspace iCal, or classes.pastlives.space.', max_length=20),
+            model_name="calendarevent",
+            name="source",
+            field=models.CharField(
+                choices=[
+                    ("guild", "Guild Calendar"),
+                    ("general", "General Calendar"),
+                    ("classes", "Classes (classes.pastlives.space)"),
+                ],
+                default="guild",
+                help_text="Origin of this event: guild iCal, general makerspace iCal, or classes.pastlives.space.",
+                max_length=20,
+            ),
         ),
         migrations.AlterField(
-            model_name='calendarevent',
-            name='guild',
-            field=models.ForeignKey(blank=True, help_text='Guild this event belongs to. Null for general or classes events.', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='calendar_events', to='membership.guild'),
+            model_name="calendarevent",
+            name="guild",
+            field=models.ForeignKey(
+                blank=True,
+                help_text="Guild this event belongs to. Null for general or classes events.",
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="calendar_events",
+                to="membership.guild",
+            ),
         ),
     ]

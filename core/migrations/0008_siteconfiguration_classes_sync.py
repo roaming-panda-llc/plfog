@@ -4,20 +4,27 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('core', '0007_siteconfiguration_calendar_fields'),
+        ("core", "0007_siteconfiguration_calendar_fields"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='siteconfiguration',
-            name='classes_last_synced_at',
-            field=models.DateTimeField(blank=True, help_text='When classes were last synced from classes.pastlives.space. Set by the calendar service.', null=True),
+            model_name="siteconfiguration",
+            name="classes_last_synced_at",
+            field=models.DateTimeField(
+                blank=True,
+                help_text="When classes were last synced from classes.pastlives.space. Set by the calendar service.",
+                null=True,
+            ),
         ),
         migrations.AddField(
-            model_name='siteconfiguration',
-            name='sync_classes_enabled',
-            field=models.BooleanField(default=False, help_text='When enabled, upcoming classes are imported into the Community Calendar with links to register.', verbose_name='Sync classes from classes.pastlives.space'),
+            model_name="siteconfiguration",
+            name="sync_classes_enabled",
+            field=models.BooleanField(
+                default=False,
+                help_text="When enabled, upcoming classes are imported into the Community Calendar with links to register.",
+                verbose_name="Sync classes from classes.pastlives.space",
+            ),
         ),
     ]

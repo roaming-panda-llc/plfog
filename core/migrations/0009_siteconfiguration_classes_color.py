@@ -4,15 +4,20 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('core', '0008_siteconfiguration_classes_sync'),
+        ("core", "0008_siteconfiguration_classes_sync"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='siteconfiguration',
-            name='classes_calendar_color',
-            field=models.CharField(blank=True, default='#7C5CBF', help_text='Hex color for classes from classes.pastlives.space on the Community Calendar (e.g. #7C5CBF).', max_length=7, verbose_name='Classes Calendar Color'),
+            model_name="siteconfiguration",
+            name="classes_calendar_color",
+            field=models.CharField(
+                blank=True,
+                default="#7C5CBF",
+                help_text="Hex color for classes from classes.pastlives.space on the Community Calendar (e.g. #7C5CBF).",
+                max_length=7,
+                verbose_name="Classes Calendar Color",
+            ),
         ),
     ]

@@ -434,7 +434,9 @@ def describe_calendar_events_partial_view():
         guild = GuildFactory(name="Pagination Guild", calendar_url="https://example.com/pag.ics")
         now = timezone.now()
         # Place 15 events in the first 15 days of next month to avoid end-of-month spillover
-        next_month_first = (now.replace(day=1) + timedelta(days=32)).replace(day=1, hour=10, minute=0, second=0, microsecond=0)
+        next_month_first = (now.replace(day=1) + timedelta(days=32)).replace(
+            day=1, hour=10, minute=0, second=0, microsecond=0
+        )
         for i in range(15):
             event_dt = next_month_first + timedelta(days=i)
             CalendarEvent.objects.create(
@@ -454,7 +456,9 @@ def describe_calendar_events_partial_view():
         _logged_in_user(client, username="caluser_page2")
         guild = GuildFactory(name="Page2 Guild", calendar_url="https://example.com/pag2.ics")
         now = timezone.now()
-        next_month_first = (now.replace(day=1) + timedelta(days=32)).replace(day=1, hour=10, minute=0, second=0, microsecond=0)
+        next_month_first = (now.replace(day=1) + timedelta(days=32)).replace(
+            day=1, hour=10, minute=0, second=0, microsecond=0
+        )
         for i in range(15):
             event_dt = next_month_first + timedelta(days=i)
             CalendarEvent.objects.create(
