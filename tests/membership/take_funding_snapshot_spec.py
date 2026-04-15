@@ -116,6 +116,27 @@ def describe_take_funding_snapshot_command():
         assert row["guild_1st_name"] == "G1"
         assert row["guild_1st_id"] == g1.pk
 
+    def it_excludes_votes_from_members_without_linked_user():
+        """Backfilled votes for Airtable-imported members who never signed up must be excluded."""
+        g1 = GuildFactory(name="G1")
+        g2 = GuildFactory(name="G2")
+        g3 = GuildFactory(name="G3")
+        paying_signed_up = MemberFactory(member_type=Member.MemberType.STANDARD)
+        unlinked = MemberFactory(user=None, member_type=Member.MemberType.STANDARD)
+        VotePreferenceFactory(member=paying_signed_up, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        VotePreferenceFactory(member=unlinked, guild_1st=g1, guild_2nd=g2, guild_3rd=g3, signed_up=False)
+
+        call_command("take_funding_snapshot", "--minimum-pool", "0", stdout=StringIO())
+
+        snap = FundingSnapshot.objects.first()
+        assert snap is not None
+        # Only the signed-up paying member contributes; unlinked is excluded
+        assert snap.contributor_count == 1
+        assert snap.funding_pool == Decimal("10.00")
+        assert snap.results["votes_cast"] == 1
+        assert len(snap.raw_votes) == 1
+        assert snap.raw_votes[0]["member_id"] == paying_signed_up.pk
+
     def it_uses_current_month_as_cycle_label():
         from django.utils import timezone
 

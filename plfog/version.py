@@ -2,9 +2,25 @@
 
 from __future__ import annotations
 
-VERSION = "1.5.5"
+VERSION = "1.5.6"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.5.6",
+        "date": "2026-04-15",
+        "title": "Voting hotfixes, User Settings, and sidebar polish",
+        "changes": [
+            "Current Vote Standings no longer inflate — we were counting old Airtable votes from members who never signed up to FOG. Now only votes from signed-up members count toward live standings, funding snapshots, and the admin dashboard",
+            "The Guild Voting page is now split into three tabs: Current Standings (live points), New Votes This Month (only votes cast or changed since the last snapshot), and Last Month's Results (the most recent snapshot with funding breakdown)",
+            "Your vote still rolls over automatically every cycle — once you've submitted it, it stays in place and keeps counting until you change it",
+            "The admin Voting Preferences page now shows a per-member voting history pulled from past snapshots, so you can audit how anyone's picks contributed to the totals cycle by cycle",
+            "New unified User Settings page at /settings/ with Profile and Emails tabs — the old Manage Email Addresses page that looked like the login screen is gone, and adding/removing/verifying emails now happens inside the hub layout",
+            "On the Emails tab, Manage Email Addresses and Email Preferences are now two separate cards, and the Re-send Verification button only appears when the selected email isn't verified yet",
+            "The user menu in the top-right is now just Settings + Log Out — everything else lives inside the new User Settings page",
+            "Resources links (Member Guide + Code of Conduct) and Feedback now live together in the bottom of the left sidebar, each styled consistently with the rest of the nav — no more floating button overlapping other content",
+            "Fixed a Postgres error that was blocking the last deploy on Render — the migration that clears legacy product data and drops old columns now commits its cleanup before altering the schema, so the two steps can't collide in a single transaction",
+        ],
+    },
     {
         "version": "1.5.5",
         "date": "2026-04-14",

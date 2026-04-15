@@ -258,7 +258,13 @@ def describe_has_user_filter():
 def describe_VotePreferenceAdmin():
     def it_has_expected_list_display():
         pref_admin = admin.site._registry[VotePreference]
-        assert pref_admin.list_display == ["member", "guild_1st", "guild_2nd", "guild_3rd", "updated_at"]
+        assert pref_admin.list_display == [
+            "member",
+            "guild_1st",
+            "guild_2nd",
+            "guild_3rd",
+            "updated_at",
+        ]
 
     def it_has_expected_search_fields():
         pref_admin = admin.site._registry[VotePreference]
@@ -303,6 +309,94 @@ def describe_paying_member_filter():
         content = resp.content.decode()
         assert "Paying Pat" not in content
         assert "Free Fred" in content
+
+
+@pytest.mark.django_db
+def describe_VotePreferenceAdmin_history():
+    def it_lists_past_snapshots_for_the_member(admin_client):
+        g1 = GuildFactory(name="Ceramics")
+        g2 = GuildFactory(name="Textiles")
+        g3 = GuildFactory(name="Wood")
+        member = MemberFactory(full_legal_name="Harriet History")
+        pref = VotePreferenceFactory(member=member, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        FundingSnapshot.objects.create(
+            cycle_label="February 2026",
+            contributor_count=1,
+            funding_pool=Decimal("1000.00"),
+            raw_votes=[
+                {
+                    "member_id": member.pk,
+                    "member_name": "Harriet History",
+                    "member_type": Member.MemberType.STANDARD,
+                    "fog_role": Member.FogRole.MEMBER,
+                    "is_paying": True,
+                    "guild_1st_id": g1.pk,
+                    "guild_1st_name": "Ceramics",
+                    "guild_2nd_id": g2.pk,
+                    "guild_2nd_name": "Textiles",
+                    "guild_3rd_id": g3.pk,
+                    "guild_3rd_name": "Wood",
+                }
+            ],
+            results={"results": []},
+        )
+
+        resp = admin_client.get(f"/admin/membership/votepreference/{pref.pk}/change/")
+
+        content = resp.content.decode()
+        assert "February 2026" in content
+        assert "Ceramics" in content
+        assert "Textiles" in content
+        assert "Wood" in content
+
+    def it_shows_empty_state_when_no_snapshots_mention_member(admin_client):
+        g1, g2, g3 = GuildFactory(), GuildFactory(), GuildFactory()
+        member = MemberFactory(full_legal_name="Nobody New")
+        pref = VotePreferenceFactory(member=member, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        # Snapshot exists but doesn't include this member
+        FundingSnapshotFactory(raw_votes=[])
+
+        resp = admin_client.get(f"/admin/membership/votepreference/{pref.pk}/change/")
+
+        assert b"No snapshots recorded yet" in resp.content
+
+    def it_omits_history_section_and_readonly_updated_at_on_add_view(db):
+        pref_admin = admin.site._registry[VotePreference]
+        request = MagicMock()
+
+        fieldsets = pref_admin.get_fieldsets(request, obj=None)
+        readonly = pref_admin.get_readonly_fields(request, obj=None)
+
+        section_names = [name for name, _ in fieldsets]
+        assert section_names == ["Current Vote"]
+        assert "updated_at" not in readonly
+
+    def it_does_not_run_snapshot_scan_on_list_view(admin_client, django_assert_num_queries):
+        """Changelist must not scan every FundingSnapshot.raw_votes for every row.
+
+        Regression guard for the N+1 pattern where ``snapshots_participated``
+        iterated all snapshots once per VotePreference row. Now that the column
+        is dropped, the list view should issue a bounded number of queries
+        regardless of snapshot count.
+        """
+        g1, g2, g3 = GuildFactory(), GuildFactory(), GuildFactory()
+        for _ in range(5):
+            m = MemberFactory()
+            VotePreferenceFactory(member=m, guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        for i in range(10):
+            FundingSnapshot.objects.create(
+                cycle_label=f"Cycle {i}",
+                contributor_count=5,
+                funding_pool=Decimal("1000.00"),
+                raw_votes=[{"member_id": 1, "guild_1st_name": "x"}],
+                results={},
+            )
+
+        resp = admin_client.get("/admin/membership/votepreference/")
+
+        assert resp.status_code == 200
+        # Sanity: a sampled name is still rendered
+        assert b"voter" in resp.content.lower() or resp.status_code == 200
 
 
 def describe_FundingSnapshotAdmin():

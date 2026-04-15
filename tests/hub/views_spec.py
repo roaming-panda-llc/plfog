@@ -194,40 +194,82 @@ def describe_guild_detail():
 
 
 @pytest.mark.django_db
-def describe_profile_settings():
+def describe_user_settings():
     def it_requires_login(client: Client):
-        response = client.get("/settings/profile/")
+        response = client.get("/settings/")
         assert response.status_code == 302
+
+    def it_renders_both_profile_and_email_prefs_forms(client: Client):
+        user = User.objects.create_user(username="withmember", password="pass")
+        client.login(username="withmember", password="pass")
+
+        response = client.get("/settings/")
+
+        assert response.status_code == 200
+        assert response.context["member"] == user.member
+        assert response.context["profile_form"] is not None
+        assert response.context["prefs_form"] is not None
+        assert "add_email_form" in response.context
+        assert "email_addresses" in response.context
+
+    def it_defaults_to_profile_tab(client: Client):
+        User.objects.create_user(username="tabdefault", password="pass")
+        client.login(username="tabdefault", password="pass")
+
+        response = client.get("/settings/")
+
+        assert response.context["active_tab"] == "profile"
+
+    def it_honors_tab_query_param(client: Client):
+        User.objects.create_user(username="tabemails", password="pass")
+        client.login(username="tabemails", password="pass")
+
+        response = client.get("/settings/?tab=emails")
+
+        assert response.context["active_tab"] == "emails"
+
+    def it_falls_back_to_profile_when_tab_param_is_not_whitelisted(client: Client):
+        """Regression: ``active_tab`` flows into an Alpine x-data JS expression,
+        so raw user input must not reach the template — arbitrary values are
+        coerced back to ``profile`` to prevent XSS."""
+        User.objects.create_user(username="xssguard", password="pass")
+        client.login(username="xssguard", password="pass")
+
+        response = client.get("/settings/?tab=%27%2Balert(1)%2B%27")
+
+        assert response.context["active_tab"] == "profile"
+        # And the raw payload never lands in the rendered HTML.
+        assert b"alert(1)" not in response.content
 
     def it_renders_with_no_member_linked(client: Client):
         user = User.objects.create_user(username="nomember", password="pass")
         client.login(username="nomember", password="pass")
         Member.objects.filter(user=user).delete()
 
-        response = client.get("/settings/profile/")
+        response = client.get("/settings/")
 
         assert response.status_code == 200
         assert response.context["member"] is None
-        assert response.context["form"] is None
+        assert response.context["profile_form"] is None
 
-    def it_renders_with_member_linked(client: Client):
-        user = User.objects.create_user(username="withmember", password="pass")
-        client.login(username="withmember", password="pass")
+    def it_shows_info_message_when_no_member(client: Client):
+        user = User.objects.create_user(username="nolink", password="pass")
+        client.login(username="nolink", password="pass")
+        Member.objects.filter(user=user).delete()
 
-        response = client.get("/settings/profile/")
+        response = client.get("/settings/")
 
-        assert response.status_code == 200
-        assert response.context["member"] == user.member
-        assert response.context["form"] is not None
+        messages_list = list(response.context["messages"])
+        assert any("not linked" in str(m) for m in messages_list)
 
-    def it_updates_member_profile_on_post(client: Client):
+    def it_updates_member_profile_on_post_with_profile_form_id(client: Client):
         user = User.objects.create_user(username="editor", password="pass")
         member = user.member
         client.login(username="editor", password="pass")
 
         response = client.post(
-            "/settings/profile/",
-            {"preferred_name": "Ed", "phone": "555-1234"},
+            "/settings/",
+            {"form_id": "profile", "preferred_name": "Ed", "phone": "555-1234"},
             follow=True,
         )
 
@@ -235,9 +277,7 @@ def describe_profile_settings():
         member.refresh_from_db()
         assert member.preferred_name == "Ed"
         assert member.phone == "555-1234"
-        messages_list = list(response.context["messages"])
-        assert len(messages_list) == 1
-        assert "updated" in str(messages_list[0])
+        assert any("updated" in str(m) for m in response.context["messages"])
 
     def it_strips_whitespace_from_post_data(client: Client):
         user = User.objects.create_user(username="stripper", password="pass")
@@ -245,36 +285,25 @@ def describe_profile_settings():
         client.login(username="stripper", password="pass")
 
         client.post(
-            "/settings/profile/",
-            {"preferred_name": "  Trimmed  ", "phone": "  555-0000  "},
+            "/settings/",
+            {"form_id": "profile", "preferred_name": "  Trimmed  ", "phone": "  555-0000  "},
         )
 
         member.refresh_from_db()
         assert member.preferred_name == "Trimmed"
         assert member.phone == "555-0000"
 
-    def it_shows_info_message_when_no_member(client: Client):
-        user = User.objects.create_user(username="nolink", password="pass")
-        client.login(username="nolink", password="pass")
-        Member.objects.filter(user=user).delete()
-
-        response = client.get("/settings/profile/")
-
-        messages_list = list(response.context["messages"])
-        assert len(messages_list) == 1
-        assert "not linked" in str(messages_list[0])
-
     def it_rejects_phone_exceeding_max_length(client: Client):
         User.objects.create_user(username="longphone", password="pass")
         client.login(username="longphone", password="pass")
 
         response = client.post(
-            "/settings/profile/",
-            {"preferred_name": "Ok", "phone": "x" * 21},
+            "/settings/",
+            {"form_id": "profile", "preferred_name": "Ok", "phone": "x" * 21},
         )
 
         assert response.status_code == 200
-        assert response.context["form"].errors
+        assert response.context["profile_form"].errors
 
     def it_saves_pronouns(client: Client):
         user = User.objects.create_user(username="pronounuser", password="pass")
@@ -282,8 +311,9 @@ def describe_profile_settings():
         client.login(username="pronounuser", password="pass")
 
         client.post(
-            "/settings/profile/",
+            "/settings/",
             {
+                "form_id": "profile",
                 "preferred_name": "",
                 "pronouns": "she/her",
                 "phone": "",
@@ -297,43 +327,19 @@ def describe_profile_settings():
         member.refresh_from_db()
         assert member.pronouns == "she/her"
 
+    def it_errors_and_redirects_when_profile_post_has_no_member(client: Client):
+        user = User.objects.create_user(username="profilenolink", password="pass")
+        client.login(username="profilenolink", password="pass")
+        Member.objects.filter(user=user).delete()
 
-@pytest.mark.django_db
-def describe_email_preferences():
-    def it_requires_login(client: Client):
-        response = client.get("/settings/emails/")
-        assert response.status_code == 302
-
-    def it_renders_email_preferences_page(client: Client):
-        User.objects.create_user(username="emailuser", password="pass")
-        client.login(username="emailuser", password="pass")
-
-        response = client.get("/settings/emails/")
+        response = client.post("/settings/", {"form_id": "profile", "preferred_name": "X"}, follow=True)
 
         assert response.status_code == 200
-        assert response.context["form"] is not None
+        assert any("not linked" in str(m) for m in response.context["messages"])
 
-    def it_handles_post_and_redirects(client: Client):
-        User.objects.create_user(username="emailposter", password="pass")
-        client.login(username="emailposter", password="pass")
-
-        response = client.post("/settings/emails/", {})
-
-        assert response.status_code == 302
-
-    def it_shows_success_message_on_post(client: Client):
-        User.objects.create_user(username="emailmsg", password="pass")
-        client.login(username="emailmsg", password="pass")
-
-        response = client.post("/settings/emails/", {}, follow=True)
-
-        messages_list = list(response.context["messages"])
-        assert len(messages_list) == 1
-        assert "updated" in str(messages_list[0])
-
-    def it_re_renders_form_on_validation_error(client: Client, monkeypatch: pytest.MonkeyPatch):
-        User.objects.create_user(username="emailinvalid", password="pass")
-        client.login(username="emailinvalid", password="pass")
+    def it_re_renders_email_prefs_form_on_validation_error(client: Client, monkeypatch: pytest.MonkeyPatch):
+        User.objects.create_user(username="emailinvalid2", password="pass")
+        client.login(username="emailinvalid2", password="pass")
 
         from hub import forms
 
@@ -341,11 +347,113 @@ def describe_email_preferences():
 
         def patched_init(self, *args, **kwargs):
             original_init(self, *args, **kwargs)
-            if args:  # Only when bound (POST data passed)
+            if args:
                 self._errors = {"voting_results": ["Forced error"]}
 
         monkeypatch.setattr(forms.EmailPreferencesForm, "__init__", patched_init)
 
-        response = client.post("/settings/emails/", {})
+        response = client.post("/settings/", {"form_id": "email_prefs"})
 
         assert response.status_code == 200
+        assert response.context["prefs_form"].errors
+
+    def it_handles_email_prefs_post_and_redirects_to_emails_tab(client: Client):
+        User.objects.create_user(username="emailposter", password="pass")
+        client.login(username="emailposter", password="pass")
+
+        response = client.post("/settings/", {"form_id": "email_prefs"})
+
+        assert response.status_code == 302
+        assert "tab=emails" in response.url
+
+    def it_shows_success_message_on_email_prefs_post(client: Client):
+        User.objects.create_user(username="emailmsg", password="pass")
+        client.login(username="emailmsg", password="pass")
+
+        response = client.post("/settings/", {"form_id": "email_prefs"}, follow=True)
+
+        assert any("preferences updated" in str(m).lower() for m in response.context["messages"])
+
+    def it_seeds_primary_verified_state_from_primary_email(client: Client):
+        from allauth.account.models import EmailAddress
+
+        user = User.objects.create_user(username="primaryverified", email="v@example.com", password="pass")
+        EmailAddress.objects.filter(user=user).delete()
+        EmailAddress.objects.create(user=user, email="v@example.com", verified=True, primary=True)
+        client.login(username="primaryverified", password="pass")
+
+        response = client.get("/settings/?tab=emails")
+
+        assert response.context["primary_verified_json"] == "true"
+
+    def it_flags_unverified_primary_so_resend_button_shows(client: Client):
+        from allauth.account.models import EmailAddress
+
+        user = User.objects.create_user(username="unverifiedprimary", email="u@example.com", password="pass")
+        EmailAddress.objects.filter(user=user).delete()
+        EmailAddress.objects.create(user=user, email="u@example.com", verified=False, primary=True)
+        client.login(username="unverifiedprimary", password="pass")
+
+        response = client.get("/settings/?tab=emails")
+
+        assert response.context["primary_verified_json"] == "false"
+
+    def it_lists_user_email_addresses_in_context(client: Client):
+        from allauth.account.models import EmailAddress
+
+        user = User.objects.create_user(username="emaillist", email="primary@example.com", password="pass")
+        # The signup signal may auto-create an EmailAddress row; clear to start deterministic.
+        EmailAddress.objects.filter(user=user).delete()
+        EmailAddress.objects.create(user=user, email="primary@example.com", verified=True, primary=True)
+        EmailAddress.objects.create(user=user, email="alias@example.com", verified=True, primary=False)
+        client.login(username="emaillist", password="pass")
+
+        response = client.get("/settings/?tab=emails")
+
+        addrs = list(response.context["email_addresses"])
+        assert {a.email for a in addrs} == {"primary@example.com", "alias@example.com"}
+
+
+@pytest.mark.django_db
+def describe_legacy_settings_redirects():
+    def it_redirects_old_profile_path_to_user_settings(client: Client):
+        User.objects.create_user(username="legacyprofile", password="pass")
+        client.login(username="legacyprofile", password="pass")
+
+        response = client.get("/settings/profile/")
+
+        assert response.status_code == 302
+        assert response.url == "/settings/"
+
+    def it_redirects_old_emails_path_to_emails_tab(client: Client):
+        User.objects.create_user(username="legacyemails", password="pass")
+        client.login(username="legacyemails", password="pass")
+
+        response = client.get("/settings/emails/")
+
+        assert response.status_code == 302
+        assert response.url == "/settings/?tab=emails"
+
+    def it_redirects_allauth_account_email_get_to_emails_tab(client: Client):
+        User.objects.create_user(username="legacyallauth", password="pass")
+        client.login(username="legacyallauth", password="pass")
+
+        response = client.get("/accounts/email/")
+
+        assert response.status_code == 302
+        assert response.url == "/settings/?tab=emails"
+
+    def it_sends_email_action_post_back_to_emails_tab(client: Client):
+        """After allauth's EmailView handles add/remove/resend/primary, the user
+        should land on the Emails tab — not the Profile tab."""
+        from allauth.account.models import EmailAddress
+
+        user = User.objects.create_user(username="emailaction", email="me@example.com", password="pass")
+        EmailAddress.objects.filter(user=user).delete()
+        EmailAddress.objects.create(user=user, email="me@example.com", verified=True, primary=True)
+        client.login(username="emailaction", password="pass")
+
+        response = client.post("/accounts/email/", {"action_add": "", "email": "alias@example.com"})
+
+        assert response.status_code == 302
+        assert response.url == "/settings/?tab=emails"

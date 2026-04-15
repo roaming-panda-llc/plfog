@@ -470,6 +470,17 @@ class Guild(models.Model):
         return total
 
 
+class VotePreferenceQuerySet(models.QuerySet):
+    def from_signed_up_members(self) -> VotePreferenceQuerySet:
+        """Votes cast by members who have a linked User account.
+
+        Excludes VotePreferences created by Airtable backfill for members
+        who were imported but never signed up to the Django app. Only
+        signed-up members should influence live standings or snapshots.
+        """
+        return self.filter(member__user__isnull=False)
+
+
 class VotePreference(models.Model):
     """Persistent guild funding vote per member — updated anytime, one row per member."""
 
@@ -506,6 +517,8 @@ class VotePreference(models.Model):
         help_text="Third-choice guild (2 points).",
     )
     updated_at = models.DateTimeField(auto_now=True, help_text="When this vote was last changed.")
+
+    objects = VotePreferenceQuerySet.as_manager()
 
     class Meta:
         verbose_name = "Vote Preference"
@@ -606,12 +619,12 @@ class FundingSnapshot(models.Model):
         """
         from membership.vote_calculator import calculate_results
 
-        preferences = VotePreference.objects.select_related(
+        preferences = VotePreference.objects.from_signed_up_members().select_related(
             "member",
             "guild_1st",
             "guild_2nd",
             "guild_3rd",
-        ).all()
+        )
 
         if not preferences.exists():
             return None

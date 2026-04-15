@@ -3,6 +3,21 @@
 
 [x-cloak] { display: none !important; }
 
+/* Tab nav used in the voting standings card */
+.vote-tab {
+    padding: 0.625rem 1.25rem;
+    font-size: 0.9rem;
+    color: var(--hub-text-muted);
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+.vote-tab:hover { color: var(--hub-text); }
+.vote-tab--active { color: var(--color-tuscan-yellow, #EEB44B); border-bottom-color: var(--color-tuscan-yellow, #EEB44B); }
+
 /* ========================================
    HTMX Loading Indicator
    ======================================== */
@@ -248,6 +263,65 @@ a:hover { color: var(--color-yellow-hover); }
 .hub-sidebar__collapsible-inner {
     overflow: hidden;
 }
+
+/* Sidebar footer — pinned to bottom, reuses .hub-sidebar__link styling */
+.hub-sidebar__footer {
+    margin-top: auto;
+    padding: 0.75rem 0.5rem 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.hub-sidebar__footer-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(150, 172, 187, 0.7);
+    padding: 0.35rem 0.75rem 0.25rem;
+}
+
+.hub-sidebar__ext-icon {
+    margin-left: auto;
+    opacity: 0.45;
+    flex-shrink: 0;
+}
+
+.hub-sidebar__link--external:hover .hub-sidebar__ext-icon {
+    opacity: 0.85;
+}
+
+.hub-sidebar__link--feedback {
+    margin-top: 0.4rem;
+    border-top: 1px dashed rgba(255, 255, 255, 0.06);
+    padding-top: 0.75rem;
+}
+
+/* Email list used on the User Settings > Emails tab */
+.hub-email-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.hub-email-list__item label {
+    display: flex; align-items: center; gap: 0.6rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--hub-border);
+    border-radius: 6px;
+    cursor: pointer;
+}
+.hub-email-list__item label:hover { background-color: rgba(255, 255, 255, 0.03); }
+.hub-email-list__addr { flex: 1; font-family: var(--font-body); }
+
+.hub-pill {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    letter-spacing: 0.02em;
+}
+.hub-pill--ok { background: rgba(52, 211, 153, 0.15); color: #6ee7b7; }
+.hub-pill--warn { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+.hub-pill--primary { background: rgba(238, 180, 75, 0.15); color: var(--color-tuscan-yellow, #EEB44B); }
 
 /* ========================================
    Main Wrapper

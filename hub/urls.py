@@ -1,4 +1,5 @@
 from django.urls import path
+from django.views.generic import RedirectView
 
 from . import views
 
@@ -26,8 +27,18 @@ urlpatterns = [
         views.guild_product_delete,
         name="hub_guild_product_delete",
     ),
-    path("settings/profile/", views.profile_settings, name="hub_profile_settings"),
-    path("settings/emails/", views.email_preferences, name="hub_email_preferences"),
+    path("settings/", views.user_settings, name="hub_user_settings"),
+    # Old settings routes redirect to the tabbed User Settings page.
+    path(
+        "settings/profile/",
+        RedirectView.as_view(pattern_name="hub_user_settings", query_string=False, permanent=False),
+        name="hub_profile_settings",
+    ),
+    path(
+        "settings/emails/",
+        RedirectView.as_view(url="/settings/?tab=emails", permanent=False),
+        name="hub_email_preferences",
+    ),
     path("feedback/", views.beta_feedback, name="hub_beta_feedback"),
     path("tab/", views.tab_detail, name="hub_tab_detail"),
     path("tab/history/", views.tab_history, name="hub_tab_history"),

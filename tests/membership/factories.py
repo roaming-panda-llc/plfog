@@ -4,8 +4,11 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 import factory
+from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
+from django.db.models.signals import post_save
 from django.utils import timezone
+from factory.django import mute_signals
 
 from membership.models import (
     FundingSnapshot,
@@ -72,6 +75,22 @@ class VotePreferenceFactory(factory.django.DjangoModelFactory):
     guild_1st = factory.SubFactory(GuildFactory)
     guild_2nd = factory.SubFactory(GuildFactory)
     guild_3rd = factory.SubFactory(GuildFactory)
+
+    @factory.post_generation
+    def signed_up(obj, create, extracted, **kwargs):  # noqa: N805
+        """Ensure the voting member has a linked User by default.
+
+        Votes in production only exist for signed-up members; the live-standings
+        and snapshot queries now filter to those. Existing tests didn't create
+        Users, so we auto-link one here unless ``signed_up=False`` is passed to
+        exercise the exclusion path.
+        """
+        if not create or extracted is False or obj.member.user_id is not None:
+            return
+        with mute_signals(post_save):
+            user = User.objects.create_user(username=f"voter_{obj.member.pk}")
+        obj.member.user = user
+        obj.member.save(update_fields=["user"])
 
 
 class FundingSnapshotFactory(factory.django.DjangoModelFactory):

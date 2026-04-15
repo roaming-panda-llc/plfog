@@ -65,13 +65,17 @@ DEFAULT_MINIMUM_POOL = Decimal("1000")
 
 
 def _serialize_live_votes() -> list[dict[str, Any]]:
-    """Snapshot live VotePreference rows into the same shape as FundingSnapshot.raw_votes."""
-    preferences = VotePreference.objects.select_related(
+    """Snapshot live VotePreference rows into the same shape as FundingSnapshot.raw_votes.
+
+    Only includes votes from signed-up members (those with a linked User) —
+    see ``VotePreferenceQuerySet.from_signed_up_members``.
+    """
+    preferences = VotePreference.objects.from_signed_up_members().select_related(
         "member",
         "guild_1st",
         "guild_2nd",
         "guild_3rd",
-    ).all()
+    )
     return [
         {
             "member_id": pref.member_id,
