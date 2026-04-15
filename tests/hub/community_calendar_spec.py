@@ -134,3 +134,44 @@ def describe_calendar_service():
                 refresh_stale_sources(max_age_seconds=900)
             guild.refresh_from_db()
             assert guild.calendar_last_fetched_at >= timezone.now() - timedelta(seconds=5)
+
+
+def describe_GuildEditForm():
+    def it_saves_calendar_url_and_color():
+        from hub.forms import GuildEditForm
+
+        guild = GuildFactory()
+        form = GuildEditForm(
+            data={
+                "name": guild.name,
+                "about": "Some about text",
+                "calendar_url": "https://calendar.google.com/calendar/ical/test.ics",
+                "calendar_color": "#FF6B6B",
+            },
+            instance=guild,
+        )
+        assert form.is_valid(), form.errors
+        saved = form.save()
+        assert saved.calendar_url == "https://calendar.google.com/calendar/ical/test.ics"
+        assert saved.calendar_color == "#FF6B6B"
+
+    def it_accepts_empty_calendar_url():
+        from hub.forms import GuildEditForm
+
+        guild = GuildFactory()
+        form = GuildEditForm(
+            data={"name": guild.name, "about": "", "calendar_url": "", "calendar_color": "#4B9FEE"},
+            instance=guild,
+        )
+        assert form.is_valid(), form.errors
+
+    def it_rejects_invalid_calendar_url():
+        from hub.forms import GuildEditForm
+
+        guild = GuildFactory()
+        form = GuildEditForm(
+            data={"name": guild.name, "about": "", "calendar_url": "not-a-url", "calendar_color": "#4B9FEE"},
+            instance=guild,
+        )
+        assert not form.is_valid()
+        assert "calendar_url" in form.errors

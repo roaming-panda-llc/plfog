@@ -15,19 +15,32 @@ from membership.models import Guild, Member
 
 
 class GuildEditForm(forms.ModelForm):
-    """Edit form for a guild's public-facing name and description."""
+    """Edit form for a guild's public-facing fields, including calendar integration."""
 
     class Meta:
         model = Guild
-        fields = ["name", "about"]
+        fields = ["name", "about", "calendar_url", "calendar_color"]
         widgets = {
             "name": forms.TextInput(attrs={"placeholder": "Guild name"}),
             "about": forms.Textarea(
                 attrs={"rows": 5, "placeholder": "Tell members what this guild is about..."},
             ),
+            "calendar_url": forms.URLInput(attrs={"placeholder": "https://calendar.google.com/calendar/ical/..."}),
+            "calendar_color": forms.TextInput(
+                attrs={"type": "color", "style": "width: 56px; height: 36px; padding: 2px;"},
+            ),
         }
         labels = {
             "about": "About",
+            "calendar_url": "Google Calendar iCal URL",
+            "calendar_color": "Calendar Color",
+        }
+        help_texts = {
+            "calendar_url": (
+                "In Google Calendar → Settings → your calendar → 'Secret address in iCal format'. "
+                "Leave blank if you don't use Google Calendar."
+            ),
+            "calendar_color": "Color used for your guild's events on the Community Calendar.",
         }
 
 
