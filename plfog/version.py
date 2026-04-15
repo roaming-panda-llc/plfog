@@ -12,6 +12,7 @@ CHANGELOG: list[dict[str, str | list[str]]] = [
         "changes": [
             "You can now edit a product right from your guild page — click the small pencil on a product card and the same pop-up you use to add products opens up pre-filled with that product's name, price, and revenue split",
             "Saving updates the product in place — no need to delete and re-add it just to fix a typo or change the percentages",
+            "Product cards are cleaner — the 'Admin 20% · Guild 80%' split summary is hidden now that you can see and edit the same info from the product's edit pop-up",
         ],
     },
     {

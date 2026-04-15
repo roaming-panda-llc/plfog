@@ -157,11 +157,6 @@
             {% endif %}
             <div class="guild-product-card__name">{{ product.name }}</div>
             <div class="guild-product-card__price">${{ product.price }}</div>
-            {% if product.splits.all %}
-            <div class="guild-product-card__splits">
-                {% for split in product.splits.all %}{% if split.recipient_type == "admin" %}Admin{% else %}{{ split.guild.name }}{% endif %} {{ split.percent|floatformat:"-2" }}%{% if not forloop.last %} &middot; {% endif %}{% endfor %}
-            </div>
-            {% endif %}
             {% if tab and tab.can_add_entry %}
             <button type="button"
                     class="guild-product-card__add-btn"
