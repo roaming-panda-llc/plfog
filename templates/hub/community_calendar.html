@@ -1,1 +1,106 @@
-{% for e in events %}{{ e.title }}{% endfor %}Community Calendar
+{% extends "hub/base.html" %}
+{% load static hub_tags %}
+
+{% block title %}Community Calendar{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/calendar.css' %}">
+
+<div class="hub-page-header">
+    <h1 class="hub-page-title">Community Calendar</h1>
+</div>
+
+<div
+    x-data="{
+        calView: localStorage.getItem('calView') || 'week',
+        activeFilters: JSON.parse(localStorage.getItem('calFilters') || '{{ default_filters_json }}'),
+        setView(v) { this.calView = v; localStorage.setItem('calView', v); },
+        toggleFilter(key) {
+            if (this.activeFilters.includes(key)) {
+                this.activeFilters = this.activeFilters.filter(k => k !== key);
+            } else {
+                this.activeFilters.push(key);
+            }
+            localStorage.setItem('calFilters', JSON.stringify(this.activeFilters));
+        },
+        isActive(key) { return this.activeFilters.includes(key); }
+    }"
+    class="pl-calendar-page"
+>
+    {# ── Top bar ── #}
+    <div class="pl-calendar-topbar">
+        <div class="pl-calendar-topbar__left">
+            <div class="pl-calendar-view-toggle">
+                <button class="pl-calendar-view-toggle__btn"
+                        :class="{ 'pl-calendar-view-toggle__btn--active': calView === 'week' }"
+                        @click="setView('week')">Week</button>
+                <button class="pl-calendar-view-toggle__btn"
+                        :class="{ 'pl-calendar-view-toggle__btn--active': calView === 'month' }"
+                        @click="setView('month')">Month</button>
+            </div>
+        </div>
+        <div class="pl-calendar-topbar__right">
+            <div class="pl-calendar-clock"
+                 x-data="{ now: new Date() }"
+                 x-init="setInterval(() => now = new Date(), 1000)">
+                <span class="pl-calendar-clock__time"
+                      x-text="now.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'})"></span>
+                <span class="pl-calendar-clock__date"
+                      x-text="now.toLocaleDateString('en-US', {weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'})"></span>
+            </div>
+            <div class="pl-calendar-export" x-data="{ open: false }">
+                <button class="pl-btn pl-btn--secondary pl-btn--sm" @click="open = !open" @click.away="open = false">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Add to Calendar
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5l3 3 3-3"/></svg>
+                </button>
+                <div class="pl-calendar-export__dropdown" x-show="open" x-transition>
+                    <a href="{% url 'hub_calendar_export_ics' %}" class="pl-calendar-export__item" download>
+                        Download .ics (Apple / Outlook)
+                    </a>
+                    <a href="webcal://{{ request.get_host }}{% url 'hub_calendar_export_ics' %}"
+                       class="pl-calendar-export__item">
+                        Subscribe (webcal)
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ── Filter toggles ── #}
+    <div class="pl-calendar-filters">
+        {% if general_enabled %}
+        <button class="pl-calendar-filter"
+                :class="{ 'pl-calendar-filter--active': isActive('general') }"
+                @click="toggleFilter('general')"
+                style="--filter-color: {{ general_color }};">
+            <span class="pl-calendar-filter__dot" style="background: {{ general_color }};"></span>
+            General
+        </button>
+        {% endif %}
+        {% for guild in guilds_with_calendars %}
+        <button class="pl-calendar-filter"
+                :class="{ 'pl-calendar-filter--active': isActive('{{ guild.pk }}') }"
+                @click="toggleFilter('{{ guild.pk }}')"
+                style="--filter-color: {{ guild.calendar_color }};">
+            <span class="pl-calendar-filter__dot" style="background: {{ guild.calendar_color }};"></span>
+            {{ guild.name }}
+        </button>
+        {% endfor %}
+        {% if not general_enabled and not guilds_with_calendars %}
+        <p class="pl-calendar-empty-notice">No calendars configured yet. Guild officers can add a Google Calendar link from their guild page.</p>
+        {% endif %}
+    </div>
+
+    {# ── Calendar events area (HTMX auto-refresh every 5 min) ── #}
+    <div id="pl-calendar-events-area"
+         hx-get="{% url 'hub_community_calendar_events' %}"
+         hx-trigger="every 300s"
+         hx-swap="innerHTML">
+        {% include "hub/partials/calendar_content.html" %}
+    </div>
+
+</div>
+{% endblock %}
