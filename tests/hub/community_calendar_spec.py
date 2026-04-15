@@ -6,10 +6,12 @@ import textwrap
 from unittest.mock import MagicMock, patch
 
 import pytest
+from django.contrib.auth.models import User
+from django.test import Client
 from django.utils import timezone
 
 from membership.models import CalendarEvent
-from tests.membership.factories import GuildFactory
+from tests.membership.factories import GuildFactory, MembershipPlanFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -175,3 +177,87 @@ def describe_GuildEditForm():
         )
         assert not form.is_valid()
         assert "calendar_url" in form.errors
+
+
+def _logged_in_user(client: Client, *, username: str = "caluser") -> User:
+    MembershipPlanFactory()
+    user = User.objects.create_user(username=username, password="pass")
+    client.login(username=username, password="pass")
+    return user
+
+
+def describe_community_calendar_view():
+    def it_requires_login(client: Client):
+        response = client.get("/calendar/")
+        assert response.status_code == 302
+        assert "/accounts/login/" in response["Location"]
+
+    def it_renders_for_logged_in_user(client: Client):
+        _logged_in_user(client)
+        response = client.get("/calendar/")
+        assert response.status_code == 200
+        assert b"Community Calendar" in response.content
+
+    def it_shows_only_guilds_with_calendars_in_context(client: Client):
+        _logged_in_user(client, username="caluser2")
+        GuildFactory(name="Ceramics Guild", calendar_url="https://calendar.google.com/calendar/ical/a.ics")
+        GuildFactory(name="Woodshop")  # no calendar_url
+        response = client.get("/calendar/")
+        assert response.status_code == 200
+        guilds = response.context["guilds_with_calendars"]
+        names = [g.name for g in guilds]
+        assert "Ceramics Guild" in names
+        assert "Woodshop" not in names
+
+
+def describe_calendar_events_partial_view():
+    def it_returns_200_and_calls_refresh(client: Client):
+        _logged_in_user(client, username="caluser3")
+        with patch("hub.views.refresh_stale_sources") as mock_refresh:
+            response = client.get("/calendar/events/")
+        assert response.status_code == 200
+        mock_refresh.assert_called_once()
+
+    def it_renders_upcoming_events(client: Client):
+        from datetime import timedelta as td
+
+        _logged_in_user(client, username="caluser4")
+        guild = GuildFactory(name="Art Guild", calendar_url="https://example.com/cal.ics")
+        now = timezone.now()
+        CalendarEvent.objects.create(
+            guild=guild,
+            uid="test-001",
+            title="Life Drawing Session",
+            start_dt=now + td(days=1),
+            end_dt=now + td(days=1, hours=2),
+            fetched_at=now,
+        )
+        with patch("hub.views.refresh_stale_sources"):
+            response = client.get("/calendar/events/")
+        assert b"Life Drawing Session" in response.content
+
+
+def describe_calendar_export_ics_view():
+    def it_returns_ics_content_type(client: Client):
+        _logged_in_user(client, username="caluser5")
+        response = client.get("/calendar/export.ics")
+        assert response.status_code == 200
+        assert "text/calendar" in response["Content-Type"]
+
+    def it_includes_events_in_ics_output(client: Client):
+        from datetime import timedelta as td
+
+        _logged_in_user(client, username="caluser6")
+        guild = GuildFactory(name="Ceramics", calendar_url="https://example.com/a.ics")
+        now = timezone.now()
+        CalendarEvent.objects.create(
+            guild=guild,
+            uid="export-001",
+            title="Glaze Workshop",
+            start_dt=now + td(days=3),
+            end_dt=now + td(days=3, hours=2),
+            fetched_at=now,
+        )
+        response = client.get("/calendar/export.ics")
+        assert b"Glaze Workshop" in response.content
+        assert b"BEGIN:VEVENT" in response.content

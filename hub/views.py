@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, TypedDict
+
+from django.utils import timezone as dj_timezone
 
 from allauth.account.models import EmailAddress
 from django.contrib import messages
@@ -17,6 +19,7 @@ from django.views.decorators.http import require_POST, require_http_methods
 
 from billing.exceptions import NoPaymentMethodError, TabLimitExceededError, TabLockedError
 from billing.models import BillingSettings, Tab, TabCharge
+from hub.calendar_service import refresh_stale_sources
 from hub.forms import BetaFeedbackForm, EmailPreferencesForm, GuildEditForm, ProfileSettingsForm, VotePreferenceForm
 from membership.cycle import get_cycle_context
 from membership.models import FundingSnapshot, Guild, Member, VotePreference
@@ -698,3 +701,149 @@ def tab_history(request: HttpRequest) -> HttpResponse:
     charges = tab.charges.exclude(status=TabCharge.Status.PENDING).order_by("-created_at").prefetch_related("entries")
 
     return render(request, "hub/tab_history.html", {**ctx, "charges": charges})
+
+
+def _get_calendar_context(request: HttpRequest) -> dict[str, Any]:
+    """Build context for both the full calendar page and the HTMX partial."""
+    import calendar as _cal
+    from collections import defaultdict
+
+    from core.models import SiteConfiguration
+    from membership.models import CalendarEvent, Guild
+
+    now = dj_timezone.now()
+    today = now.date()
+    horizon = now + timedelta(days=90)
+
+    events = list(
+        CalendarEvent.objects.filter(start_dt__gte=now, start_dt__lte=horizon)
+        .select_related("guild")
+        .order_by("start_dt")
+    )
+
+    guilds_with_calendars = list(Guild.objects.filter(is_active=True, calendar_url__gt="").order_by("name"))
+
+    config = SiteConfiguration.load()
+    general_enabled = bool(config.general_calendar_url)
+    general_color = config.general_calendar_color
+
+    source_colors: dict[str, str] = {"general": general_color}
+    for g in guilds_with_calendars:
+        source_colors[str(g.pk)] = g.calendar_color
+
+    # Group events by date for calendar grid dots
+    events_by_date: dict = defaultdict(list)
+    for evt in events:
+        events_by_date[evt.start_dt.date()].append(evt)
+
+    # Week grid: 7 days starting from Monday of the current week
+    week_start = today - timedelta(days=today.weekday())
+    week_days = [
+        {
+            "date": week_start + timedelta(days=i),
+            "is_today": (week_start + timedelta(days=i)) == today,
+            "events": events_by_date.get(week_start + timedelta(days=i), []),
+        }
+        for i in range(7)
+    ]
+
+    # Month grid: current month padded to complete 7-column rows (Mon–Sun)
+    month_headers = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    first_of_month = today.replace(day=1)
+    leading = first_of_month.weekday()
+    last_day = _cal.monthrange(today.year, today.month)[1]
+    last_of_month = today.replace(day=last_day)
+    trailing = (6 - last_of_month.weekday()) % 7
+
+    month_days = []
+    for i in range(leading):
+        d = first_of_month - timedelta(days=leading - i)
+        month_days.append({"date": d, "is_today": False, "in_month": False, "events": events_by_date.get(d, [])})
+    for day_num in range(1, last_day + 1):
+        d = today.replace(day=day_num)
+        month_days.append({"date": d, "is_today": d == today, "in_month": True, "events": events_by_date.get(d, [])})
+    for i in range(1, trailing + 1):
+        d = last_of_month + timedelta(days=i)
+        month_days.append({"date": d, "is_today": False, "in_month": False, "events": events_by_date.get(d, [])})
+
+    return {
+        "events": events,
+        "guilds_with_calendars": guilds_with_calendars,
+        "general_enabled": general_enabled,
+        "general_color": general_color,
+        "source_colors": source_colors,
+        "week_days": week_days,
+        "month_days": month_days,
+        "month_headers": month_headers,
+        "now": now,
+    }
+
+
+@login_required
+def community_calendar(request: HttpRequest) -> HttpResponse:
+    """Community Calendar page — upcoming events from all guild and general calendars."""
+    import json as _json
+
+    ctx = _get_hub_context(request)
+    cal_ctx = _get_calendar_context(request)
+
+    default_filters = []
+    if cal_ctx["general_enabled"]:
+        default_filters.append("general")
+    for g in cal_ctx["guilds_with_calendars"]:
+        default_filters.append(str(g.pk))
+
+    cal_ctx["default_filters_json"] = _json.dumps(default_filters).replace('"', '\\"')
+    return render(request, "hub/community_calendar.html", {**ctx, **cal_ctx})
+
+
+@login_required
+def calendar_events_partial(request: HttpRequest) -> HttpResponse:
+    """HTMX partial — refreshes stale calendar sources and returns updated event HTML."""
+    refresh_stale_sources()
+    cal_ctx = _get_calendar_context(request)
+    return render(request, "hub/partials/calendar_content.html", cal_ctx)
+
+
+@login_required
+def calendar_export_ics(request: HttpRequest) -> HttpResponse:
+    """Download a combined iCal file of all upcoming events."""
+    from membership.models import CalendarEvent
+
+    now = dj_timezone.now()
+    horizon = now + timedelta(days=90)
+    events = (
+        CalendarEvent.objects.filter(start_dt__gte=now, start_dt__lte=horizon)
+        .select_related("guild")
+        .order_by("start_dt")
+    )
+
+    lines: list[str] = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Past Lives Makerspace//Community Calendar//EN",
+        "X-WR-CALNAME:Past Lives Community Calendar",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+    ]
+
+    for evt in events:
+        lines += [
+            "BEGIN:VEVENT",
+            f"UID:{evt.uid}",
+            f"SUMMARY:{evt.title}",
+            f"DTSTART:{evt.start_dt.strftime('%Y%m%dT%H%M%SZ')}",
+            f"DTEND:{evt.end_dt.strftime('%Y%m%dT%H%M%SZ')}",
+        ]
+        if evt.description:
+            lines.append(f"DESCRIPTION:{evt.description[:250]}")
+        if evt.location:
+            lines.append(f"LOCATION:{evt.location}")
+        lines.append("END:VEVENT")
+
+    lines.append("END:VCALENDAR")
+    ical_content = "\r\n".join(lines) + "\r\n"
+
+    response = HttpResponse(ical_content, content_type="text/calendar; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="past-lives-calendar.ics"'
+    return response
