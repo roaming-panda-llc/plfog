@@ -442,8 +442,8 @@ class Guild(models.Model):
     )
     calendar_color = models.CharField(
         max_length=7,
-        default="#4B9FEE",
         blank=True,
+        default="#4B9FEE",
         help_text="Hex color code for this guild's events on the Community Calendar (e.g. #4B9FEE).",
     )
     calendar_last_fetched_at = models.DateTimeField(
