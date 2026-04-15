@@ -200,10 +200,13 @@ def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Guild detail page — shows about text, active products, and cart interface."""
     from billing.forms import CONTEXT_MEMBER_GUILD_PAGE, TabItemForm
 
-    guild = get_object_or_404(Guild, pk=pk)
+    guild = get_object_or_404(
+        Guild.objects.prefetch_related("products__splits__guild"),
+        pk=pk,
+    )
     ctx = _get_hub_context(request)
     # TODO(splits): Task 6 reintroduces per-product visibility. For now show all products.
-    products = guild.products.order_by("name")
+    products = guild.products.order_by("name").prefetch_related("splits__guild")
     member = _get_member(request)
 
     tab: Tab | None = None
