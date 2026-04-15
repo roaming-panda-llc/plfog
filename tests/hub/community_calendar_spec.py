@@ -40,6 +40,57 @@ SAMPLE_ICAL = textwrap.dedent("""\
     END:VCALENDAR
 """).encode()
 
+# iCal with an all-day event (DATE value, not DATETIME) and a naive datetime event
+ALLDAY_ICAL = textwrap.dedent("""\
+    BEGIN:VCALENDAR
+    VERSION:2.0
+    PRODID:-//Test//Test//EN
+    BEGIN:VEVENT
+    UID:allday-001@test.com
+    SUMMARY:All Day Workshop
+    DTSTART;VALUE=DATE:20260510
+    DTEND;VALUE=DATE:20260511
+    END:VEVENT
+    END:VCALENDAR
+""").encode()
+
+# iCal with a naive (floating) datetime — no Z suffix, no TZID
+NAIVE_DATETIME_ICAL = textwrap.dedent("""\
+    BEGIN:VCALENDAR
+    VERSION:2.0
+    PRODID:-//Test//Test//EN
+    BEGIN:VEVENT
+    UID:naive-001@test.com
+    SUMMARY:Floating Event
+    DTSTART:20260515T100000
+    DTEND:20260515T120000
+    END:VEVENT
+    END:VCALENDAR
+""").encode()
+
+# iCal with an event missing UID and one missing DTSTART — both should be skipped
+SKIP_CASES_ICAL = textwrap.dedent("""\
+    BEGIN:VCALENDAR
+    VERSION:2.0
+    PRODID:-//Test//Test//EN
+    BEGIN:VEVENT
+    SUMMARY:No UID Event
+    DTSTART:20260520T100000Z
+    DTEND:20260520T120000Z
+    END:VEVENT
+    BEGIN:VEVENT
+    UID:no-dtstart-001@test.com
+    SUMMARY:No DTSTART Event
+    END:VEVENT
+    BEGIN:VEVENT
+    UID:valid-001@test.com
+    SUMMARY:Valid Event
+    DTSTART:20260521T100000Z
+    DTEND:20260521T120000Z
+    END:VEVENT
+    END:VCALENDAR
+""").encode()
+
 
 def _fake_urlopen(url, **kwargs):
     mock_response = MagicMock()
@@ -47,6 +98,17 @@ def _fake_urlopen(url, **kwargs):
     mock_response.__enter__ = lambda s: s
     mock_response.__exit__ = MagicMock(return_value=False)
     return mock_response
+
+
+def _make_urlopen(ical_bytes: bytes):
+    def _fake(url, **kwargs):
+        mock_response = MagicMock()
+        mock_response.read.return_value = ical_bytes
+        mock_response.__enter__ = lambda s: s
+        mock_response.__exit__ = MagicMock(return_value=False)
+        return mock_response
+
+    return _fake
 
 
 def describe_calendar_service():
@@ -89,6 +151,39 @@ def describe_calendar_service():
             guild = GuildFactory(calendar_url="")
             count = sync_guild_calendar(guild)
             assert count == 0
+
+        def it_handles_all_day_events():
+            from hub.calendar_service import sync_guild_calendar
+
+            guild = GuildFactory(calendar_url="https://calendar.google.com/calendar/ical/test.ics")
+            with patch("hub.calendar_service.urllib.request.urlopen", side_effect=_make_urlopen(ALLDAY_ICAL)):
+                count = sync_guild_calendar(guild)
+            assert count == 1
+            event = CalendarEvent.objects.get(guild=guild)
+            assert event.all_day is True
+            assert event.title == "All Day Workshop"
+
+        def it_handles_naive_datetime_events():
+            from hub.calendar_service import sync_guild_calendar
+
+            guild = GuildFactory(calendar_url="https://calendar.google.com/calendar/ical/test.ics")
+            with patch("hub.calendar_service.urllib.request.urlopen", side_effect=_make_urlopen(NAIVE_DATETIME_ICAL)):
+                count = sync_guild_calendar(guild)
+            assert count == 1
+            event = CalendarEvent.objects.get(guild=guild)
+            assert event.title == "Floating Event"
+            assert event.start_dt.tzinfo is not None
+
+        def it_skips_events_with_empty_uid_or_missing_dtstart():
+            from hub.calendar_service import sync_guild_calendar
+
+            guild = GuildFactory(calendar_url="https://calendar.google.com/calendar/ical/test.ics")
+            with patch("hub.calendar_service.urllib.request.urlopen", side_effect=_make_urlopen(SKIP_CASES_ICAL)):
+                count = sync_guild_calendar(guild)
+            # Only the one event with UID and DTSTART should be created
+            assert count == 1
+            assert CalendarEvent.objects.filter(guild=guild).count() == 1
+            assert CalendarEvent.objects.get(guild=guild).title == "Valid Event"
 
     def describe_sync_general_calendar():
         def it_creates_general_events_with_null_guild():
@@ -136,6 +231,72 @@ def describe_calendar_service():
                 refresh_stale_sources(max_age_seconds=900)
             guild.refresh_from_db()
             assert guild.calendar_last_fetched_at >= timezone.now() - timedelta(seconds=5)
+
+        def it_swallows_exceptions_from_stale_guild_sync():
+            from datetime import timedelta
+
+            from hub.calendar_service import refresh_stale_sources
+
+            stale_time = timezone.now() - timedelta(seconds=1000)
+            GuildFactory(
+                calendar_url="https://example.com/broken.ics",
+                calendar_last_fetched_at=stale_time,
+            )
+            with patch("hub.calendar_service.sync_guild_calendar", side_effect=RuntimeError("network error")):
+                # Should not raise — exceptions are swallowed
+                refresh_stale_sources(max_age_seconds=900)
+
+        def it_refreshes_stale_general_calendar():
+            from datetime import timedelta
+
+            from core.models import SiteConfiguration
+            from hub.calendar_service import refresh_stale_sources
+
+            config = SiteConfiguration.load()
+            config.general_calendar_url = "https://example.com/general.ics"
+            config.general_calendar_last_fetched_at = timezone.now() - timedelta(seconds=1000)
+            config.save()
+            with patch("hub.calendar_service.urllib.request.urlopen", side_effect=_fake_urlopen):
+                refresh_stale_sources(max_age_seconds=900)
+            config.refresh_from_db()
+            assert config.general_calendar_last_fetched_at >= timezone.now() - timedelta(seconds=5)
+
+        def it_refreshes_general_calendar_never_fetched():
+            from core.models import SiteConfiguration
+            from hub.calendar_service import refresh_stale_sources
+
+            config = SiteConfiguration.load()
+            config.general_calendar_url = "https://example.com/general2.ics"
+            config.general_calendar_last_fetched_at = None
+            config.save()
+            with patch("hub.calendar_service.urllib.request.urlopen", side_effect=_fake_urlopen):
+                refresh_stale_sources(max_age_seconds=900)
+            config.refresh_from_db()
+            assert config.general_calendar_last_fetched_at is not None
+
+        def it_swallows_exceptions_from_stale_general_sync():
+            from core.models import SiteConfiguration
+            from hub.calendar_service import refresh_stale_sources
+
+            config = SiteConfiguration.load()
+            config.general_calendar_url = "https://example.com/broken-general.ics"
+            config.general_calendar_last_fetched_at = None
+            config.save()
+            with patch("hub.calendar_service.sync_general_calendar", side_effect=RuntimeError("network error")):
+                # Should not raise — exceptions are swallowed
+                refresh_stale_sources(max_age_seconds=900)
+
+        def it_skips_general_calendar_fetched_recently():
+            from core.models import SiteConfiguration
+            from hub.calendar_service import refresh_stale_sources
+
+            config = SiteConfiguration.load()
+            config.general_calendar_url = "https://example.com/recent-general.ics"
+            config.general_calendar_last_fetched_at = timezone.now()
+            config.save()
+            with patch("hub.calendar_service.urllib.request.urlopen", side_effect=_fake_urlopen) as mock_open:
+                refresh_stale_sources(max_age_seconds=900)
+            mock_open.assert_not_called()
 
 
 def describe_GuildEditForm():
