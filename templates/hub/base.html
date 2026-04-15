@@ -187,6 +187,7 @@
                     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
                 </svg>
             </button>
+            {% if user.is_authenticated %}
             <div class="pl-profile" x-data="{ open: false }">
                 <button class="pl-profile__avatar" @click="open = !open" :aria-expanded="open" @keydown.escape.window="if (open) { open = false; $el.focus() }" aria-label="User menu">
                     {{ user_initials }}
@@ -201,6 +202,9 @@
                     <a href="{% url 'account_logout' %}" class="pl-profile__dropdown-item pl-profile__dropdown-item--danger" role="menuitem" hx-boost="false">Log Out</a>
                 </div>
             </div>
+            {% else %}
+            <a href="{% url 'account_login' %}" class="pl-btn pl-btn--secondary pl-btn--sm" hx-boost="false">Log In</a>
+            {% endif %}
         </header>
 
         <main class="hub-content">

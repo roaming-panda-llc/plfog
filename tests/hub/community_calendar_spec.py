@@ -368,10 +368,10 @@ def _logged_in_user(client: Client, *, username: str = "caluser") -> User:
 
 
 def describe_community_calendar_view():
-    def it_requires_login(client: Client):
+    def it_returns_200_for_anonymous_user(client: Client):
         response = client.get("/calendar/")
-        assert response.status_code == 302
-        assert "/accounts/login/" in response["Location"]
+        assert response.status_code == 200
+        assert b"Community Calendar" in response.content
 
     def it_renders_for_logged_in_user(client: Client):
         _logged_in_user(client)
@@ -406,7 +406,6 @@ def describe_community_calendar_view():
 
 def describe_calendar_events_partial_view():
     def it_returns_200_and_calls_refresh(client: Client):
-        _logged_in_user(client, username="caluser3")
         with patch("hub.views.refresh_stale_sources") as mock_refresh:
             response = client.get("/calendar/events/")
         assert response.status_code == 200
@@ -477,7 +476,6 @@ def describe_calendar_events_partial_view():
 
 def describe_calendar_export_ics_view():
     def it_returns_ics_content_type(client: Client):
-        _logged_in_user(client, username="caluser5")
         response = client.get("/calendar/export.ics")
         assert response.status_code == 200
         assert "text/calendar" in response["Content-Type"]

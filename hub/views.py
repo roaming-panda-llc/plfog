@@ -835,7 +835,6 @@ def _get_calendar_context(
     }
 
 
-@login_required
 def community_calendar(request: HttpRequest) -> HttpResponse:
     """Community Calendar page — upcoming events from all guild and general calendars."""
     ctx = _get_hub_context(request)
@@ -853,7 +852,6 @@ def community_calendar(request: HttpRequest) -> HttpResponse:
     return render(request, "hub/community_calendar.html", {**ctx, **cal_ctx})
 
 
-@login_required
 def calendar_events_partial(request: HttpRequest) -> HttpResponse:
     """HTMX partial — refreshes stale calendar sources and returns updated event HTML."""
     refresh_stale_sources()
@@ -877,7 +875,6 @@ def _ical_escape(value: str) -> str:
     return value
 
 
-@login_required
 def calendar_export_ics(request: HttpRequest) -> HttpResponse:
     """Download a combined iCal file of all upcoming events."""
     from membership.models import CalendarEvent
