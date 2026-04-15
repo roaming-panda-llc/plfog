@@ -584,6 +584,11 @@ def user_settings(request: HttpRequest) -> HttpResponse:
     primary_email = next((ea for ea in email_addresses if ea.primary), None)
     primary_verified_json = "true" if primary_email is None or primary_email.verified else "false"
 
+    # Whitelist the tab param — it flows into an Alpine x-data JS expression, so
+    # HTML escaping alone isn't enough to stop a payload like ?tab='+alert(1)+'.
+    tab_param = request.GET.get("tab", "profile")
+    active_tab = tab_param if tab_param in {"profile", "emails"} else "profile"
+
     if member is None and request.method == "GET" and not request.GET.get("tab"):
         messages.info(request, "Your account is not linked to a membership.")
 
@@ -598,7 +603,7 @@ def user_settings(request: HttpRequest) -> HttpResponse:
             "add_email_form": add_email_form,
             "email_addresses": email_addresses,
             "primary_verified_json": primary_verified_json,
-            "active_tab": request.GET.get("tab", "profile"),
+            "active_tab": active_tab,
         },
     )
 

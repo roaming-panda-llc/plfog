@@ -228,6 +228,19 @@ def describe_user_settings():
 
         assert response.context["active_tab"] == "emails"
 
+    def it_falls_back_to_profile_when_tab_param_is_not_whitelisted(client: Client):
+        """Regression: ``active_tab`` flows into an Alpine x-data JS expression,
+        so raw user input must not reach the template — arbitrary values are
+        coerced back to ``profile`` to prevent XSS."""
+        User.objects.create_user(username="xssguard", password="pass")
+        client.login(username="xssguard", password="pass")
+
+        response = client.get("/settings/?tab=%27%2Balert(1)%2B%27")
+
+        assert response.context["active_tab"] == "profile"
+        # And the raw payload never lands in the rendered HTML.
+        assert b"alert(1)" not in response.content
+
     def it_renders_with_no_member_linked(client: Client):
         user = User.objects.create_user(username="nomember", password="pass")
         client.login(username="nomember", password="pass")
@@ -426,6 +439,21 @@ def describe_legacy_settings_redirects():
         client.login(username="legacyallauth", password="pass")
 
         response = client.get("/accounts/email/")
+
+        assert response.status_code == 302
+        assert response.url == "/settings/?tab=emails"
+
+    def it_sends_email_action_post_back_to_emails_tab(client: Client):
+        """After allauth's EmailView handles add/remove/resend/primary, the user
+        should land on the Emails tab — not the Profile tab."""
+        from allauth.account.models import EmailAddress
+
+        user = User.objects.create_user(username="emailaction", email="me@example.com", password="pass")
+        EmailAddress.objects.filter(user=user).delete()
+        EmailAddress.objects.create(user=user, email="me@example.com", verified=True, primary=True)
+        client.login(username="emailaction", password="pass")
+
+        response = client.post("/accounts/email/", {"action_add": "", "email": "alias@example.com"})
 
         assert response.status_code == 302
         assert response.url == "/settings/?tab=emails"

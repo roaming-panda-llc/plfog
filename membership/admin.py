@@ -274,7 +274,10 @@ class PayingMemberFilter(admin.SimpleListFilter):
 
 @admin.register(VotePreference)
 class VotePreferenceAdmin(ModelAdmin):
-    list_display = ["member", "guild_1st", "guild_2nd", "guild_3rd", "updated_at", "snapshots_participated"]
+    # Per-row counts were deliberately dropped from list_display: they required
+    # a full FundingSnapshot.raw_votes scan per row, which scales as O(rows × snapshots)
+    # on every changelist load. Per-member history lives on the change view instead.
+    list_display = ["member", "guild_1st", "guild_2nd", "guild_3rd", "updated_at"]
     list_filter = [PayingMemberFilter]
     search_fields = ["member__full_legal_name", "member__preferred_name"]
     readonly_fields = ["voting_history"]
@@ -291,11 +294,6 @@ class VotePreferenceAdmin(ModelAdmin):
         if obj is not None:
             return (*base, "updated_at")
         return base
-
-    @admin.display(description="Snapshots")
-    def snapshots_participated(self, obj: VotePreference) -> str:
-        """Count of snapshots where this member's vote appears (for list view)."""
-        return str(_count_member_snapshots(obj.member_id))
 
     @admin.display(description="Past votes from funding snapshots")
     def voting_history(self, obj: VotePreference) -> str:
@@ -336,15 +334,6 @@ class VotePreferenceAdmin(ModelAdmin):
         return mark_safe(  # noqa: S308
             f"<table style='border-collapse:collapse;width:100%'><thead>{header}</thead><tbody>{body}</tbody></table>"
         )
-
-
-def _count_member_snapshots(member_id: int) -> int:
-    """Count snapshots whose raw_votes contain this member."""
-    total = 0
-    for snap in FundingSnapshot.objects.only("raw_votes").iterator():
-        if any(v.get("member_id") == member_id for v in snap.raw_votes or []):
-            total += 1
-    return total
 
 
 def _member_snapshot_rows(member_id: int) -> list[tuple]:
