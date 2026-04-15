@@ -782,8 +782,6 @@ def _get_calendar_context(request: HttpRequest) -> dict[str, Any]:
 @login_required
 def community_calendar(request: HttpRequest) -> HttpResponse:
     """Community Calendar page — upcoming events from all guild and general calendars."""
-    import json as _json
-
     ctx = _get_hub_context(request)
     cal_ctx = _get_calendar_context(request)
 
@@ -793,7 +791,7 @@ def community_calendar(request: HttpRequest) -> HttpResponse:
     for g in cal_ctx["guilds_with_calendars"]:
         default_filters.append(str(g.pk))
 
-    cal_ctx["default_filters_json"] = _json.dumps(default_filters).replace('"', '\\"')
+    cal_ctx["default_filters_json"] = json.dumps(default_filters).replace('"', '\\"')
     return render(request, "hub/community_calendar.html", {**ctx, **cal_ctx})
 
 
