@@ -314,6 +314,36 @@ def describe_user_settings():
         member.refresh_from_db()
         assert member.pronouns == "she/her"
 
+    def it_errors_and_redirects_when_profile_post_has_no_member(client: Client):
+        user = User.objects.create_user(username="profilenolink", password="pass")
+        client.login(username="profilenolink", password="pass")
+        Member.objects.filter(user=user).delete()
+
+        response = client.post("/settings/", {"form_id": "profile", "preferred_name": "X"}, follow=True)
+
+        assert response.status_code == 200
+        assert any("not linked" in str(m) for m in response.context["messages"])
+
+    def it_re_renders_email_prefs_form_on_validation_error(client: Client, monkeypatch: pytest.MonkeyPatch):
+        User.objects.create_user(username="emailinvalid2", password="pass")
+        client.login(username="emailinvalid2", password="pass")
+
+        from hub import forms
+
+        original_init = forms.EmailPreferencesForm.__init__
+
+        def patched_init(self, *args, **kwargs):
+            original_init(self, *args, **kwargs)
+            if args:
+                self._errors = {"voting_results": ["Forced error"]}
+
+        monkeypatch.setattr(forms.EmailPreferencesForm, "__init__", patched_init)
+
+        response = client.post("/settings/", {"form_id": "email_prefs"})
+
+        assert response.status_code == 200
+        assert response.context["prefs_form"].errors
+
     def it_handles_email_prefs_post_and_redirects_to_emails_tab(client: Client):
         User.objects.create_user(username="emailposter", password="pass")
         client.login(username="emailposter", password="pass")

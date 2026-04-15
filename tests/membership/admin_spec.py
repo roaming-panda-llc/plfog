@@ -361,6 +361,17 @@ def describe_VotePreferenceAdmin_history():
 
         assert b"No snapshots recorded yet" in resp.content
 
+    def it_omits_history_section_and_readonly_updated_at_on_add_view(db):
+        pref_admin = admin.site._registry[VotePreference]
+        request = MagicMock()
+
+        fieldsets = pref_admin.get_fieldsets(request, obj=None)
+        readonly = pref_admin.get_readonly_fields(request, obj=None)
+
+        section_names = [name for name, _ in fieldsets]
+        assert section_names == ["Current Vote"]
+        assert "updated_at" not in readonly
+
     def it_shows_snapshot_count_in_list_view(admin_client):
         g1, g2, g3 = GuildFactory(), GuildFactory(), GuildFactory()
         member = MemberFactory(full_legal_name="Countable Cal")
