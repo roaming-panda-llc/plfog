@@ -139,10 +139,14 @@ def _compute_live_standings() -> list[VoteStanding]:
     signed_up_1st = Q(first_choice_votes__member__user__isnull=False)
     signed_up_2nd = Q(second_choice_votes__member__user__isnull=False)
     signed_up_3rd = Q(third_choice_votes__member__user__isnull=False)
+    # distinct=True is essential: annotating three reverse-FK Counts on the same
+    # queryset cross-joins first/second/third_choice_votes, so without distinct
+    # each Count is multiplied by the other two. A guild with 1/2/3 first/second/
+    # third-place votes would show 6/6/6 and score 60 points instead of 17.
     guilds = Guild.objects.filter(is_active=True).annotate(
-        first=Count("first_choice_votes", filter=signed_up_1st),
-        second=Count("second_choice_votes", filter=signed_up_2nd),
-        third=Count("third_choice_votes", filter=signed_up_3rd),
+        first=Count("first_choice_votes", filter=signed_up_1st, distinct=True),
+        second=Count("second_choice_votes", filter=signed_up_2nd, distinct=True),
+        third=Count("third_choice_votes", filter=signed_up_3rd, distinct=True),
     )
 
     results: list[VoteStanding] = []
@@ -176,10 +180,12 @@ def _compute_new_votes_since(since: datetime | None) -> list[VoteStanding]:
         second_q &= Q(second_choice_votes__updated_at__gt=since)
         third_q &= Q(third_choice_votes__updated_at__gt=since)
 
+    # See note on distinct=True in _compute_live_standings — same cross-join
+    # multiplication applies here.
     guilds = Guild.objects.filter(is_active=True).annotate(
-        first=Count("first_choice_votes", filter=first_q),
-        second=Count("second_choice_votes", filter=second_q),
-        third=Count("third_choice_votes", filter=third_q),
+        first=Count("first_choice_votes", filter=first_q, distinct=True),
+        second=Count("second_choice_votes", filter=second_q, distinct=True),
+        third=Count("third_choice_votes", filter=third_q, distinct=True),
     )
 
     results: list[VoteStanding] = []

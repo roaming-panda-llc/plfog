@@ -534,6 +534,32 @@ def describe_compute_live_standings():
         assert "Backfill Only" not in names
         assert names == {"Signed Up Pick", "Signed Up 2nd", "Signed Up 3rd"}
 
+    def it_does_not_cross_multiply_counts_when_one_guild_appears_at_multiple_ranks():
+        """Regression: three Count annotations cross-joined reverse FKs and multiplied.
+
+        With 1 first-place, 2 second-place, and 3 third-place votes for the same
+        guild, the raw JOIN produced 1*2*3 = 6 rows; each un-distinct Count
+        returned 6, yielding 6*5 + 6*3 + 6*2 = 60 instead of 1*5 + 2*3 + 3*2 = 17.
+        """
+        target = GuildFactory(name="Popular Across Ranks")
+        # Filler guilds so each VotePreference has three distinct slots.
+        fillers = [GuildFactory(name=f"Filler {i}") for i in range(6)]
+
+        # 1 first-place vote for target
+        VotePreferenceFactory(guild_1st=target, guild_2nd=fillers[0], guild_3rd=fillers[1])
+        # 2 second-place votes for target
+        VotePreferenceFactory(guild_1st=fillers[0], guild_2nd=target, guild_3rd=fillers[1])
+        VotePreferenceFactory(guild_1st=fillers[1], guild_2nd=target, guild_3rd=fillers[2])
+        # 3 third-place votes for target
+        VotePreferenceFactory(guild_1st=fillers[2], guild_2nd=fillers[3], guild_3rd=target)
+        VotePreferenceFactory(guild_1st=fillers[3], guild_2nd=fillers[4], guild_3rd=target)
+        VotePreferenceFactory(guild_1st=fillers[4], guild_2nd=fillers[5], guild_3rd=target)
+
+        result = _compute_live_standings()
+
+        by_name = {r["guild_name"]: r for r in result}
+        assert by_name["Popular Across Ranks"]["total_points"] == 1 * 5 + 2 * 3 + 3 * 2
+
 
 # ---------------------------------------------------------------------------
 # describe_compute_new_votes_since

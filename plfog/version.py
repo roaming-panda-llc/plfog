@@ -2,15 +2,22 @@
 
 from __future__ import annotations
 
-VERSION = "1.5.6"
+VERSION = "1.5.7"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.5.7",
+        "date": "2026-04-15",
+        "title": "Current Vote Standings — real totals",
+        "changes": [
+            "Current Vote Standings now show the real point totals — a guild that picked up votes at multiple ranks (say, one 1st, two 2nds, and three 3rds) was being displayed with those counts multiplied together instead of added, so some guilds were appearing at 60 points when the actual total was 17. Fixed on the Guild Voting page and the admin dashboard",
+        ],
+    },
     {
         "version": "1.5.6",
         "date": "2026-04-15",
         "title": "Voting hotfixes, User Settings, and sidebar polish",
         "changes": [
-            "Current Vote Standings no longer inflate — we were counting old Airtable votes from members who never signed up to FOG. Now only votes from signed-up members count toward live standings, funding snapshots, and the admin dashboard",
             "The Guild Voting page is now split into three tabs: Current Standings (live points), New Votes This Month (only votes cast or changed since the last snapshot), and Last Month's Results (the most recent snapshot with funding breakdown)",
             "Your vote still rolls over automatically every cycle — once you've submitted it, it stays in place and keeps counting until you change it",
             "The admin Voting Preferences page now shows a per-member voting history pulled from past snapshots, so you can audit how anyone's picks contributed to the totals cycle by cycle",
