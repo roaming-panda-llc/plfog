@@ -23,3 +23,23 @@ def describe_Guild_calendar_fields():
     def it_calendar_last_fetched_at_defaults_to_null():
         guild = GuildFactory()
         assert guild.calendar_last_fetched_at is None
+
+
+def describe_SiteConfiguration_calendar_fields():
+    def it_has_default_general_calendar_color():
+        from core.models import SiteConfiguration
+
+        config = SiteConfiguration.load()
+        assert config.general_calendar_color == "#EEB44B"
+
+    def it_general_calendar_url_defaults_to_blank():
+        from core.models import SiteConfiguration
+
+        config = SiteConfiguration.load()
+        assert config.general_calendar_url == ""
+
+    def it_general_calendar_last_fetched_at_defaults_to_null():
+        from core.models import SiteConfiguration
+
+        config = SiteConfiguration.load()
+        assert config.general_calendar_last_fetched_at is None

@@ -40,6 +40,24 @@ class SiteConfiguration(models.Model):
         default=RegistrationMode.INVITE_ONLY,
         help_text="Open — anyone can sign up. Invite Only — only people with an invite can register.",
     )
+    general_calendar_url = models.URLField(
+        blank=True,
+        default="",
+        verbose_name="General Calendar iCal URL",
+        help_text="Public iCal URL for the general makerspace calendar. Paste the 'Secret address in iCal format' from Google Calendar settings.",
+    )
+    general_calendar_color = models.CharField(
+        max_length=7,
+        blank=True,
+        default="#EEB44B",
+        verbose_name="General Calendar Color",
+        help_text="Hex color for general makerspace events on the Community Calendar (e.g. #EEB44B).",
+    )
+    general_calendar_last_fetched_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the general calendar was last synced. Set by the calendar service.",
+    )
 
     class Meta:
         verbose_name = "Site Settings"
