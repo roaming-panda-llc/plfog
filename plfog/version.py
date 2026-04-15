@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
-VERSION = "1.6.1"
+VERSION = "1.6.2"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.6.2",
+        "date": "2026-04-15",
+        "title": "Fix: login page CSS broken after navigating from the hub",
+        "changes": [
+            "Fixed a bug where navigating to a protected page with an expired session would redirect you to the login page with completely broken styles — it now does a proper full-page load so the login page looks correct",
+        ],
+    },
     {
         "version": "1.6.1",
         "date": "2026-04-15",
