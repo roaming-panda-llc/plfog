@@ -11,7 +11,7 @@ from django.test import Client
 
 from unittest.mock import patch
 
-from billing.exceptions import TabLockedError
+from billing.exceptions import TabLimitExceededError, TabLockedError
 from billing.models import TabEntry
 from tests.billing.factories import BillingSettingsFactory, ProductFactory, TabFactory
 from tests.membership.factories import GuildFactory, MembershipPlanFactory
@@ -176,11 +176,37 @@ def describe_guild_eyop_form():
         assert response.status_code == 200
         assert b"description" in response.content.lower() or b"Description" in response.content
 
-    # TODO(splits): rewrite in Task 7 — EYOP (enter-your-own-price) is a
-    # custom entry which now needs an explicit splits payload. Task 7 rebuilds
-    # the form to attach the fixed guild at 80% + admin at 20% automatically.
-    # def it_creates_entry_on_post(client: Client): ...
-    # def it_creates_n_entries_when_quantity_is_n(client: Client): ...
+    def it_creates_entry_on_post(client: Client):
+        BillingSettingsFactory()
+        guild = GuildFactory()
+        _user, tab = _linked_user(client, username="eyop_post")
+
+        response = client.post(
+            f"/guilds/{guild.pk}/eyop-form/",
+            {"description": "Custom thing", "amount": "12.50", "quantity": "1"},
+        )
+
+        assert response.status_code == 204
+        entries = TabEntry.objects.filter(tab=tab)
+        assert entries.count() == 1
+        entry = entries.first()
+        assert entry.description == "Custom thing"
+        assert entry.amount == Decimal("12.50")
+        # Auto-constructed splits: admin + the fixed guild
+        assert entry.splits.count() == 2
+
+    def it_creates_n_entries_when_quantity_is_n(client: Client):
+        BillingSettingsFactory()
+        guild = GuildFactory()
+        _user, tab = _linked_user(client, username="eyop_qty")
+
+        response = client.post(
+            f"/guilds/{guild.pk}/eyop-form/",
+            {"description": "Bulk", "amount": "3.00", "quantity": "3"},
+        )
+
+        assert response.status_code == 204
+        assert TabEntry.objects.filter(tab=tab).count() == 3
 
     def it_requires_login(client: Client):
         guild = GuildFactory()
@@ -201,10 +227,38 @@ def describe_guild_eyop_form():
         )
         assert response.status_code == 400
 
-    # TODO(splits): rewrite in Task 7 — same as above. These mock the
-    # Tab.add_entry call path, which is now required to carry splits.
-    # def it_returns_error_when_tab_locked(client: Client): ...
-    # def it_returns_error_when_tab_limit_exceeded(client: Client): ...
+    def it_returns_error_when_tab_locked(client: Client):
+        BillingSettingsFactory()
+        guild = GuildFactory()
+        _user, _tab = _linked_user(client, username="eyop_locked")
+
+        with patch("billing.models.Tab.add_entry", side_effect=TabLockedError("locked")):
+            response = client.post(
+                f"/guilds/{guild.pk}/eyop-form/",
+                {"description": "x", "amount": "1.00", "quantity": "1"},
+            )
+
+        assert response.status_code == 400
+        trigger = json.loads(response["HX-Trigger"])
+        assert trigger["showToast"]["type"] == "error"
+
+    def it_returns_error_when_tab_limit_exceeded(client: Client):
+        BillingSettingsFactory()
+        guild = GuildFactory()
+        _user, _tab = _linked_user(client, username="eyop_over")
+
+        with patch(
+            "billing.models.Tab.add_entry",
+            side_effect=TabLimitExceededError("over limit"),
+        ):
+            response = client.post(
+                f"/guilds/{guild.pk}/eyop-form/",
+                {"description": "x", "amount": "1.00", "quantity": "1"},
+            )
+
+        assert response.status_code == 400
+        trigger = json.loads(response["HX-Trigger"])
+        assert trigger["showToast"]["type"] == "error"
 
     def it_re_renders_form_on_validation_error(client: Client):
         BillingSettingsFactory()

@@ -1,11 +1,4 @@
-"""Forms for billing admin operations and tab-item entry.
-
-Note: during the v1.7 product-revenue-splits refactor the ``TabItemForm`` is
-degraded. The old ``admin_percent`` / ``split_equally`` fields are gone; Task 7
-rebuilds a proper splits UI. In the meantime, custom (non-product) entries
-raise ``NotImplementedError`` because the new revenue-split contract has no
-legacy single-guild fallback.
-"""
+"""Forms for billing admin operations and tab-item entry."""
 
 from __future__ import annotations
 
@@ -53,12 +46,18 @@ def _user_can_edit_split(user: UserLike) -> bool:
 
 
 class TabItemForm(forms.Form):
-    """Unified tab-item entry form — degraded during v1.7 refactor.
+    """Unified tab-item entry form for admin and member contexts.
 
-    The ``admin_percent`` and ``split_equally`` fields have been removed;
-    Task 7 rewrites this form on top of ``ProductRevenueSplit``. Only product
-    entries are supported while the refactor is in flight; custom entries
-    raise ``NotImplementedError``.
+    Three contexts:
+      * ``member_guild_page`` — guild is fixed; member picks a product (or
+        enters custom description + amount for EYOP).  Splits for custom
+        EYOP entries default to ``admin %`` from ``BillingSettings`` plus
+        the rest to the page's guild.
+      * ``member_tab_page`` — member adds an item from their tab page; must
+        pick a product (splits come from the product).
+      * ``admin_dashboard`` — staff adds an entry to a member's tab.  Either
+        pick a product (splits come from the product) or post a
+        ``CustomSplitFormSet`` alongside.
     """
 
     description = forms.CharField(
@@ -146,6 +145,31 @@ class TabItemForm(forms.Form):
         if not cleaned.get("description") or not cleaned.get("amount"):
             raise forms.ValidationError("Either select a product or enter a description and amount.")
 
+    def save(
+        self,
+        *,
+        tab: Tab,
+        splits: list[dict[str, Any]] | None = None,
+    ) -> TabEntry:
+        """Create a TabEntry on ``tab`` using ``Tab.add_entry``.
+
+        For product entries, splits come from the product (pass
+        ``splits=None``). For custom entries, ``splits`` is required.
+        """
+        if not self.is_valid():
+            raise RuntimeError("call form.is_valid() before save()")
+        product = self.cleaned_data.get("product")
+        if product is None and splits is None:
+            raise ValueError("Custom entries (no product) require explicit splits.")
+        return tab.add_entry(
+            description=self.cleaned_data["description"],
+            amount=self.cleaned_data["amount"],
+            added_by=self.user,  # type: ignore[arg-type]  # views gate on @login_required
+            is_self_service=(self.context != CONTEXT_ADMIN_DASHBOARD),
+            product=product,
+            splits=splits,
+        )
+
     def apply_to_tab(
         self,
         tab: Tab,
@@ -153,24 +177,138 @@ class TabItemForm(forms.Form):
         added_by: "UserLike",
         is_self_service: bool,
     ) -> TabEntry:
-        """Add the entry to the tab using ``Tab.add_entry``.
+        """Back-compat wrapper used by the hub views.
 
-        During the v1.7 refactor, only product-driven entries work. Custom
-        entries raise ``NotImplementedError`` — Task 7 rebuilds the custom
-        path with a proper splits editor.
+        For ``member_guild_page`` custom entries, auto-constructs splits
+        using ``BillingSettings.default_admin_percent`` on admin plus the
+        remainder to the page's fixed guild.  Admin-context callers should
+        prefer ``save()`` directly so they can attach a custom splits
+        formset.
         """
         if not self.is_valid():
             raise RuntimeError("call form.is_valid() before apply_to_tab()")
+        # Re-bind context-ish attrs the plan's save() uses
+        self.user = added_by
         product = self.cleaned_data.get("product")
+        splits: list[dict[str, Any]] | None = None
         if product is None:
-            raise NotImplementedError("Custom-entry splits rebuilt in Task 7")
+            splits = self._default_custom_splits()
         return tab.add_entry(
             description=self.cleaned_data["description"],
             amount=self.cleaned_data["amount"],
             added_by=added_by,  # type: ignore[arg-type]  # views gate on @login_required
             is_self_service=is_self_service,
             product=product,
+            splits=splits,
         )
+
+    def _default_custom_splits(self) -> list[dict[str, Any]]:
+        """Default splits for a custom entry when no explicit formset is posted.
+
+        Only sensible for ``member_guild_page`` where a fixed guild is known.
+        The admin dashboard path must always post an explicit splits formset.
+        """
+        if self.context != CONTEXT_MEMBER_GUILD_PAGE or self.fixed_guild is None:
+            raise ValueError(
+                "Custom entries outside member_guild_page require explicit splits."
+            )
+        admin_percent: Decimal = BillingSettings.load().default_admin_percent
+        guild_percent = Decimal("100") - admin_percent
+        return [
+            {
+                "recipient_type": ProductRevenueSplit.RecipientType.ADMIN,
+                "guild": None,
+                "percent": admin_percent,
+            },
+            {
+                "recipient_type": ProductRevenueSplit.RecipientType.GUILD,
+                "guild": self.fixed_guild,
+                "percent": guild_percent,
+            },
+        ]
+
+
+class _SplitRowForm(forms.Form):
+    """Single row of a non-model ``CustomSplitFormSet``."""
+
+    recipient_type = forms.ChoiceField(choices=ProductRevenueSplit.RecipientType.choices)
+    guild = forms.ModelChoiceField(queryset=Guild.objects.all(), required=False)
+    percent = forms.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        min_value=Decimal("0.01"),
+        max_value=Decimal("100"),
+    )
+
+
+class _BaseCustomSplitFormSet(forms.BaseFormSet):
+    """Validates sum=100, >=1 row, no duplicate guilds, recipient/guild rules.
+
+    Intentionally parallel to ``_BaseProductSplitFormSet`` — same shape, but
+    operates on a non-model ``BaseFormSet`` since custom-entry splits aren't
+    backed by ``ProductRevenueSplit`` rows.
+    """
+
+    def clean(self) -> None:
+        super().clean()
+        if any(self.errors):
+            return
+        active = [
+            f.cleaned_data
+            for f in self.forms
+            if f.cleaned_data and not f.cleaned_data.get("DELETE", False)
+        ]
+        if not active:
+            raise forms.ValidationError("At least one split row is required.")
+        total = sum((row["percent"] for row in active), Decimal("0"))
+        if total != Decimal("100"):
+            raise forms.ValidationError(
+                f"Splits must sum to 100% — currently {total}%."
+            )
+        seen_admin = False
+        seen_guilds: set[int] = set()
+        for row in active:
+            rtype = row["recipient_type"]
+            guild = row.get("guild")
+            if rtype == ProductRevenueSplit.RecipientType.ADMIN:
+                if guild is not None:
+                    raise forms.ValidationError("Admin rows must not select a guild.")
+                if seen_admin:
+                    raise forms.ValidationError("Only one Admin row is allowed.")
+                seen_admin = True
+            else:
+                if guild is None:
+                    raise forms.ValidationError("Guild rows must select a guild.")
+                if guild.pk in seen_guilds:
+                    raise forms.ValidationError(
+                        f"Guild '{guild.name}' appears more than once."
+                    )
+                seen_guilds.add(guild.pk)
+
+    def to_split_dicts(self) -> list[dict[str, Any]]:
+        """Serialize active rows into the dict shape ``Tab.add_entry`` expects."""
+        out: list[dict[str, Any]] = []
+        for f in self.forms:
+            if not f.cleaned_data or f.cleaned_data.get("DELETE"):
+                continue
+            out.append(
+                {
+                    "recipient_type": f.cleaned_data["recipient_type"],
+                    "guild": f.cleaned_data.get("guild"),
+                    "percent": f.cleaned_data["percent"],
+                }
+            )
+        return out
+
+
+CustomSplitFormSet = forms.formset_factory(
+    _SplitRowForm,
+    formset=_BaseCustomSplitFormSet,
+    extra=0,
+    min_num=1,
+    validate_min=True,
+    can_delete=True,
+)
 
 
 class VoidTabEntryForm(forms.Form):

@@ -251,27 +251,57 @@ def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
 
 @staff_member_required
 def admin_add_tab_entry(request: HttpRequest) -> HttpResponse:
-    """Admin quick-add: add a charge to any member's tab."""
+    """Admin quick-add: add a charge to any member's tab.
+
+    Two paths:
+      * Product selected — splits come from the product; no formset needed.
+      * Custom entry (no product) — ``CustomSplitFormSet`` is required and
+        validated before any entry is created.
+    """
     from django.contrib import admin
+
+    from typing import Any
+
+    from billing.forms import CustomSplitFormSet
+    from membership.models import Guild
+
+    def _render(form: TabItemForm, splits_formset: Any) -> HttpResponse:
+        context = {
+            **admin.site.each_context(request),
+            "form": form,
+            "splits_formset": splits_formset,
+            "all_guilds": Guild.objects.filter(is_active=True).order_by("name"),
+        }
+        return render(request, "billing/admin_add_entry.html", context)
 
     if request.method == "POST":
         form = TabItemForm(request.POST, context=CONTEXT_ADMIN_DASHBOARD, user=request.user)
+        splits_formset = CustomSplitFormSet(data=request.POST, prefix="splits")
         if form.is_valid():
             member = form.cleaned_data["member"]
             tab, _created = Tab.objects.get_or_create(member=member)
+            product = form.cleaned_data.get("product")
             try:
-                form.apply_to_tab(tab, added_by=request.user, is_self_service=False)
+                if product is not None:
+                    form.save(tab=tab)
+                else:
+                    if not splits_formset.is_valid():
+                        django_messages.error(
+                            request,
+                            f"Invalid splits: {splits_formset.non_form_errors() or 'see row errors'}",
+                        )
+                        return _render(form, splits_formset)
+                    form.save(tab=tab, splits=splits_formset.to_split_dicts())
             except (TabLockedError, TabLimitExceededError) as exc:
                 django_messages.error(request, str(exc))
-                context = {**admin.site.each_context(request), "form": form}
-                return render(request, "billing/admin_add_entry.html", context)
+                return _render(form, splits_formset)
             django_messages.success(request, f"Added ${form.cleaned_data['amount']} to {member.display_name}'s tab.")
             return redirect("billing_admin_dashboard")
     else:
         form = TabItemForm(context=CONTEXT_ADMIN_DASHBOARD, user=request.user)
+        splits_formset = CustomSplitFormSet(prefix="splits")
 
-    context = {**admin.site.each_context(request), "form": form}
-    return render(request, "billing/admin_add_entry.html", context)
+    return _render(form, splits_formset)
 
 
 @staff_member_required
