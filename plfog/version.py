@@ -2,9 +2,21 @@
 
 from __future__ import annotations
 
-VERSION = "1.6.0"
+VERSION = "1.7.0"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.7.0",
+        "date": "2026-04-14",
+        "title": "Flexible Product Revenue Splits",
+        "changes": [
+            "Products can now split revenue across multiple guilds and admin in any combination — for example, a $10 product can be set up so 20% goes to admin, 60% to the Ceramics Guild, and 20% to the Art Framing Guild",
+            "The percentages have to add up to 100%, but otherwise you can mix recipients however you like",
+            "The Add Product form has been redesigned: it now appears inline on the guild edit page (no more popup) with a live preview that shows exactly how a sale will be divided up",
+            "The 'active/inactive' toggle is gone — if a product exists, it's available; if you delete it, it's gone",
+            "Existing products and past tab entries were cleared during this upgrade — you'll need to re-add your products with their new split configuration",
+        ],
+    },
     {
         "version": "1.6.0",
         "date": "2026-04-14",
