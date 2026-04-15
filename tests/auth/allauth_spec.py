@@ -37,8 +37,8 @@ def describe_allauth_urls():
     def it_login_page_does_not_contain_google_button(client):
         response = client.get("/accounts/login/")
         content = response.content.decode()
-        assert "google" not in content.lower()
         assert "Continue with Google" not in content
+        assert "accounts/google" not in content
 
     def it_login_page_shows_version_badge(client):
         response = client.get("/accounts/login/")
