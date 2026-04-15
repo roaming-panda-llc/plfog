@@ -14,12 +14,20 @@ class SiteConfigurationAdmin(ModelAdmin):
     """Admin for the singleton SiteConfiguration model."""
 
     list_display = ["__str__", "registration_mode"]
+    readonly_fields = ["general_calendar_last_fetched_at"]
     fieldsets = [
         (
             None,
             {
                 "fields": ["registration_mode"],
                 "description": "Global settings that control how the site behaves. Changes take effect immediately.",
+            },
+        ),
+        (
+            "Community Calendar",
+            {
+                "fields": ["general_calendar_url", "general_calendar_color", "general_calendar_last_fetched_at"],
+                "description": "Configure the makerspace's general Google Calendar feed. Paste the iCal URL from Google Calendar settings.",
             },
         ),
     ]
