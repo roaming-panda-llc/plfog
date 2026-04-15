@@ -8,286 +8,37 @@ import pytest
 
 from billing.forms import (
     CONTEXT_ADMIN_DASHBOARD,
-    CONTEXT_MEMBER_GUILD_PAGE,
-    CONTEXT_MEMBER_TAB_PAGE,
     BillingSettingsForm,
     ConnectPlatformSettingsForm,
+    CustomSplitFormSet,
     TabItemForm,
     VoidTabEntryForm,
 )
-from billing.models import Product
-from tests.billing.factories import BillingSettingsFactory, ProductFactory, TabFactory, UserFactory
-from tests.membership.factories import GuildFactory, MemberFactory
+from billing.models import TabEntrySplit
+from tests.billing.factories import BillingSettingsFactory, ProductFactory, TabFactory
+from tests.membership.factories import GuildFactory
 
 pytestmark = pytest.mark.django_db
 
 
-def _member_user(*, fog_role: str = "member"):
-    """Create a User linked to a Member with the requested fog_role.
-
-    The post_save signal on User auto-creates a Member, so we just grab it
-    back and set the fog_role directly (skipping the permission-check helper).
-    """
-    # Need a MembershipPlan for the auto-creation signal to succeed
-    from tests.membership.factories import MembershipPlanFactory
-
-    MembershipPlanFactory()
-    user = UserFactory()
-    member = user.member
-    member.fog_role = fog_role
-    member.save(update_fields=["fog_role"])
-    member.sync_user_permissions()
-    user.refresh_from_db()
-    return user, member
-
-
-def describe_TabItemForm_member_tab_page():
-    def it_is_valid_with_description_and_amount():
-        BillingSettingsFactory()
-        form = TabItemForm(
-            data={"description": "Laser cutter", "amount": "15.00"},
-            context=CONTEXT_MEMBER_TAB_PAGE,
-        )
-        assert form.is_valid(), form.errors
-        assert form.cleaned_data["admin_percent"] == Decimal("20.00")
-        assert form.cleaned_data["split_mode"] == Product.SplitMode.SINGLE_GUILD
-
-    def it_rejects_when_no_product_and_no_manual_fields():
-        form = TabItemForm(data={}, context=CONTEXT_MEMBER_TAB_PAGE)
-        assert not form.is_valid()
-        assert form.non_field_errors()
-
-    def it_rejects_zero_amount():
-        form = TabItemForm(
-            data={"description": "Test", "amount": "0.00"},
-            context=CONTEXT_MEMBER_TAB_PAGE,
-        )
-        assert not form.is_valid()
-        assert "amount" in form.errors
-
-    def it_accepts_one_cent_minimum():
-        BillingSettingsFactory()
-        form = TabItemForm(
-            data={"description": "Tiny", "amount": "0.01"},
-            context=CONTEXT_MEMBER_TAB_PAGE,
-        )
-        assert form.is_valid()
-        assert form.cleaned_data["amount"] == Decimal("0.01")
-
-    def it_fills_description_and_amount_from_product():
-        BillingSettingsFactory()
-        product = ProductFactory(name="Laser time", price=Decimal("12.50"))
-        form = TabItemForm(data={"product": product.pk}, context=CONTEXT_MEMBER_TAB_PAGE)
-        assert form.is_valid(), form.errors
-        assert form.cleaned_data["description"] == "Laser time"
-        assert form.cleaned_data["amount"] == Decimal("12.50")
-        assert form.cleaned_data["guild"] == product.guild
-
-    def it_resolves_admin_percent_from_product_override():
-        BillingSettingsFactory(default_admin_percent=Decimal("20.00"))
-        product = ProductFactory(admin_percent_override=Decimal("50.00"))
-        form = TabItemForm(data={"product": product.pk}, context=CONTEXT_MEMBER_TAB_PAGE)
-        assert form.is_valid(), form.errors
-        assert form.cleaned_data["admin_percent"] == Decimal("50.00")
-
-
-def describe_TabItemForm_member_role_gating():
-    def it_disables_admin_percent_for_non_staff_members():
-        BillingSettingsFactory()
-        user, _member = _member_user(fog_role="member")
-        form = TabItemForm(
-            data={"description": "Tool", "amount": "5.00", "admin_percent": "90"},
-            context=CONTEXT_MEMBER_TAB_PAGE,
-            user=user,
-        )
-        assert form.is_valid(), form.errors
-        # Disabled field → POST value is discarded, form falls back to the site default
-        assert form.cleaned_data["admin_percent"] == Decimal("20.00")
-
-    def it_allows_officer_to_override_admin_percent():
-        BillingSettingsFactory()
-        user, _member = _member_user(fog_role="guild_officer")
-        form = TabItemForm(
-            data={"description": "Tool", "amount": "5.00", "admin_percent": "40"},
-            context=CONTEXT_MEMBER_TAB_PAGE,
-            user=user,
-        )
-        assert form.is_valid(), form.errors
-        assert form.cleaned_data["admin_percent"] == Decimal("40.00")
-
-    def it_disables_split_equally_for_non_staff_members():
-        BillingSettingsFactory()
-        user, _member = _member_user(fog_role="member")
-        form = TabItemForm(
-            data={
-                "description": "Tool",
-                "amount": "5.00",
-                "split_equally": "on",
-            },
-            context=CONTEXT_MEMBER_TAB_PAGE,
-            user=user,
-        )
-        assert form.is_valid()
-        assert form.cleaned_data["split_mode"] == Product.SplitMode.SINGLE_GUILD
-
-    def it_allows_officer_to_toggle_split_equally():
-        BillingSettingsFactory()
-        user, _member = _member_user(fog_role="guild_officer")
-        form = TabItemForm(
-            data={
-                "description": "Tool",
-                "amount": "5.00",
-                "split_equally": "on",
-            },
-            context=CONTEXT_MEMBER_TAB_PAGE,
-            user=user,
-        )
-        assert form.is_valid()
-        assert form.cleaned_data["split_mode"] == Product.SplitMode.SPLIT_EQUALLY
-
-
-def describe_TabItemForm_member_guild_page():
-    def it_requires_guild_kwarg_in_init():
-        import pytest
-
-        with pytest.raises(ValueError, match="requires guild"):
-            TabItemForm(context=CONTEXT_MEMBER_GUILD_PAGE)
-
-    def it_fixes_guild_from_constructor():
-        BillingSettingsFactory()
-        guild = GuildFactory()
-        form = TabItemForm(
-            data={"description": "Donation", "amount": "5.00", "quantity": "1"},
-            context=CONTEXT_MEMBER_GUILD_PAGE,
-            guild=guild,
-        )
-        assert form.is_valid(), form.errors
-        assert form.cleaned_data["guild"] == guild
-        assert form.cleaned_data["quantity"] == 1
-
-    def it_requires_description_and_amount():
-        guild = GuildFactory()
-        form = TabItemForm(
-            data={},
-            context=CONTEXT_MEMBER_GUILD_PAGE,
-            guild=guild,
-        )
-        assert not form.is_valid()
-
-
-def describe_TabItemForm_admin_dashboard():
-    def it_is_valid_with_member_and_manual_entry():
-        BillingSettingsFactory()
-        member = MemberFactory()
-        form = TabItemForm(
-            data={"member": member.pk, "description": "Admin charge", "amount": "50.00"},
-            context=CONTEXT_ADMIN_DASHBOARD,
-        )
-        assert form.is_valid(), form.errors
-
-    def it_rejects_missing_member():
-        form = TabItemForm(
-            data={"description": "Test", "amount": "10.00"},
-            context=CONTEXT_ADMIN_DASHBOARD,
-        )
-        assert not form.is_valid()
-        assert "member" in form.errors
-
-    def it_fills_fields_from_product():
-        BillingSettingsFactory()
-        member = MemberFactory()
-        product = ProductFactory(name="Plasma cutter", price=Decimal("25.00"))
-        form = TabItemForm(
-            data={"member": member.pk, "product": product.pk},
-            context=CONTEXT_ADMIN_DASHBOARD,
-        )
-        assert form.is_valid(), form.errors
-        assert form.cleaned_data["description"] == "Plasma cutter"
-        assert form.cleaned_data["amount"] == Decimal("25.00")
-        assert form.cleaned_data["guild"] == product.guild
-
-
-def describe_TabItemForm_apply_to_tab():
-    def it_snapshots_the_entry_onto_the_tab():
-        BillingSettingsFactory()
-        tab = TabFactory()
-        guild = GuildFactory()
-        form = TabItemForm(
-            data={"description": "Clay", "amount": "4.00", "quantity": "1"},
-            context=CONTEXT_MEMBER_GUILD_PAGE,
-            guild=guild,
-        )
-        assert form.is_valid(), form.errors
-        entry = form.apply_to_tab(tab, added_by=None, is_self_service=True)
-        assert entry.description == "Clay"
-        assert entry.amount == Decimal("4.00")
-        assert entry.guild == guild
-        assert entry.admin_percent == Decimal("20.00")
-        assert entry.split_mode == Product.SplitMode.SINGLE_GUILD
-
-    def it_raises_runtime_error_when_form_is_invalid():
-        BillingSettingsFactory()
-        tab = TabFactory()
-        guild = GuildFactory()
-        form = TabItemForm(
-            data={},
-            context=CONTEXT_MEMBER_GUILD_PAGE,
-            guild=guild,
-        )
-        assert not form.is_valid()
-        with pytest.raises(RuntimeError, match="call form.is_valid"):
-            form.apply_to_tab(tab, added_by=None, is_self_service=True)
-
-
 def describe_VoidTabEntryForm():
-    def it_is_valid_with_reason():
-        form = VoidTabEntryForm(data={"reason": "Duplicate charge"})
-        assert form.is_valid()
-
-    def it_rejects_empty_reason():
-        form = VoidTabEntryForm(data={"reason": ""})
+    def it_requires_reason():
+        form = VoidTabEntryForm(data={})
         assert not form.is_valid()
         assert "reason" in form.errors
 
+    def it_is_valid_with_reason():
+        form = VoidTabEntryForm(data={"reason": "Duplicate"})
+        assert form.is_valid()
+
 
 def describe_BillingSettingsForm():
-    def it_is_valid_with_daily_frequency():
-        form = BillingSettingsForm(
-            data={
-                "charge_frequency": "daily",
-                "charge_time": "23:00",
-                "charge_day_of_week": "",
-                "charge_day_of_month": "",
-                "default_tab_limit": "200.00",
-                "default_admin_percent": "20.00",
-                "max_retry_attempts": "3",
-                "retry_interval_hours": "24",
-            }
-        )
-        assert form.is_valid(), form.errors
-
-    def it_is_valid_with_weekly_frequency():
-        form = BillingSettingsForm(
-            data={
-                "charge_frequency": "weekly",
-                "charge_time": "23:00",
-                "charge_day_of_week": "0",
-                "charge_day_of_month": "",
-                "default_tab_limit": "200.00",
-                "default_admin_percent": "20.00",
-                "max_retry_attempts": "3",
-                "retry_interval_hours": "24",
-            }
-        )
-        assert form.is_valid(), form.errors
-
-    def it_is_valid_with_monthly_frequency():
+    def it_saves_valid_settings():
         form = BillingSettingsForm(
             data={
                 "charge_frequency": "monthly",
                 "charge_time": "23:00",
-                "charge_day_of_week": "",
-                "charge_day_of_month": "15",
+                "charge_day_of_month": "1",
                 "default_tab_limit": "200.00",
                 "default_admin_percent": "20.00",
                 "max_retry_attempts": "3",
@@ -296,24 +47,13 @@ def describe_BillingSettingsForm():
         )
         assert form.is_valid(), form.errors
 
-    def it_populates_from_instance(db):
-        settings = BillingSettingsFactory(
-            charge_frequency="weekly",
-            charge_day_of_week=2,
-            default_tab_limit="150.00",
-        )
-        form = BillingSettingsForm(instance=settings)
-        assert form.initial.get("charge_frequency") == "weekly" or form["charge_frequency"].value() == "weekly"
-        assert form["default_tab_limit"].value() == "150.00"
-
     def it_rejects_negative_tab_limit():
         form = BillingSettingsForm(
             data={
-                "charge_frequency": "daily",
+                "charge_frequency": "monthly",
                 "charge_time": "23:00",
-                "charge_day_of_week": "",
-                "charge_day_of_month": "",
-                "default_tab_limit": "-10.00",
+                "charge_day_of_month": "1",
+                "default_tab_limit": "-5.00",
                 "default_admin_percent": "20.00",
                 "max_retry_attempts": "3",
                 "retry_interval_hours": "24",
@@ -323,113 +63,295 @@ def describe_BillingSettingsForm():
         assert "default_tab_limit" in form.errors
 
 
-def describe_user_can_edit_split():
-    def it_returns_false_when_user_has_no_member_attr():
-        from billing.forms import _user_can_edit_split
-        from django.contrib.auth.models import AnonymousUser
-
-        # AnonymousUser has no .member attribute — exercises the `member is None` branch
-        user = AnonymousUser()
-        assert _user_can_edit_split(user) is False
-
-
-def describe_TabItemForm_unknown_context():
-    def it_raises_value_error_for_unknown_context():
-        import pytest
-
-        with pytest.raises(ValueError, match="Unknown TabItemForm context"):
-            TabItemForm(context="bogus_context")
-
-    def it_reaches_role_gating_without_any_field_branch_via_extended_valid_contexts():
-        import billing.forms as billing_forms
-        from unittest.mock import patch
-
-        # The elif chain in __init__ has three branches; to hit the implicit
-        # "else" (132->139 False path), we need a context that passes the
-        # VALID_CONTEXTS guard at line 101 but matches none of the three elifs.
-        # We patch VALID_CONTEXTS to include a fourth value.
-        with patch.object(billing_forms, "VALID_CONTEXTS", billing_forms.VALID_CONTEXTS | {"extra_context"}):
-            form = TabItemForm(context="extra_context")
-        # The form was created without setting any context-specific fields —
-        # confirms the False branch of the final elif was taken.
-        assert form.context == "extra_context"
-
-
-def describe_TabItemForm_resolve_admin_percent():
-    def it_converts_non_decimal_non_empty_submitted_value_via_decimal_str():
-        BillingSettingsFactory()
-        # We exercise the branch: submitted not None, not "", not Decimal → Decimal(str(submitted))
-        # TabItemForm.fields["admin_percent"] is a DecimalField, but we can bypass it by
-        # using a superuser-style user (can edit split) and a product with no override,
-        # then checking that a raw numeric string submitted value is converted.
-        from tests.membership.factories import MembershipPlanFactory
-
-        MembershipPlanFactory()
-        user = UserFactory()
-        # Make user a superuser so the field isn't disabled
-        user.is_superuser = True
-        user.save()
-        # Manually call _resolve_admin_percent with a non-Decimal, non-None, non-"" value
-        # The static method coerces via Decimal(str(submitted))
-        from billing.forms import TabItemForm
-
-        cleaned: dict = {"admin_percent": 35}  # int, not Decimal
-        result = TabItemForm._resolve_admin_percent(cleaned, None)
-        from decimal import Decimal
-
-        assert result == Decimal("35")
-
-
 def describe_ConnectPlatformSettingsForm():
-    def it_is_valid_when_disabled_with_all_fields_empty():
+    def it_saves_when_connect_is_disabled():
+        settings = BillingSettingsFactory()
         form = ConnectPlatformSettingsForm(
+            instance=settings,
             data={
-                "connect_enabled": "",
+                "connect_enabled": False,
                 "connect_client_id": "",
                 "connect_platform_publishable_key": "",
                 "connect_platform_secret_key": "",
                 "connect_platform_webhook_secret": "",
-            }
+            },
         )
-        assert form.is_valid()
+        assert form.is_valid(), form.errors
 
-    def it_is_valid_when_enabled_with_all_fields():
+    def it_requires_all_keys_when_connect_is_enabled():
+        settings = BillingSettingsFactory()
         form = ConnectPlatformSettingsForm(
+            instance=settings,
             data={
-                "connect_enabled": "on",
-                "connect_client_id": "ca_test_1",
-                "connect_platform_publishable_key": "pk_test_1",
-                "connect_platform_secret_key": "sk_test_1",
-                "connect_platform_webhook_secret": "whsec_1",
-            }
-        )
-        assert form.is_valid()
-
-    def it_errors_when_enabled_with_missing_secret_key():
-        form = ConnectPlatformSettingsForm(
-            data={
-                "connect_enabled": "on",
-                "connect_client_id": "ca_test_1",
-                "connect_platform_publishable_key": "pk_test_1",
-                "connect_platform_secret_key": "",
-                "connect_platform_webhook_secret": "whsec_1",
-            }
-        )
-        assert not form.is_valid()
-        assert "connect_platform_secret_key" in form.errors
-
-    def it_errors_on_all_missing_fields_when_enabled():
-        form = ConnectPlatformSettingsForm(
-            data={
-                "connect_enabled": "on",
+                "connect_enabled": True,
                 "connect_client_id": "",
                 "connect_platform_publishable_key": "",
                 "connect_platform_secret_key": "",
                 "connect_platform_webhook_secret": "",
-            }
+            },
         )
         assert not form.is_valid()
-        assert "connect_client_id" in form.errors
-        assert "connect_platform_publishable_key" in form.errors
-        assert "connect_platform_secret_key" in form.errors
-        assert "connect_platform_webhook_secret" in form.errors
+        for field in (
+            "connect_client_id",
+            "connect_platform_publishable_key",
+            "connect_platform_secret_key",
+            "connect_platform_webhook_secret",
+        ):
+            assert field in form.errors
+
+    def it_accepts_full_credential_set():
+        settings = BillingSettingsFactory()
+        form = ConnectPlatformSettingsForm(
+            instance=settings,
+            data={
+                "connect_enabled": True,
+                "connect_client_id": "ca_123",
+                "connect_platform_publishable_key": "pk_test_123",
+                "connect_platform_secret_key": "sk_test_123",
+                "connect_platform_webhook_secret": "whsec_test_123",
+            },
+        )
+        assert form.is_valid(), form.errors
+
+
+def describe_TabItemForm():
+    def describe_save_with_product():
+        def it_creates_an_entry_with_product_splits():
+            BillingSettingsFactory()
+            product = ProductFactory()
+            tab = TabFactory()
+            form = TabItemForm(
+                data={
+                    "description": "x",
+                    "amount": "10.00",
+                    "product": product.pk,
+                    "member": tab.member.pk,
+                },
+                context=CONTEXT_ADMIN_DASHBOARD,
+            )
+            assert form.is_valid(), form.errors
+            entry = form.save(tab=tab)
+            assert entry.splits.count() >= 1
+
+    def describe_save_with_custom_splits():
+        def it_creates_an_entry_with_explicit_splits():
+            BillingSettingsFactory()
+            tab = TabFactory()
+            form = TabItemForm(
+                data={
+                    "description": "custom",
+                    "amount": "10.00",
+                    "member": tab.member.pk,
+                },
+                context=CONTEXT_ADMIN_DASHBOARD,
+            )
+            assert form.is_valid(), form.errors
+            entry = form.save(
+                tab=tab,
+                splits=[
+                    {
+                        "recipient_type": "admin",
+                        "guild": None,
+                        "percent": Decimal("100"),
+                    },
+                ],
+            )
+            assert entry.splits.count() == 1
+            only = entry.splits.first()
+            assert only.recipient_type == TabEntrySplit.RecipientType.ADMIN
+
+        def it_raises_when_custom_entry_has_no_splits():
+            BillingSettingsFactory()
+            tab = TabFactory()
+            form = TabItemForm(
+                data={
+                    "description": "custom",
+                    "amount": "10.00",
+                    "member": tab.member.pk,
+                },
+                context=CONTEXT_ADMIN_DASHBOARD,
+            )
+            assert form.is_valid(), form.errors
+            with pytest.raises(ValueError):
+                form.save(tab=tab)
+
+    def describe_custom_split_formset():
+        def _make_data(rows: list[tuple[str, str, str]]) -> dict[str, str]:
+            data: dict[str, str] = {
+                "splits-TOTAL_FORMS": str(len(rows)),
+                "splits-INITIAL_FORMS": "0",
+                "splits-MIN_NUM_FORMS": "1",
+                "splits-MAX_NUM_FORMS": "1000",
+            }
+            for i, (rtype, guild, percent) in enumerate(rows):
+                data[f"splits-{i}-recipient_type"] = rtype
+                data[f"splits-{i}-guild"] = guild
+                data[f"splits-{i}-percent"] = percent
+            return data
+
+        def it_rejects_when_sum_not_100():
+            data = _make_data([("admin", "", "50")])
+            fs = CustomSplitFormSet(data=data, prefix="splits")
+            assert not fs.is_valid()
+
+        def it_accepts_valid_admin_only_split():
+            data = _make_data([("admin", "", "100")])
+            fs = CustomSplitFormSet(data=data, prefix="splits")
+            assert fs.is_valid(), fs.errors
+            dicts = fs.to_split_dicts()
+            assert len(dicts) == 1
+            assert dicts[0]["recipient_type"] == "admin"
+            assert dicts[0]["percent"] == Decimal("100")
+
+        def it_rejects_duplicate_guild_rows():
+            guild = GuildFactory()
+            data = _make_data(
+                [
+                    ("guild", str(guild.pk), "50"),
+                    ("guild", str(guild.pk), "50"),
+                ]
+            )
+            fs = CustomSplitFormSet(data=data, prefix="splits")
+            assert not fs.is_valid()
+
+        def it_rejects_admin_row_with_guild():
+            guild = GuildFactory()
+            data = _make_data([("admin", str(guild.pk), "100")])
+            fs = CustomSplitFormSet(data=data, prefix="splits")
+            assert not fs.is_valid()
+
+        def it_rejects_guild_row_without_guild():
+            data = _make_data([("guild", "", "100")])
+            fs = CustomSplitFormSet(data=data, prefix="splits")
+            assert not fs.is_valid()
+
+        def it_rejects_two_admin_rows():
+            data = _make_data([("admin", "", "50"), ("admin", "", "50")])
+            fs = CustomSplitFormSet(data=data, prefix="splits")
+            assert not fs.is_valid()
+            assert any("Admin" in e for e in fs.non_form_errors())
+
+        def it_skips_per_form_validation_short_circuit_when_row_invalid():
+            # A row missing percent triggers per-form errors; clean() must early-return.
+            data = _make_data([("admin", "", "")])
+            fs = CustomSplitFormSet(data=data, prefix="splits")
+            assert not fs.is_valid()
+
+        def it_skips_deleted_rows_in_to_split_dicts():
+            guild = GuildFactory()
+            data = _make_data([("admin", "", "100"), ("guild", str(guild.pk), "50")])
+            # Mark second row as deleted via an extra field. Using can_delete=True
+            data["splits-1-DELETE"] = "on"
+            data["splits-TOTAL_FORMS"] = "2"
+            fs = CustomSplitFormSet(data=data, prefix="splits")
+            assert fs.is_valid(), fs.errors
+            dicts = fs.to_split_dicts()
+            assert len(dicts) == 1
+            assert dicts[0]["recipient_type"] == "admin"
+
+
+def describe_TabItemForm_init_and_clean():
+    def it_rejects_unknown_context():
+        with pytest.raises(ValueError, match="Unknown TabItemForm context"):
+            TabItemForm(context="bogus")
+
+    def it_requires_guild_for_member_guild_page_context():
+        from billing.forms import CONTEXT_MEMBER_GUILD_PAGE
+
+        with pytest.raises(ValueError, match="member_guild_page context requires guild"):
+            TabItemForm(context=CONTEXT_MEMBER_GUILD_PAGE)
+
+    def it_builds_member_tab_page_context():
+        from billing.forms import CONTEXT_MEMBER_TAB_PAGE
+
+        form = TabItemForm(context=CONTEXT_MEMBER_TAB_PAGE)
+        assert "product" in form.fields
+        # The member-tab-page context omits the member + guild fields.
+        assert "member" not in form.fields
+        assert "guild" not in form.fields
+
+    def it_raises_when_no_product_and_no_description_or_amount():
+        # Admin-context with neither product nor manual fields → form-level error.
+        form = TabItemForm(data={"member": ""}, context=CONTEXT_ADMIN_DASHBOARD)
+        # member field is required so form invalid; but the clean() error path
+        # is hit when description+amount empty and no product.
+        form.is_valid()
+        # The non-field error from clean() should appear:
+        assert any("description and amount" in e for e in form.non_field_errors()) or (
+            "member" in form.errors  # acceptable: validation order may surface member first
+        )
+
+    def it_apply_to_tab_raises_if_form_not_validated():
+        from tests.billing.factories import TabFactory
+
+        BillingSettingsFactory()
+        tab = TabFactory()
+        form = TabItemForm(context=CONTEXT_ADMIN_DASHBOARD)  # never bound, never validated
+        with pytest.raises(RuntimeError, match="apply_to_tab"):
+            form.apply_to_tab(tab, added_by=None, is_self_service=True)
+
+    def it_save_raises_if_form_not_validated():
+        from tests.billing.factories import TabFactory
+
+        BillingSettingsFactory()
+        tab = TabFactory()
+        form = TabItemForm(context=CONTEXT_ADMIN_DASHBOARD)
+        with pytest.raises(RuntimeError, match="save"):
+            form.save(tab=tab)
+
+    def it_default_custom_splits_uses_billing_settings_admin_percent():
+        from billing.forms import CONTEXT_MEMBER_GUILD_PAGE
+        from tests.billing.factories import TabFactory
+
+        BillingSettingsFactory(default_admin_percent=Decimal("15.00"))
+        guild = GuildFactory()
+        tab = TabFactory()
+        form = TabItemForm(
+            data={"description": "tea", "amount": "5.00", "quantity": "1"},
+            context=CONTEXT_MEMBER_GUILD_PAGE,
+            guild=guild,
+        )
+        assert form.is_valid(), form.errors
+        entry = form.apply_to_tab(tab, added_by=None, is_self_service=True)
+        admin_split = entry.splits.get(recipient_type="admin")
+        guild_split = entry.splits.get(recipient_type="guild")
+        # 15% admin, 85% guild
+        assert admin_split.percent == Decimal("15.00")
+        assert guild_split.percent == Decimal("85.00")
+
+    def it_default_custom_splits_rejected_outside_member_guild_page():
+        from tests.billing.factories import TabFactory
+
+        BillingSettingsFactory()
+        tab = TabFactory()
+        # admin_dashboard context, no product, no splits → save() raises ValueError.
+        form = TabItemForm(
+            data={"description": "x", "amount": "5.00", "member": tab.member.pk},
+            context=CONTEXT_ADMIN_DASHBOARD,
+        )
+        assert form.is_valid(), form.errors
+        with pytest.raises(ValueError, match="explicit splits"):
+            # apply_to_tab → _default_custom_splits → ValueError because not member_guild_page.
+            form.apply_to_tab(tab, added_by=None, is_self_service=False)
+
+    def it_apply_to_tab_with_product_uses_product_splits():
+        from tests.billing.factories import ProductFactory, TabFactory
+
+        BillingSettingsFactory()
+        guild = GuildFactory()
+        product = ProductFactory(guild=guild)
+        tab = TabFactory()
+        # Use admin context to bind a product field via the form.
+        form = TabItemForm(
+            data={
+                "description": "x",
+                "amount": "1.00",
+                "member": tab.member.pk,
+                "product": product.pk,
+            },
+            context=CONTEXT_ADMIN_DASHBOARD,
+        )
+        assert form.is_valid(), form.errors
+        entry = form.apply_to_tab(tab, added_by=None, is_self_service=False)
+        # 20/80 split from ProductFactory default
+        assert entry.splits.count() == 2

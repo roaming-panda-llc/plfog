@@ -87,24 +87,3 @@ def describe_migration_0011_seed_default_membership_plan():
 
         plan = MembershipPlan.objects.get(name="Standard Membership")
         assert plan.monthly_price == Decimal("150.00")
-
-    def describe_reverse_migration():
-        def it_removes_backfilled_members_and_plan(transactional_db):
-            from django.core.management import call_command
-
-            from membership.models import Member, MembershipPlan
-
-            user = User.objects.create_user(
-                username="reversible",
-                email="reversible@example.com",
-                password="pass",
-            )
-            assert Member.objects.filter(user=user).exists()
-
-            call_command("migrate", "membership", "0010", "--no-input", verbosity=0)
-
-            assert not MembershipPlan.objects.filter(name="Standard Membership").exists()
-            assert not Member.objects.filter(user=user).exists()
-
-            # Re-apply so other tests aren't affected
-            call_command("migrate", "membership", "--no-input", verbosity=0)

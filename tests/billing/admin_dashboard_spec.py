@@ -9,7 +9,7 @@ import pytest
 from django.contrib.auth.models import User
 from django.test import Client
 
-from billing.models import BillingSettings, Tab, TabCharge
+from billing.models import BillingSettings, TabCharge
 from tests.billing.factories import BillingSettingsFactory, TabChargeFactory, TabEntryFactory, TabFactory
 from tests.membership.factories import MemberFactory
 
@@ -323,54 +323,173 @@ def describe_admin_add_tab_entry():
         assert response.status_code == 200
         assert "form" in response.context
 
-    def it_creates_entry_on_valid_post(client: Client):
+    def it_creates_entry_when_product_selected(client: Client):
+        from tests.billing.factories import ProductFactory
+
+        BillingSettingsFactory()
         _create_superuser(client)
         member = MemberFactory(status="active")
-        TabFactory(member=member, stripe_payment_method_id="pm_test123")
-
+        product = ProductFactory()  # default 20/80 split
         response = client.post(
             "/billing/admin/add-entry/",
-            {
-                "member": member.pk,
-                "description": "Admin charge",
-                "amount": "25.00",
+            data={
+                "member": str(member.pk),
+                "product": str(product.pk),
+                "description": "ignored",
+                "amount": "1.00",
+                # Empty splits formset still required by form parsing
+                "splits-TOTAL_FORMS": "0",
+                "splits-INITIAL_FORMS": "0",
+                "splits-MIN_NUM_FORMS": "1",
+                "splits-MAX_NUM_FORMS": "1000",
             },
         )
-
         assert response.status_code == 302
+        from billing.models import Tab
+
         tab = Tab.objects.get(member=member)
         assert tab.entries.count() == 1
-        assert tab.entries.first().amount == Decimal("25.00")
 
-    def it_shows_errors_on_invalid_post(client: Client):
-        _create_superuser(client)
-
-        response = client.post(
-            "/billing/admin/add-entry/",
-            {
-                "description": "Missing member",
-                "amount": "10.00",
-            },
-        )
-
-        assert response.status_code == 200  # Re-renders form with errors
-
-    def it_shows_error_when_tab_add_entry_raises(client: Client):
+    def it_creates_entry_when_custom_splits_supplied(client: Client):
+        BillingSettingsFactory()
         _create_superuser(client)
         member = MemberFactory(status="active")
-        # Locked tab — add_entry raises TabLockedError
-        TabFactory(member=member, is_locked=True, locked_reason="Frozen for testing")
-
         response = client.post(
             "/billing/admin/add-entry/",
-            {
-                "member": member.pk,
-                "description": "Charge",
-                "amount": "10.00",
+            data={
+                "member": str(member.pk),
+                "description": "manual entry",
+                "amount": "5.00",
+                "splits-TOTAL_FORMS": "1",
+                "splits-INITIAL_FORMS": "0",
+                "splits-MIN_NUM_FORMS": "1",
+                "splits-MAX_NUM_FORMS": "1000",
+                "splits-0-recipient_type": "admin",
+                "splits-0-guild": "",
+                "splits-0-percent": "100",
             },
         )
+        assert response.status_code == 302
+        from billing.models import Tab
 
-        assert response.status_code == 200  # Re-renders form with error message
+        tab = Tab.objects.get(member=member)
+        assert tab.entries.count() == 1
+
+    def it_re_renders_when_custom_splits_invalid(client: Client):
+        BillingSettingsFactory()
+        _create_superuser(client)
+        member = MemberFactory(status="active")
+        response = client.post(
+            "/billing/admin/add-entry/",
+            data={
+                "member": str(member.pk),
+                "description": "manual entry",
+                "amount": "5.00",
+                # Splits don't sum to 100 → formset invalid
+                "splits-TOTAL_FORMS": "1",
+                "splits-INITIAL_FORMS": "0",
+                "splits-MIN_NUM_FORMS": "1",
+                "splits-MAX_NUM_FORMS": "1000",
+                "splits-0-recipient_type": "admin",
+                "splits-0-guild": "",
+                "splits-0-percent": "50",
+            },
+        )
+        assert response.status_code == 200
+        from billing.models import TabEntry
+
+        # No tab/entry created
+        assert TabEntry.objects.filter(tab__member=member).count() == 0
+
+    def it_re_renders_when_tab_locked(client: Client):
+        from tests.billing.factories import ProductFactory, TabFactory
+
+        BillingSettingsFactory()
+        _create_superuser(client)
+        member = MemberFactory(status="active")
+        TabFactory(member=member, is_locked=True, locked_reason="test")
+        product = ProductFactory()
+        response = client.post(
+            "/billing/admin/add-entry/",
+            data={
+                "member": str(member.pk),
+                "product": str(product.pk),
+                "description": "x",
+                "amount": "1.00",
+                "splits-TOTAL_FORMS": "0",
+                "splits-INITIAL_FORMS": "0",
+                "splits-MIN_NUM_FORMS": "1",
+                "splits-MAX_NUM_FORMS": "1000",
+            },
+        )
+        assert response.status_code == 200  # re-renders the form
+
+    def it_re_renders_when_form_invalid(client: Client):
+        # POST with no member field at all → form-level invalid → re-renders
+        BillingSettingsFactory()
+        _create_superuser(client)
+        response = client.post(
+            "/billing/admin/add-entry/",
+            data={
+                "description": "x",
+                "amount": "1.00",
+                "splits-TOTAL_FORMS": "0",
+                "splits-INITIAL_FORMS": "0",
+                "splits-MIN_NUM_FORMS": "1",
+                "splits-MAX_NUM_FORMS": "1000",
+            },
+        )
+        assert response.status_code == 200
+
+
+def describe_admin_reports():
+    def it_requires_staff(client: Client):
+        response = client.get("/billing/admin/reports/")
+        assert response.status_code == 302
+
+    def it_renders_with_default_current_month_when_no_filters(client: Client):
+        _create_superuser(client)
+        response = client.get("/billing/admin/reports/")
+        assert response.status_code == 200
+        assert "rows" in response.context
+        assert "payout_summary" in response.context
+        assert "admin_total" in response.context
+
+    def it_renders_with_explicit_filters(client: Client):
+        from tests.billing.factories import ProductFactory
+
+        BillingSettingsFactory()
+        _create_superuser(client)
+        product = ProductFactory()
+        tab = TabFactory()
+        tab.add_entry(description="x", amount=Decimal("10.00"), product=product)
+        response = client.get(
+            "/billing/admin/reports/?start_date=2020-01-01&end_date=2099-12-31&guilds=99&charge_type=product&status=pending"
+        )
+        assert response.status_code == 200
+        assert response.context["selected_charge_types"] == ["product"]
+        assert response.context["selected_statuses"] == ["pending"]
+        assert response.context["selected_guilds"] == ["99"]
+
+
+def describe_admin_reports_csv():
+    def it_requires_staff(client: Client):
+        response = client.get("/billing/admin/reports/export/csv/")
+        assert response.status_code == 302
+
+    def it_streams_csv(client: Client):
+        from tests.billing.factories import ProductFactory
+
+        BillingSettingsFactory()
+        _create_superuser(client)
+        product = ProductFactory()
+        tab = TabFactory()
+        tab.add_entry(description="bag", amount=Decimal("10.00"), product=product)
+        response = client.get("/billing/admin/reports/export/csv/")
+        assert response.status_code == 200
+        body = b"".join(response.streaming_content).decode()
+        assert "date,member,description" in body
+        assert "bag" in body
 
 
 def describe_billing_test_platform_connection():

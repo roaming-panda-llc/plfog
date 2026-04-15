@@ -1,19 +1,14 @@
 from __future__ import annotations
 
-from django import forms
 from django.contrib import admin
-from django.db import models
 from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.utils import timezone
 from django.utils.safestring import mark_safe
-from django.http import HttpResponseRedirect
 from unfold.admin import ModelAdmin, TabularInline
-from unfold.decorators import action
 
-from billing.models import Product
 from .forms import MemberAdminForm
-from .models import FundingSnapshot, Guild, Member, MemberEmail, VotePreference
+from .models import FundingSnapshot, Member, MemberEmail, VotePreference
 
 
 # ---------------------------------------------------------------------------
@@ -250,64 +245,6 @@ class MemberAdmin(ModelAdmin):
         if days_ago == 1:
             return "Yesterday"
         return f"{days_ago} days ago"
-
-
-# ---------------------------------------------------------------------------
-# GuildAdmin
-# ---------------------------------------------------------------------------
-
-
-class GuildProductInline(TabularInline):
-    model = Product
-    fields = ["name", "price", "admin_percent_override", "split_mode", "is_active"]
-    extra = 1
-    show_change_link = False
-    template = "admin/membership/guild_product_inline.html"
-
-    def formfield_for_dbfield(  # type: ignore[override]
-        self, db_field: models.Field, request: HttpRequest | None = None, **kwargs: object
-    ) -> forms.Field | None:
-        field = super().formfield_for_dbfield(db_field, request, **kwargs)
-        if db_field.name == "admin_percent_override" and field is not None:
-            field.label = "Admin %"
-            field.widget.attrs["placeholder"] = "20 (default)"  # type: ignore[union-attr]
-        return field
-
-
-@admin.register(Guild)
-class GuildAdmin(ModelAdmin):
-    inlines = [GuildProductInline]
-    list_display = ["name", "guild_lead", "notes_preview"]
-    search_fields = ["name"]
-    autocomplete_fields = ["guild_lead"]
-    actions_detail = ["view_guild_page"]
-
-    @action(description="View Guild Page", icon="open_in_new")
-    def view_guild_page(self, request: HttpRequest, object_id: int) -> HttpResponseRedirect:
-        return HttpResponseRedirect(f"/guilds/{object_id}/")
-
-    def formfield_for_foreignkey(self, db_field: object, request: HttpRequest, **kwargs: object) -> object:  # type: ignore[override]
-        if db_field.name == "guild_lead":  # type: ignore[attr-defined]
-            kwargs["empty_label"] = "Unassigned"
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)  # type: ignore[arg-type]
-
-    def formfield_for_dbfield(self, db_field: object, request: HttpRequest, **kwargs: object) -> object:  # type: ignore[override]
-        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)  # type: ignore[arg-type]
-        if db_field.name == "guild_lead" and hasattr(formfield, "widget"):  # type: ignore[attr-defined]
-            formfield.widget.can_add_related = False
-            formfield.widget.can_change_related = False
-            formfield.widget.can_delete_related = False
-            formfield.widget.can_view_related = False
-        return formfield
-
-    def response_change(self, request: HttpRequest, obj: Guild) -> HttpResponseRedirect:  # type: ignore[override]
-        return HttpResponseRedirect(request.path + "#pl-products-section")
-
-    @admin.display(description="Notes")
-    def notes_preview(self, obj: Guild) -> str:
-        if len(obj.notes) > 80:
-            return obj.notes[:80] + "..."
-        return obj.notes
 
 
 # ---------------------------------------------------------------------------

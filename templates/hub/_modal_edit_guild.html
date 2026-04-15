@@ -1,0 +1,30 @@
+{% comment %}
+Body for the Edit Guild modal. Included twice-over by guild_detail.html:
+once as the modal body (via {% include "components/modal.html" %} with
+modal_body=...), and once-nothing here — we render the form directly and
+the modal wrapper handles the chrome.
+{% endcomment %}
+<form method="post" action="{% url 'hub_guild_edit' guild.pk %}" class="pl-guild-edit-form">
+    {% csrf_token %}
+    <div class="pl-form-group">
+        <label class="pl-form-label" for="id_guild_name">Guild name</label>
+        <input type="text"
+               id="id_guild_name"
+               name="name"
+               value="{{ guild_edit_form.name.value|default_if_none:'' }}"
+               required>
+    </div>
+    <div class="pl-form-group">
+        <label class="pl-form-label" for="id_guild_about">About</label>
+        <textarea id="id_guild_about"
+                  name="about"
+                  rows="5"
+                  placeholder="Tell members what this guild is about...">{{ guild_edit_form.about.value|default_if_none:'' }}</textarea>
+    </div>
+    <div class="pl-guild-edit-form__actions">
+        <button type="button"
+                class="pl-btn pl-btn--secondary"
+                @click="$dispatch('close-modal', 'edit-guild')">Cancel</button>
+        <button type="submit" class="pl-btn pl-btn--primary">Save</button>
+    </div>
+</form>

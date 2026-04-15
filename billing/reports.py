@@ -1,10 +1,9 @@
 """Reports queries and CSV export for billing.
 
-The report expands TabEntries into per-guild "long-format" rows using
-``TabEntry.compute_splits()``. Filtering by date range, guild, charge type,
-and charge status all happen at the queryset level; SPLIT_EQUALLY expansion
-happens in Python because JSONField-contains semantics vary by backend and
-the plfog row count is tiny.
+Built on top of ``TabEntrySplit`` — the frozen per-recipient snapshot rows
+created at entry time. Each row in the report corresponds to one
+``TabEntrySplit`` (not one ``TabEntry``), so a single charge that splits
+between Admin and a guild produces two rows.
 """
 
 from __future__ import annotations
@@ -20,8 +19,7 @@ from django.db.models import Q, QuerySet
 from django.http import StreamingHttpResponse
 from django.utils import timezone
 
-from billing.models import Product, TabCharge, TabEntry
-from membership.models import Guild
+from billing.models import TabCharge, TabEntrySplit
 
 if TYPE_CHECKING:
     from django.http.request import QueryDict  # noqa: F401
@@ -34,73 +32,63 @@ class ReportRow:
     created_at: datetime
     member_name: str
     description: str
+    recipient_type: str  # "admin" | "guild"
+    recipient_label: str  # "Admin" or guild name
     guild_id: int | None
-    guild_name: str
-    split_mode: str
-    split_mode_display: str
-    amount: Decimal
-    admin_percent: Decimal
-    admin_amount: Decimal
-    guild_amount: Decimal
+    amount: Decimal  # this recipient's share
+    percent: Decimal
+    entry_amount: Decimal  # the parent entry's full amount
     charge_status: str
     charge_type: str  # "product" | "custom"
 
 
 @dataclass(frozen=True)
 class PayoutRow:
+    recipient_type: str  # "admin" | "guild"
+    recipient_label: str
     guild_id: int | None
-    guild_name: str
-    entry_count: int
-    guild_amount: Decimal
+    entry_count: int  # distinct entries that paid this recipient
+    amount: Decimal
 
 
-def _base_entries(
+def _apply_filters(
+    qs: QuerySet[TabEntrySplit],
     *,
     start_date: date_cls | None,
     end_date: date_cls | None,
     guild_ids: list[int] | None,
     charge_types: list[str] | None,
     statuses: list[str] | None,
-) -> QuerySet[TabEntry]:
-    """Return a filtered, ordered TabEntry queryset for report generation."""
-    qs: QuerySet[TabEntry] = (
-        TabEntry.objects.all()
-        .select_related("tab__member", "guild", "product", "tab_charge")
-        .order_by("created_at", "pk")
-    )
+) -> QuerySet[TabEntrySplit]:
     if start_date:
-        qs = qs.filter(created_at__date__gte=start_date)
+        qs = qs.filter(entry__created_at__date__gte=start_date)
     if end_date:
-        qs = qs.filter(created_at__date__lte=end_date)
+        qs = qs.filter(entry__created_at__date__lte=end_date)
 
     if guild_ids:
-        # Match entries whose snapshot guild is in the requested set OR any
-        # SPLIT_EQUALLY entry (we filter the individual splits in Python below
-        # since JSONField contains semantics vary by backend).
-        qs = qs.filter(Q(guild_id__in=guild_ids) | Q(split_mode=Product.SplitMode.SPLIT_EQUALLY))
+        # Only show guild splits that match the requested guilds.
+        # Admin splits for matching entries are still included.
+        qs = qs.filter(
+            Q(recipient_type=TabEntrySplit.RecipientType.GUILD, guild_id__in=guild_ids)
+            | Q(recipient_type=TabEntrySplit.RecipientType.ADMIN, entry__splits__guild_id__in=guild_ids)
+        ).distinct()
 
     if charge_types:
-        has_product = "product" in charge_types
-        has_custom = "custom" in charge_types
-        if has_product and not has_custom:
-            qs = qs.filter(product__isnull=False)
-        elif has_custom and not has_product:
-            qs = qs.filter(product__isnull=True)
+        if "product" in charge_types and "custom" not in charge_types:
+            qs = qs.filter(entry__product__isnull=False)
+        elif "custom" in charge_types and "product" not in charge_types:
+            qs = qs.filter(entry__product__isnull=True)
 
     if statuses:
         status_q = Q()
         if "pending" in statuses:
-            status_q |= Q(tab_charge__isnull=True)
+            status_q |= Q(entry__tab_charge__isnull=True)
         other = [s for s in statuses if s != "pending"]
         if other:
-            status_q |= Q(tab_charge__status__in=other)
+            status_q |= Q(entry__tab_charge__status__in=other)
         qs = qs.filter(status_q)
 
     return qs
-
-
-def _guild_name_cache() -> dict[int, str]:
-    return dict(Guild.objects.values_list("pk", "name"))
 
 
 def build_report(
@@ -111,26 +99,15 @@ def build_report(
     charge_types: list[str] | None = None,
     statuses: list[str] | None = None,
 ) -> tuple[list[ReportRow], list[PayoutRow], Decimal]:
-    """Return ``(rows, payout_summary, admin_total)`` for the Reports page.
-
-    ``rows`` is a long-format list: one row per (entry × guild split). A
-    SPLIT_EQUALLY entry across N guilds emits N rows; the admin share sits
-    on the first row only to avoid double-counting. Sum of ``admin_amount``
-    across all rows equals ``admin_total``. Sum of ``guild_amount`` grouped
-    by guild matches ``payout_summary``.
-
-    When ``guild_ids`` is set, split rows that map to non-requested guilds
-    are dropped so the payout summary only shows what's owed to the filtered
-    guilds.
-    """
-    name_cache = _guild_name_cache()
-    split_mode_choices = dict(Product.SplitMode.choices)
-
-    rows: list[ReportRow] = []
-    payouts: dict[int | None, PayoutRow] = {}
-    admin_total = _ZERO
-
-    qs = _base_entries(
+    """Return (rows, payout_summary, admin_total) sourced from TabEntrySplit."""
+    qs: QuerySet[TabEntrySplit] = (
+        TabEntrySplit.objects.all()
+        .select_related("entry__tab__member", "entry__tab_charge", "entry__product", "guild")
+        .filter(entry__voided_at__isnull=True)
+        .order_by("entry__created_at", "entry_id", "id")
+    )
+    qs = _apply_filters(
+        qs,
         start_date=start_date,
         end_date=end_date,
         guild_ids=guild_ids,
@@ -138,57 +115,62 @@ def build_report(
         statuses=statuses,
     )
 
-    for entry in qs.iterator(chunk_size=500):
-        splits = entry.compute_splits()
-        tab_charge = entry.tab_charge  # narrowed local so mypy sees the None check
-        charge_status = tab_charge.status if tab_charge is not None else "pending"
+    rows: list[ReportRow] = []
+    payouts: dict[tuple[str, int | None], PayoutRow] = {}
+    admin_total = _ZERO
+
+    for split in qs.iterator(chunk_size=500):
+        entry = split.entry
+        charge_status = entry.tab_charge.status if entry.tab_charge_id else "pending"
         charge_type = "product" if entry.product_id else "custom"
+        recipient_label = (
+            "Admin"
+            if split.recipient_type == TabEntrySplit.RecipientType.ADMIN
+            else (split.guild.name if split.guild_id else "?")
+        )
 
-        for split in splits:
-            if guild_ids and split.guild_id is not None and split.guild_id not in guild_ids:
-                # Filtered out — this split row is for a guild the user didn't request
-                continue
-
-            gname = (
-                name_cache.get(split.guild_id, "— unattributed —") if split.guild_id is not None else "— unattributed —"
+        rows.append(
+            ReportRow(
+                created_at=entry.created_at,
+                member_name=entry.tab.member.display_name,
+                description=entry.description,
+                recipient_type=split.recipient_type,
+                recipient_label=recipient_label,
+                guild_id=split.guild_id,
+                amount=split.amount,
+                percent=split.percent,
+                entry_amount=entry.amount,
+                charge_status=charge_status,
+                charge_type=charge_type,
             )
-            rows.append(
-                ReportRow(
-                    created_at=entry.created_at,
-                    member_name=entry.tab.member.display_name,
-                    description=entry.description,
-                    guild_id=split.guild_id,
-                    guild_name=gname,
-                    split_mode=entry.split_mode,
-                    split_mode_display=split_mode_choices.get(entry.split_mode, entry.split_mode),
-                    amount=entry.amount,
-                    admin_percent=entry.admin_percent,
-                    admin_amount=split.admin_amount,
-                    guild_amount=split.guild_amount,
-                    charge_status=charge_status,
-                    charge_type=charge_type,
-                )
+        )
+
+        if split.recipient_type == TabEntrySplit.RecipientType.ADMIN:
+            admin_total += split.amount
+
+        key = (split.recipient_type, split.guild_id)
+        existing = payouts.get(key)
+        if existing is None:
+            payouts[key] = PayoutRow(
+                recipient_type=split.recipient_type,
+                recipient_label=recipient_label,
+                guild_id=split.guild_id,
+                entry_count=1,
+                amount=split.amount,
+            )
+        else:
+            payouts[key] = PayoutRow(
+                recipient_type=split.recipient_type,
+                recipient_label=recipient_label,
+                guild_id=split.guild_id,
+                entry_count=existing.entry_count + 1,
+                amount=existing.amount + split.amount,
             )
 
-            admin_total += split.admin_amount
-            if split.guild_id is not None and split.guild_amount > _ZERO:
-                existing = payouts.get(split.guild_id)
-                if existing is None:
-                    payouts[split.guild_id] = PayoutRow(
-                        guild_id=split.guild_id,
-                        guild_name=gname,
-                        entry_count=1,
-                        guild_amount=split.guild_amount,
-                    )
-                else:
-                    payouts[split.guild_id] = PayoutRow(
-                        guild_id=split.guild_id,
-                        guild_name=gname,
-                        entry_count=existing.entry_count + 1,
-                        guild_amount=existing.guild_amount + split.guild_amount,
-                    )
-
-    payout_list = sorted(payouts.values(), key=lambda p: (p.guild_name or "", p.guild_id or 0))
+    payout_list = sorted(
+        payouts.values(),
+        key=lambda p: (0 if p.recipient_type == "admin" else 1, p.recipient_label),
+    )
     return rows, payout_list, admin_total
 
 
@@ -203,14 +185,13 @@ CSV_HEADERS = [
     "date",
     "member",
     "description",
-    "guild",
-    "split_mode",
+    "recipient_type",
+    "recipient",
     "charge_type",
     "charge_status",
+    "entry_amount",
+    "percent",
     "amount",
-    "admin_percent",
-    "admin_amount",
-    "guild_amount",
 ]
 
 
@@ -241,14 +222,13 @@ def stream_report_csv(
                     r.created_at.date().isoformat(),
                     r.member_name,
                     r.description,
-                    r.guild_name,
-                    r.split_mode,
+                    r.recipient_type,
+                    r.recipient_label,
                     r.charge_type,
                     r.charge_status,
+                    f"{r.entry_amount:.2f}",
+                    f"{r.percent:.2f}",
                     f"{r.amount:.2f}",
-                    f"{r.admin_percent:.2f}",
-                    f"{r.admin_amount:.2f}",
-                    f"{r.guild_amount:.2f}",
                 ]
             )
 

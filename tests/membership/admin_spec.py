@@ -12,7 +12,6 @@ from unittest.mock import MagicMock
 from membership.admin import (
     ActiveStatusFilter,
     FundingSnapshotAdmin,
-    GuildAdmin,
     HasUserFilter,
     MemberAdmin,
     MemberEmailInline,
@@ -48,9 +47,10 @@ def describe_admin_registration():
         assert Member in admin.site._registry
         assert isinstance(admin.site._registry[Member], MemberAdmin)
 
-    def it_registers_guild():
-        assert Guild in admin.site._registry
-        assert isinstance(admin.site._registry[Guild], GuildAdmin)
+    def it_does_not_register_guild():
+        # Guild was moved out of the admin in v1.6.0 — editing happens on
+        # the public guild page for admins / officers / that guild's lead.
+        assert Guild not in admin.site._registry
 
     def it_registers_vote_preference():
         assert VotePreference in admin.site._registry
@@ -255,87 +255,6 @@ def describe_has_user_filter():
         assert "Has User Helen" in content
 
 
-def describe_GuildAdmin():
-    def it_has_expected_list_display():
-        guild_admin = admin.site._registry[Guild]
-        assert guild_admin.list_display == ["name", "guild_lead", "notes_preview"]
-
-    def it_has_expected_search_fields():
-        guild_admin = admin.site._registry[Guild]
-        assert guild_admin.search_fields == ["name"]
-
-
-@pytest.mark.django_db
-def describe_GuildAdmin_actions():
-    def it_view_guild_page_redirects_to_guild_url():
-        guild = GuildFactory()
-        guild_admin = admin.site._registry[Guild]
-        request = MagicMock()
-        response = guild_admin.view_guild_page(request, guild.pk)
-        assert response.status_code == 302
-        assert response["Location"] == f"/guilds/{guild.pk}/"
-
-    def it_response_change_stays_on_page():
-        guild = GuildFactory()
-        guild_admin = admin.site._registry[Guild]
-        request = MagicMock()
-        request.path = f"/admin/membership/guild/{guild.pk}/change/"
-        response = guild_admin.response_change(request, guild)
-        assert response.status_code == 302
-        assert response["Location"].endswith("#pl-products-section")
-
-    def it_formfield_for_foreignkey_sets_unassigned_label_for_guild_lead():
-        from unittest.mock import patch
-
-        guild_admin = admin.site._registry[Guild]
-        request = MagicMock()
-        db_field = MagicMock()
-        db_field.name = "guild_lead"
-        sentinel = object()
-        with patch("membership.admin.ModelAdmin.formfield_for_foreignkey", return_value=sentinel) as mock_super:
-            result = guild_admin.formfield_for_foreignkey(db_field, request)
-        assert result is sentinel
-        _, _, kwargs = mock_super.mock_calls[0]
-        assert kwargs.get("empty_label") == "Unassigned"
-
-    def it_formfield_for_foreignkey_skips_label_for_other_fields():
-        from unittest.mock import patch
-
-        guild_admin = admin.site._registry[Guild]
-        request = MagicMock()
-        db_field = MagicMock()
-        db_field.name = "some_other_field"
-        sentinel = object()
-        with patch("membership.admin.ModelAdmin.formfield_for_foreignkey", return_value=sentinel) as mock_super:
-            result = guild_admin.formfield_for_foreignkey(db_field, request)
-        assert result is sentinel
-        _, _, kwargs = mock_super.mock_calls[0]
-        assert "empty_label" not in kwargs
-
-
-@pytest.mark.django_db
-def describe_admin_guild_computed_fields():
-    def it_displays_notes_preview_short():
-        guild = GuildFactory(name="Short Notes Guild", notes="Brief note")
-        guild_admin = admin.site._registry[Guild]
-        result = guild_admin.notes_preview(guild)
-        assert result == "Brief note"
-
-    def it_displays_notes_preview_truncated():
-        long_notes = "A" * 100
-        guild = GuildFactory(name="Long Notes Guild", notes=long_notes)
-        guild_admin = admin.site._registry[Guild]
-        result = guild_admin.notes_preview(guild)
-        assert result == "A" * 80 + "..."
-        assert len(result) == 83
-
-    def it_displays_notes_preview_empty():
-        guild = GuildFactory(name="No Notes Guild", notes="")
-        guild_admin = admin.site._registry[Guild]
-        result = guild_admin.notes_preview(guild)
-        assert result == ""
-
-
 def describe_VotePreferenceAdmin():
     def it_has_expected_list_display():
         pref_admin = admin.site._registry[VotePreference]
@@ -454,14 +373,11 @@ def describe_admin_member_views():
 
 @pytest.mark.django_db
 def describe_admin_guild_views():
-    def it_loads_changelist(admin_client):
-        GuildFactory(name="View Test Guild")
+    def it_returns_404_because_guild_is_no_longer_in_admin(admin_client):
+        # Guild was moved out of the admin — editing happens on the public
+        # guild detail page for admins / officers / guild leads.
         resp = admin_client.get("/admin/membership/guild/")
-        assert resp.status_code == 200
-
-    def it_loads_add_form(admin_client):
-        resp = admin_client.get("/admin/membership/guild/add/")
-        assert resp.status_code == 200
+        assert resp.status_code == 404
 
 
 @pytest.mark.django_db

@@ -14,6 +14,23 @@ if TYPE_CHECKING:
 from membership.models import Guild, Member
 
 
+class GuildEditForm(forms.ModelForm):
+    """Edit form for a guild's public-facing name and description."""
+
+    class Meta:
+        model = Guild
+        fields = ["name", "about"]
+        widgets = {
+            "name": forms.TextInput(attrs={"placeholder": "Guild name"}),
+            "about": forms.Textarea(
+                attrs={"rows": 5, "placeholder": "Tell members what this guild is about..."},
+            ),
+        }
+        labels = {
+            "about": "About",
+        }
+
+
 class ProfileSettingsForm(forms.ModelForm):
     """Form for editing member profile fields."""
 

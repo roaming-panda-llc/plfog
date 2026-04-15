@@ -50,16 +50,6 @@ def describe_guild_detail():
         response = client.get(f"/guilds/{guild.pk}/")
         assert b"Nothing here yet" in response.content
 
-    def it_shows_active_products_only(client: Client):
-        User.objects.create_user(username="v4", password="pass")
-        guild = GuildFactory()
-        ProductFactory(guild=guild, name="Laser Cutter", is_active=True)
-        ProductFactory(guild=guild, name="Hidden", is_active=False)
-        client.login(username="v4", password="pass")
-        response = client.get(f"/guilds/{guild.pk}/")
-        assert b"Laser Cutter" in response.content
-        assert b"Hidden" not in response.content
-
     def it_shows_no_products_placeholder_when_empty(client: Client):
         User.objects.create_user(username="v5", password="pass")
         guild = GuildFactory()
@@ -71,7 +61,7 @@ def describe_guild_detail():
         def it_shows_add_to_cart_button_when_member_can_add(client: Client):
             BillingSettingsFactory()
             guild = GuildFactory()
-            ProductFactory(guild=guild, name="Laser Time", is_active=True)
+            ProductFactory(guild=guild, name="Laser Time")
             _linked_user(client)
             response = client.get(f"/guilds/{guild.pk}/")
             assert b"Add to Cart" in response.content
@@ -79,7 +69,7 @@ def describe_guild_detail():
         def it_hides_add_button_when_no_payment_method(client: Client):
             MembershipPlanFactory()
             guild = GuildFactory()
-            ProductFactory(guild=guild, is_active=True)
+            ProductFactory(guild=guild)
             user = User.objects.create_user(username="nocard_grid", password="pass")
             TabFactory(member=user.member, stripe_payment_method_id="")
             client.login(username="nocard_grid", password="pass")

@@ -169,10 +169,13 @@ class TabChargeAdmin(ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(ModelAdmin):
-    list_display = ["name", "guild_name", "price", "admin_percent_override", "split_mode", "is_active"]
-    list_filter = ["is_active", "guild", "split_mode"]
+    # Splits are managed via the public guild detail page
+    # (``templates/hub/_modal_add_product.html``) for admins / officers /
+    # guild leads; this admin change-form is read-mostly for quick lookup/deletion.
+    list_display = ["name", "guild_name", "price"]
+    list_filter = ["guild"]
     search_fields = ["name", "guild__name"]
-    fields = ["name", "guild", "price", "admin_percent_override", "split_mode", "is_active"]
+    fields = ["name", "guild", "price"]
 
     @admin.display(description="Guild", ordering="guild__name")
     def guild_name(self, obj: Product) -> str:

@@ -179,28 +179,30 @@ def describe_guild_eyop_form():
     def it_creates_entry_on_post(client: Client):
         BillingSettingsFactory()
         guild = GuildFactory()
-        _user, tab = _linked_user(client, username="eyopp")
+        _user, tab = _linked_user(client, username="eyop_post")
 
         response = client.post(
             f"/guilds/{guild.pk}/eyop-form/",
-            {"description": "Custom item", "amount": "7.50", "quantity": "1"},
-            HTTP_HX_REQUEST="true",
+            {"description": "Custom thing", "amount": "12.50", "quantity": "1"},
         )
 
         assert response.status_code == 204
-        entry = TabEntry.objects.get(tab=tab)
-        assert entry.description == "Custom item"
-        assert entry.amount == Decimal("7.50")
+        entries = TabEntry.objects.filter(tab=tab)
+        assert entries.count() == 1
+        entry = entries.first()
+        assert entry.description == "Custom thing"
+        assert entry.amount == Decimal("12.50")
+        # Auto-constructed splits: admin + the fixed guild
+        assert entry.splits.count() == 2
 
     def it_creates_n_entries_when_quantity_is_n(client: Client):
         BillingSettingsFactory()
         guild = GuildFactory()
-        _user, tab = _linked_user(client, username="eyopq")
+        _user, tab = _linked_user(client, username="eyop_qty")
 
         response = client.post(
             f"/guilds/{guild.pk}/eyop-form/",
-            {"description": "Clay", "amount": "2.50", "quantity": "3"},
-            HTTP_HX_REQUEST="true",
+            {"description": "Bulk", "amount": "3.00", "quantity": "3"},
         )
 
         assert response.status_code == 204
@@ -228,26 +230,35 @@ def describe_guild_eyop_form():
     def it_returns_error_when_tab_locked(client: Client):
         BillingSettingsFactory()
         guild = GuildFactory()
-        _user, _tab = _linked_user(client, username="locked_eyop")
+        _user, _tab = _linked_user(client, username="eyop_locked")
 
         with patch("billing.models.Tab.add_entry", side_effect=TabLockedError("locked")):
             response = client.post(
                 f"/guilds/{guild.pk}/eyop-form/",
-                {"description": "Test", "amount": "5.00", "quantity": "1"},
+                {"description": "x", "amount": "1.00", "quantity": "1"},
             )
+
         assert response.status_code == 400
+        trigger = json.loads(response["HX-Trigger"])
+        assert trigger["showToast"]["type"] == "error"
 
     def it_returns_error_when_tab_limit_exceeded(client: Client):
         BillingSettingsFactory()
         guild = GuildFactory()
-        _user, _tab = _linked_user(client, username="limit_eyop")
+        _user, _tab = _linked_user(client, username="eyop_over")
 
-        with patch("billing.models.Tab.add_entry", side_effect=TabLimitExceededError("exceeded")):
+        with patch(
+            "billing.models.Tab.add_entry",
+            side_effect=TabLimitExceededError("over limit"),
+        ):
             response = client.post(
                 f"/guilds/{guild.pk}/eyop-form/",
-                {"description": "Test", "amount": "5.00", "quantity": "1"},
+                {"description": "x", "amount": "1.00", "quantity": "1"},
             )
+
         assert response.status_code == 400
+        trigger = json.loads(response["HX-Trigger"])
+        assert trigger["showToast"]["type"] == "error"
 
     def it_re_renders_form_on_validation_error(client: Client):
         BillingSettingsFactory()

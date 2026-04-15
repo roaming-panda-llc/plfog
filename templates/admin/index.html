@@ -173,10 +173,10 @@
             <div class="pl-stat__value">{{ stats.paying_voters }}</div>
             <div class="pl-stat__label">Paying voters</div>
         </a>
-        <a href="{% url 'admin:membership_guild_changelist' %}" class="pl-stat pl-stat--link">
+        <div class="pl-stat">
             <div class="pl-stat__value">{{ stats.active_guilds }}</div>
             <div class="pl-stat__label">Active guilds</div>
-        </a>
+        </div>
         <div class="pl-stat">
             <div class="pl-stat__value">${{ stats.projected_pool }}</div>
             <div class="pl-stat__label">

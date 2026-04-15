@@ -26,7 +26,6 @@
   .pl-checkbox-group { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: #F4EFDD; }
   .pl-checkbox-group label { display: flex; align-items: center; gap: 0.5rem; color: #F4EFDD; }
   .pl-filter-actions { display: flex; gap: 0.75rem; margin-top: 0.5rem; }
-  .pl-admin-total { color: #EEB44B; font-weight: 700; }
 </style>
 
 <div class="pl-dashboard">
@@ -102,27 +101,23 @@
     <table class="pl-table">
       <thead>
         <tr>
-          <th>Guild</th>
+          <th>Recipient</th>
           <th class="text-right">Entries</th>
-          <th class="text-right">Guild share</th>
+          <th class="text-right">Amount</th>
         </tr>
       </thead>
       <tbody>
         {% for row in payout_summary %}
         <tr>
-          <td>{{ row.guild_name }}</td>
+          <td>{{ row.recipient_label }}</td>
           <td class="text-right">{{ row.entry_count }}</td>
-          <td class="text-right">${{ row.guild_amount }}</td>
+          <td class="text-right">${{ row.amount }}</td>
         </tr>
         {% endfor %}
-        <tr>
-          <td colspan="2" class="pl-admin-total">Past Lives admin total</td>
-          <td class="text-right pl-admin-total">${{ admin_total }}</td>
-        </tr>
       </tbody>
     </table>
     {% else %}
-    <p class="pl-text-muted">No guild payouts in this window.</p>
+    <p class="pl-text-muted">No payouts in this window.</p>
     {% endif %}
   </div>
   {% endif %}
@@ -136,13 +131,10 @@
           <th>Date</th>
           <th>Member</th>
           <th>Description</th>
-          <th>Guild</th>
-          <th>Split</th>
+          <th>Recipient</th>
           <th>Status</th>
+          <th class="text-right">%</th>
           <th class="text-right">Amount</th>
-          <th class="text-right">Admin %</th>
-          <th class="text-right">Admin $</th>
-          <th class="text-right">Guild $</th>
         </tr>
       </thead>
       <tbody>
@@ -151,13 +143,10 @@
           <td>{{ r.created_at|date:"Y-m-d" }}</td>
           <td>{{ r.member_name }}</td>
           <td>{{ r.description }}</td>
-          <td>{{ r.guild_name }}</td>
-          <td>{{ r.split_mode_display }}</td>
+          <td>{{ r.recipient_label }}</td>
           <td>{{ r.charge_status }}</td>
+          <td class="text-right">{{ r.percent }}%</td>
           <td class="text-right">${{ r.amount }}</td>
-          <td class="text-right">{{ r.admin_percent }}%</td>
-          <td class="text-right">${{ r.admin_amount }}</td>
-          <td class="text-right">${{ r.guild_amount }}</td>
         </tr>
         {% endfor %}
       </tbody>

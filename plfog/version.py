@@ -2,11 +2,49 @@
 
 from __future__ import annotations
 
-VERSION = "1.6.0"
+VERSION = "1.5.5"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
     {
-        "version": "1.6.0",
+        "version": "1.5.5",
+        "date": "2026-04-14",
+        "title": "Edit products in place",
+        "changes": [
+            "You can now edit a product right from your guild page — click the small pencil on a product card and the same pop-up you use to add products opens up pre-filled with that product's name, price, and revenue split",
+            "Saving updates the product in place — no need to delete and re-add it just to fix a typo or change the percentages",
+            "Product cards are cleaner — the 'Admin 20% · Guild 80%' split summary is hidden now that you can see and edit the same info from the product's edit pop-up",
+        ],
+    },
+    {
+        "version": "1.5.4",
+        "date": "2026-04-14",
+        "title": "Edit Your Guild Page Directly",
+        "changes": [
+            "Guild leads can now edit their guild's page without going through the admin — just open your guild page and you'll see an 'Edit Guild Page' button next to the title and an 'Add Product' button in the Products section",
+            "Admins and guild officers see the same edit buttons on every guild page",
+            "Changing the guild name or description happens right in a pop-up window on the guild page",
+            "Adding a new product now opens a pop-up with the revenue-split builder instead of sending you to the admin panel — closing and re-opening the pop-up resets it cleanly",
+            "Existing products show a small delete button in the corner so you can remove them without leaving the page",
+            "The old 'Guilds' entry in the admin panel is gone — everything guild-related lives on the public guild pages now",
+            "My Tab page now has a hoverable '?' next to the title that explains how tabs work, and the next-charge date shows as subtext below the heading instead of buried in the middle of the card",
+            "Small copy fix on guild pages so the payment-method prompt reads 'add items to your tab' instead of just 'add items'",
+            "Sidebar 'Guilds' section starts expanded by default, and remembers your preference if you collapse it",
+        ],
+    },
+    {
+        "version": "1.5.3",
+        "date": "2026-04-14",
+        "title": "Flexible Product Revenue Splits",
+        "changes": [
+            "Products can now split revenue across multiple guilds and admin in any combination — for example, a $10 product can be set up so 20% goes to admin, 60% to the Ceramics Guild, and 20% to the Art Framing Guild",
+            "The percentages have to add up to 100%, but otherwise you can mix recipients however you like",
+            "The Add Product form has been redesigned: it now appears inline on the guild edit page (no more popup) with a live preview that shows exactly how a sale will be divided up",
+            "The 'active/inactive' toggle is gone — if a product exists, it's available; if you delete it, it's gone",
+            "Existing products and past tab entries were cleared during this upgrade — you'll need to re-add your products with their new split configuration",
+        ],
+    },
+    {
+        "version": "1.5.2",
         "date": "2026-04-14",
         "title": "Local Dev Setup & Cart Toast Fix",
         "changes": [

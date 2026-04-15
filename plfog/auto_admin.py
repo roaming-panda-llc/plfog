@@ -12,6 +12,15 @@ from django.contrib.sites.models import Site
 from django.db import models
 from unfold.admin import ModelAdmin as UnfoldModelAdmin
 
+# Models intentionally NOT registered in the Django admin. Guild was moved out
+# of the admin in v1.6.0 — all guild editing happens on the public guild page
+# at /guilds/<id>/ for authorized users (admin, guild officer, or that guild's
+# lead). See hub/views.py for the replacement views.
+EXCLUDED_MODELS = {
+    ("membership", "guild"),
+}
+
+
 EXCLUDED_APPS = {
     "django.contrib.admin",
     "django.contrib.auth",
@@ -108,7 +117,13 @@ def register_all_models():
     skipped_count = 0
     for model in apps.get_models():
         app_config = apps.get_app_config(model._meta.app_label)
-        if app_config.name in EXCLUDED_APPS or model._meta.abstract or is_model_registered(model):
+        key = (model._meta.app_label, model._meta.model_name)
+        if (
+            app_config.name in EXCLUDED_APPS
+            or model._meta.abstract
+            or is_model_registered(model)
+            or key in EXCLUDED_MODELS
+        ):
             skipped_count += 1
             continue
         admin.site.register(model, create_model_admin(model))

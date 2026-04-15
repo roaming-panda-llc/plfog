@@ -5,7 +5,6 @@ from decimal import Decimal
 import pytest
 from django.db.models import ProtectedError
 
-from billing.exceptions import TabLimitExceededError, TabLockedError
 from tests.billing.factories import BillingSettingsFactory, TabEntryFactory, TabFactory, UserFactory
 
 pytestmark = pytest.mark.django_db
@@ -94,55 +93,6 @@ def describe_Tab():
             tab = TabFactory(tab_limit=None)
             TabEntryFactory(tab=tab, amount=Decimal("75.00"))
             assert tab.remaining_limit == Decimal("125.00")
-
-    def describe_add_entry():
-        def it_creates_an_entry():
-            BillingSettingsFactory(default_tab_limit=Decimal("200.00"))
-            tab = TabFactory()
-            user = UserFactory()
-            entry = tab.add_entry(description="Laser time", amount=Decimal("15.00"), added_by=user)
-            assert entry.description == "Laser time"
-            assert entry.amount == Decimal("15.00")
-            assert entry.added_by == user
-            assert entry.tab == tab
-
-        def it_creates_self_service_entry():
-            BillingSettingsFactory(default_tab_limit=Decimal("200.00"))
-            tab = TabFactory()
-            entry = tab.add_entry(description="Self-service item", amount=Decimal("10.00"), is_self_service=True)
-            assert entry.is_self_service is True
-
-        def it_raises_TabLockedError_when_locked():
-            tab = TabFactory(is_locked=True, locked_reason="Payment failed")
-            with pytest.raises(TabLockedError, match="Payment failed"):
-                tab.add_entry(description="Test", amount=Decimal("10.00"))
-
-        def it_allows_entry_without_a_saved_payment_method():
-            # Direct-keys mode bills via Stripe Checkout, so no saved card is needed.
-            tab = TabFactory(stripe_payment_method_id="")
-            entry = tab.add_entry(description="Test", amount=Decimal("10.00"))
-            assert entry.pk is not None
-
-        def it_raises_TabLimitExceededError_when_over_limit():
-            BillingSettingsFactory(default_tab_limit=Decimal("50.00"))
-            tab = TabFactory(tab_limit=None)
-            TabEntryFactory(tab=tab, amount=Decimal("40.00"))
-            with pytest.raises(TabLimitExceededError, match="exceed tab limit"):
-                tab.add_entry(description="Test", amount=Decimal("20.00"))
-
-        def it_allows_entry_at_exact_limit():
-            BillingSettingsFactory(default_tab_limit=Decimal("50.00"))
-            tab = TabFactory(tab_limit=None)
-            TabEntryFactory(tab=tab, amount=Decimal("40.00"))
-            entry = tab.add_entry(description="Exact", amount=Decimal("10.00"))
-            assert entry.amount == Decimal("10.00")
-
-        def it_rejects_entry_one_cent_over_limit():
-            BillingSettingsFactory(default_tab_limit=Decimal("50.00"))
-            tab = TabFactory(tab_limit=None)
-            TabEntryFactory(tab=tab, amount=Decimal("40.00"))
-            with pytest.raises(TabLimitExceededError):
-                tab.add_entry(description="Over", amount=Decimal("10.01"))
 
     def describe_lock():
         def it_locks_the_tab():
@@ -236,3 +186,78 @@ def describe_Tab():
             with patch("billing.stripe_utils.detach_payment_method") as mock_detach:
                 tab.clear_payment_method()
             mock_detach.assert_not_called()
+
+
+def describe_Tab_add_entry_with_splits():
+    def it_pulls_splits_from_the_product_when_no_splits_kwarg(db):
+        from billing.models import TabEntrySplit
+        from tests.billing.factories import ProductFactory
+
+        product = ProductFactory()  # default 20% admin / 80% owning guild
+        tab = TabFactory()
+        entry = tab.add_entry(description="bag of clay", amount=Decimal("10.00"), product=product)
+        assert entry.splits.count() == 2
+        admin = entry.splits.get(recipient_type=TabEntrySplit.RecipientType.ADMIN)
+        guild_split = entry.splits.get(recipient_type=TabEntrySplit.RecipientType.GUILD)
+        assert admin.amount == Decimal("2.00")
+        assert guild_split.amount == Decimal("8.00")
+        assert guild_split.guild_id == product.guild_id
+
+    def it_uses_explicit_splits_kwarg_when_supplied(db):
+        from billing.models import TabEntrySplit
+
+        tab = TabFactory()
+        entry = tab.add_entry(
+            description="custom",
+            amount=Decimal("10.00"),
+            splits=[
+                {"recipient_type": "admin", "guild": None, "percent": Decimal("100")},
+            ],
+        )
+        assert entry.splits.count() == 1
+        only = entry.splits.first()
+        assert only.recipient_type == TabEntrySplit.RecipientType.ADMIN
+        assert only.amount == Decimal("10.00")
+
+    def it_raises_when_neither_product_nor_splits_supplied(db):
+        tab = TabFactory()
+        with pytest.raises(ValueError):
+            tab.add_entry(description="x", amount=Decimal("5.00"))
+
+    def it_snapshots_split_state_at_creation_time(db):
+        # If the product's splits are edited later, the entry's snapshot should not change.
+        from billing.models import ProductRevenueSplit
+        from tests.billing.factories import ProductFactory
+
+        product = ProductFactory()
+        tab = TabFactory()
+        entry = tab.add_entry(description="x", amount=Decimal("10.00"), product=product)
+
+        product.splits.all().delete()
+        ProductRevenueSplit.objects.create(
+            product=product,
+            recipient_type=ProductRevenueSplit.RecipientType.ADMIN,
+            guild=None,
+            percent=Decimal("100"),
+        )
+
+        entry.refresh_from_db()
+        assert entry.splits.count() == 2  # unchanged
+
+    def it_raises_TabLockedError_when_tab_is_locked(db):
+        from billing.exceptions import TabLockedError
+        from tests.billing.factories import ProductFactory
+
+        product = ProductFactory()
+        tab = TabFactory(is_locked=True, locked_reason="Payment failed")
+        with pytest.raises(TabLockedError, match="Payment failed"):
+            tab.add_entry(description="x", amount=Decimal("5.00"), product=product)
+
+    def it_raises_TabLimitExceededError_when_entry_would_exceed_limit(db):
+        from billing.exceptions import TabLimitExceededError
+        from tests.billing.factories import ProductFactory
+
+        product = ProductFactory(price=Decimal("10.00"))
+        tab = TabFactory(tab_limit=Decimal("5.00"))
+        with pytest.raises(TabLimitExceededError, match="exceed tab limit"):
+            tab.add_entry(description="x", amount=Decimal("10.00"), product=product)

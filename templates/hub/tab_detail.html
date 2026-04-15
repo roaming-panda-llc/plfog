@@ -3,7 +3,22 @@
 
 {% block content %}
 <div class="tab-page-header">
-    <h1 class="hub-page-title">My Tab</h1>
+    <div class="tab-page-header__title">
+        <div class="tab-page-header__title-row">
+            <h1 class="hub-page-title">My Tab</h1>
+            <span class="pl-help" tabindex="0" aria-label="What is a tab?">
+                <span class="pl-help__icon" aria-hidden="true">?</span>
+                <span class="pl-help__bubble" role="tooltip">
+                    Your tab works like a bar tab, not a cart. Items you add from guild pages accumulate here and get charged to your card all at once on the next billing run (not immediately). You can remove any pending charge from this page before it&rsquo;s processed.
+                </span>
+            </span>
+        </div>
+        {% if next_charge_at %}
+        <p class="tab-page-header__subtext">
+            Next charge: {{ next_charge_at|date:"F jS" }} at {{ next_charge_at|date:"g:i A" }}
+        </p>
+        {% endif %}
+    </div>
     <a href="{% url 'hub_tab_history' %}" class="tab-history-link">Tab History</a>
 </div>
 
@@ -34,12 +49,6 @@
         <span class="tab-summary__label">Remaining</span>
         <span class="tab-summary__value">${{ tab.remaining_limit }}</span>
     </div>
-    {% if next_charge_at %}
-    <p class="hub-text-muted" style="margin:1rem 0 0;font-size:0.875rem;">
-        Your tab will be processed by Stripe on {{ next_charge_at|date:"F jS" }} at {{ next_charge_at|date:"g:i A" }}.
-    </p>
-    {% endif %}
-
     {% if entries %}
     <table class="tab-table" style="margin-top:1.25rem;">
         <thead>
