@@ -435,7 +435,6 @@ class Guild(models.Model):
         default="",
         help_text="Member-facing description or announcement shown on the guild page.",
     )
-    created_at = models.DateTimeField(auto_now_add=True)
     calendar_url = models.URLField(
         blank=True,
         default="",
@@ -452,6 +451,7 @@ class Guild(models.Model):
         blank=True,
         help_text="When this guild's iCal feed was last synced. Set by the calendar service.",
     )
+    created_at = models.DateTimeField(auto_now_add=True)
     leases = GenericRelation(
         "Lease",
         content_type_field="content_type",
