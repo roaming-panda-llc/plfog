@@ -397,6 +397,7 @@ class Tab(models.Model):
                     f"(balance: ${current}, limit: ${locked_self.effective_tab_limit})."
                 )
             if splits is None:
+                assert product is not None  # guarded at top of method
                 splits = [
                     {"recipient_type": s.recipient_type, "guild": s.guild, "percent": s.percent}
                     for s in product.splits.all()
@@ -914,7 +915,8 @@ class ProductRevenueSplit(models.Model):
     def __str__(self) -> str:
         if self.recipient_type == self.RecipientType.ADMIN:
             return f"Admin {self.percent}%"
-        return f"{self.guild.name if self.guild_id else 'Guild?'} {self.percent}%"
+        guild_name = self.guild.name if self.guild is not None else "Guild?"
+        return f"{guild_name} {self.percent}%"
 
 
 class TabEntrySplit(models.Model):
@@ -977,9 +979,10 @@ class TabEntrySplit(models.Model):
         ]
 
     def __str__(self) -> str:
-        recipient = (
-            "Admin"
-            if self.recipient_type == self.RecipientType.ADMIN
-            else (self.guild.name if self.guild_id else "Guild?")
-        )
+        if self.recipient_type == self.RecipientType.ADMIN:
+            recipient = "Admin"
+        elif self.guild is not None:
+            recipient = self.guild.name
+        else:
+            recipient = "Guild?"
         return f"{recipient} ${self.amount} ({self.percent}%)"

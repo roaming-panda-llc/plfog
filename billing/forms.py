@@ -435,7 +435,7 @@ class _BaseProductSplitFormSet(BaseInlineFormSet):
                 seen_guilds.add(guild.pk)
 
 
-ProductRevenueSplitFormSet = inlineformset_factory(
+ProductRevenueSplitFormSet: Any = inlineformset_factory(
     Product,
     ProductRevenueSplit,
     formset=_BaseProductSplitFormSet,
