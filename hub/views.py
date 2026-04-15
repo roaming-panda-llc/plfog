@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, TypedDict
+
+from django.utils import timezone as dj_timezone
 
 from allauth.account.models import EmailAddress
 from django.contrib import messages
@@ -17,6 +19,7 @@ from django.views.decorators.http import require_POST, require_http_methods
 
 from billing.exceptions import NoPaymentMethodError, TabLimitExceededError, TabLockedError
 from billing.models import BillingSettings, Tab, TabCharge
+from hub.calendar_service import refresh_stale_sources
 from hub.forms import BetaFeedbackForm, EmailPreferencesForm, GuildEditForm, ProfileSettingsForm, VotePreferenceForm
 from membership.cycle import get_cycle_context
 from membership.models import FundingSnapshot, Guild, Member, VotePreference
@@ -698,3 +701,229 @@ def tab_history(request: HttpRequest) -> HttpResponse:
     charges = tab.charges.exclude(status=TabCharge.Status.PENDING).order_by("-created_at").prefetch_related("entries")
 
     return render(request, "hub/tab_history.html", {**ctx, "charges": charges})
+
+
+_CALENDAR_PAGE_SIZE = 10
+
+
+def _get_calendar_context(
+    request: HttpRequest, week_offset: int = 0, month_offset: int = 0, event_page: int = 1
+) -> dict[str, Any]:
+    """Build context for both the full calendar page and the HTMX partial.
+
+    Args:
+        week_offset: Weeks relative to the current week (negative = past, positive = future).
+        month_offset: Months relative to the current month (negative = past, positive = future).
+        event_page: 1-based page number for the event list (PAGE_SIZE events per page).
+    """
+    import calendar as _cal
+    from collections import defaultdict
+    from datetime import date as date_type
+
+    from core.models import SiteConfiguration
+    from membership.models import CalendarEvent, Guild
+
+    def _shift_month(d: date_type, months: int) -> date_type:
+        """Return the first day of the month shifted by `months`."""
+        m = d.month - 1 + months
+        return d.replace(year=d.year + m // 12, month=m % 12 + 1, day=1)
+
+    now = dj_timezone.now()
+    today = now.date()
+
+    # Navigated week
+    current_week_start = today - timedelta(days=today.weekday())
+    week_start = current_week_start + timedelta(weeks=week_offset)
+    week_end = week_start + timedelta(days=6)
+
+    # Navigated month
+    nav_month_first = _shift_month(today.replace(day=1), month_offset)
+    nav_month_last_day = _cal.monthrange(nav_month_first.year, nav_month_first.month)[1]
+    nav_month_last = nav_month_first.replace(day=nav_month_last_day)
+
+    # Fetch only events covering the navigated week and month ranges
+    fetch_from = min(week_start, nav_month_first)
+    fetch_to = max(week_end, nav_month_last)
+
+    all_events = list(
+        CalendarEvent.objects.filter(start_dt__date__gte=fetch_from, start_dt__date__lte=fetch_to)
+        .select_related("guild")
+        .order_by("start_dt")
+    )
+
+    # Week event list: events whose start date falls within the navigated week
+    week_events = [e for e in all_events if week_start <= e.start_dt.date() <= week_end]
+
+    # Month event list: events whose start date falls within the navigated month (paginated)
+    raw_month_events = [e for e in all_events if nav_month_first <= e.start_dt.date() <= nav_month_last]
+    total_pages = max(1, (len(raw_month_events) + _CALENDAR_PAGE_SIZE - 1) // _CALENDAR_PAGE_SIZE)
+    event_page = max(1, min(event_page, total_pages))
+    page_start = (event_page - 1) * _CALENDAR_PAGE_SIZE
+    month_events = raw_month_events[page_start : page_start + _CALENDAR_PAGE_SIZE]
+
+    guilds_with_calendars = list(Guild.objects.filter(is_active=True, calendar_url__gt="").order_by("name"))
+
+    config = SiteConfiguration.load()
+    general_enabled = bool(config.general_calendar_url)
+    general_color = config.general_calendar_color
+    classes_enabled = config.sync_classes_enabled
+    classes_color = config.classes_calendar_color
+
+    source_colors: dict[str, str] = {"general": general_color, "classes": classes_color}
+    for g in guilds_with_calendars:
+        source_colors[str(g.pk)] = g.calendar_color
+
+    # Group events by date for calendar grid dots
+    events_by_date: dict = defaultdict(list)
+    for evt in all_events:
+        events_by_date[evt.start_dt.date()].append(evt)
+
+    # Week label (e.g. "Apr 14 – 20, 2026" or "Apr 28 – May 4, 2026")
+    if week_start.month == week_end.month and week_start.year == week_end.year:
+        week_label = f"{week_start.strftime('%b %-d')} – {week_end.strftime('%-d')}, {week_end.year}"
+    else:
+        week_label = f"{week_start.strftime('%b %-d')} – {week_end.strftime('%b %-d')}, {week_end.year}"
+
+    # Week grid: 7 days starting from navigated Monday
+    week_days = [
+        {
+            "date": week_start + timedelta(days=i),
+            "is_today": (week_start + timedelta(days=i)) == today,
+            "events": events_by_date.get(week_start + timedelta(days=i), []),
+        }
+        for i in range(7)
+    ]
+
+    # Month label (e.g. "April 2026")
+    month_label = nav_month_first.strftime("%B %Y")
+
+    # Month grid: navigated month padded to complete 7-column rows (Mon–Sun)
+    month_headers = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    leading = nav_month_first.weekday()
+    trailing = (6 - nav_month_last.weekday()) % 7
+
+    month_days = []
+    for i in range(leading):
+        d = nav_month_first - timedelta(days=leading - i)
+        month_days.append({"date": d, "is_today": d == today, "in_month": False, "events": events_by_date.get(d, [])})
+    for day_num in range(1, nav_month_last_day + 1):
+        d = nav_month_first.replace(day=day_num)
+        month_days.append({"date": d, "is_today": d == today, "in_month": True, "events": events_by_date.get(d, [])})
+    for i in range(1, trailing + 1):
+        d = nav_month_last + timedelta(days=i)
+        month_days.append({"date": d, "is_today": d == today, "in_month": False, "events": events_by_date.get(d, [])})
+
+    return {
+        "week_events": week_events,
+        "month_events": month_events,
+        "event_page": event_page,
+        "event_total_pages": total_pages,
+        "guilds_with_calendars": guilds_with_calendars,
+        "general_enabled": general_enabled,
+        "general_color": general_color,
+        "classes_enabled": classes_enabled,
+        "classes_color": classes_color,
+        "source_colors": source_colors,
+        "week_days": week_days,
+        "week_label": week_label,
+        "week_offset": week_offset,
+        "month_days": month_days,
+        "month_headers": month_headers,
+        "month_label": month_label,
+        "month_offset": month_offset,
+        "now": now,
+    }
+
+
+@login_required
+def community_calendar(request: HttpRequest) -> HttpResponse:
+    """Community Calendar page — upcoming events from all guild and general calendars."""
+    ctx = _get_hub_context(request)
+    cal_ctx = _get_calendar_context(request)
+
+    default_filters = []
+    if cal_ctx["general_enabled"]:
+        default_filters.append("general")
+    if cal_ctx["classes_enabled"]:
+        default_filters.append("classes")
+    for g in cal_ctx["guilds_with_calendars"]:
+        default_filters.append(str(g.pk))
+
+    cal_ctx["default_filters_json"] = json.dumps(default_filters).replace('"', '\\"')
+    return render(request, "hub/community_calendar.html", {**ctx, **cal_ctx})
+
+
+@login_required
+def calendar_events_partial(request: HttpRequest) -> HttpResponse:
+    """HTMX partial — refreshes stale calendar sources and returns updated event HTML."""
+    refresh_stale_sources()
+    try:
+        week_offset = max(-52, min(52, int(request.GET.get("week_offset", 0))))
+        month_offset = max(-24, min(24, int(request.GET.get("month_offset", 0))))
+        event_page = max(1, int(request.GET.get("page", 1)))
+    except (ValueError, TypeError):
+        week_offset = 0
+        month_offset = 0
+        event_page = 1
+    cal_ctx = _get_calendar_context(request, week_offset=week_offset, month_offset=month_offset, event_page=event_page)
+    return render(request, "hub/partials/calendar_content.html", cal_ctx)
+
+
+def _ical_escape(value: str) -> str:
+    """Escape special characters per RFC 5545 §3.3.11."""
+    value = value.replace("\\", "\\\\")
+    value = value.replace("\r\n", "\\n").replace("\n", "\\n").replace("\r", "\\n")
+    value = value.replace(";", "\\;").replace(",", "\\,")
+    return value
+
+
+@login_required
+def calendar_export_ics(request: HttpRequest) -> HttpResponse:
+    """Download a combined iCal file of all upcoming events."""
+    from membership.models import CalendarEvent
+
+    now = dj_timezone.now()
+    horizon = now + timedelta(days=90)
+    events = (
+        CalendarEvent.objects.filter(start_dt__gte=now, start_dt__lte=horizon)
+        .select_related("guild")
+        .order_by("start_dt")
+    )
+
+    lines: list[str] = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Past Lives Makerspace//Community Calendar//EN",
+        "X-WR-CALNAME:Past Lives Community Calendar",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+    ]
+
+    for evt in events:
+        lines += [
+            "BEGIN:VEVENT",
+            f"UID:{evt.uid}",
+            f"SUMMARY:{_ical_escape(evt.title)}",
+        ]
+        if evt.all_day:
+            lines += [
+                f"DTSTART;VALUE=DATE:{evt.start_dt.strftime('%Y%m%d')}",
+                f"DTEND;VALUE=DATE:{evt.end_dt.strftime('%Y%m%d')}",
+            ]
+        else:
+            lines += [
+                f"DTSTART:{evt.start_dt.strftime('%Y%m%dT%H%M%SZ')}",
+                f"DTEND:{evt.end_dt.strftime('%Y%m%dT%H%M%SZ')}",
+            ]
+        if evt.description:
+            lines.append(f"DESCRIPTION:{_ical_escape(evt.description[:250])}")
+        if evt.location:
+            lines.append(f"LOCATION:{evt.location}")
+        lines.append("END:VEVENT")
+
+    lines.append("END:VCALENDAR")
+    ical_content = "\r\n".join(lines) + "\r\n"
+
+    response = HttpResponse(ical_content, content_type="text/calendar; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="past-lives-calendar.ics"'
+    return response

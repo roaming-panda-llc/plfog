@@ -435,6 +435,22 @@ class Guild(models.Model):
         default="",
         help_text="Member-facing description or announcement shown on the guild page.",
     )
+    calendar_url = models.URLField(
+        blank=True,
+        default="",
+        help_text="Public iCal URL for this guild's Google Calendar (File → Share → Get shareable iCal link).",
+    )
+    calendar_color = models.CharField(
+        max_length=7,
+        blank=True,
+        default="#4B9FEE",
+        help_text="Hex color code for this guild's events on the Community Calendar (e.g. #4B9FEE).",
+    )
+    calendar_last_fetched_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this guild's iCal feed was last synced. Set by the calendar service.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     leases = GenericRelation(
         "Lease",
@@ -888,3 +904,73 @@ class Lease(models.Model):
 
     # Lease records are managed in Airtable and pulled into Django via airtable_pull.
     # No save()/delete() sync overrides — this model is read-only from Airtable's perspective.
+
+
+# ---------------------------------------------------------------------------
+# CalendarEvent
+# ---------------------------------------------------------------------------
+
+
+class CalendarEventQuerySet(models.QuerySet):
+    def upcoming(self) -> CalendarEventQuerySet:
+        """Events whose end time is now or in the future."""
+        return self.filter(end_dt__gte=timezone.now())
+
+
+class CalendarEvent(models.Model):
+    """Cached calendar event fetched from a guild's or the general makerspace's iCal feed.
+
+    Treat as a read-through cache — do not edit records directly; re-sync from the source.
+    """
+
+    class Source(models.TextChoices):
+        GUILD = "guild", "Guild Calendar"
+        GENERAL = "general", "General Calendar"
+        CLASSES = "classes", "Classes (classes.pastlives.space)"
+
+    guild = models.ForeignKey(
+        "Guild",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="calendar_events",
+        help_text="Guild this event belongs to. Null for general or classes events.",
+    )
+    source = models.CharField(
+        max_length=20,
+        choices=Source.choices,
+        default=Source.GUILD,
+        help_text="Origin of this event: guild iCal, general makerspace iCal, or classes.pastlives.space.",
+    )
+    uid = models.CharField(max_length=500, db_index=True, help_text="iCal UID, unique within a source.")
+    title = models.CharField(max_length=500, help_text="Event title from iCal SUMMARY field.")
+    description = models.TextField(blank=True, help_text="Event description from iCal DESCRIPTION field.")
+    location = models.CharField(max_length=500, blank=True, help_text="Event location from iCal LOCATION field.")
+    url = models.URLField(blank=True, help_text="Event URL from iCal URL field.")
+    start_dt = models.DateTimeField(help_text="Event start time, UTC-normalized.")
+    end_dt = models.DateTimeField(help_text="Event end time, UTC-normalized.")
+    all_day = models.BooleanField(default=False, help_text="True for all-day events (DATE not DATETIME in iCal).")
+    fetched_at = models.DateTimeField(help_text="When this record was last synced from the iCal source.")
+
+    objects = CalendarEventQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["start_dt"]
+        indexes = [
+            models.Index(fields=["start_dt", "end_dt"], name="idx_calendarevent_start_end"),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=["guild", "uid"], name="uq_calendarevent_guild_uid"),
+        ]
+        verbose_name = "Calendar Event"
+        verbose_name_plural = "Calendar Events"
+
+    def __str__(self) -> str:
+        return self.title
+
+    @property
+    def source_key(self) -> str:
+        """Key used to look up this event's display color in the source_colors dict."""
+        if self.source == self.Source.GUILD and self.guild_id:
+            return str(self.guild_id)
+        return self.source

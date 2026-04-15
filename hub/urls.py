@@ -43,4 +43,7 @@ urlpatterns = [
     path("tab/", views.tab_detail, name="hub_tab_detail"),
     path("tab/history/", views.tab_history, name="hub_tab_history"),
     path("tab/void/<int:entry_pk>/", views.void_tab_entry, name="hub_void_tab_entry"),
+    path("calendar/", views.community_calendar, name="hub_community_calendar"),
+    path("calendar/events/", views.calendar_events_partial, name="hub_community_calendar_events"),
+    path("calendar/export.ics", views.calendar_export_ics, name="hub_calendar_export_ics"),
 ]

@@ -1,0 +1,157 @@
+{% load hub_tags %}
+
+{# Week navigation #}
+<div class="pl-calendar-nav" x-show="calView === 'week'">
+    <button class="pl-calendar-nav__btn"
+            hx-get="{% url 'hub_community_calendar_events' %}?week_offset={{ week_offset|add:-1 }}&amp;month_offset={{ month_offset }}"
+            hx-target="#pl-calendar-events-area"
+            hx-swap="innerHTML"
+            hx-indicator="#pl-calendar-loading">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <span class="pl-calendar-nav__label">{{ week_label }}</span>
+    <button class="pl-calendar-nav__btn"
+            hx-get="{% url 'hub_community_calendar_events' %}?week_offset={{ week_offset|add:1 }}&amp;month_offset={{ month_offset }}"
+            hx-target="#pl-calendar-events-area"
+            hx-swap="innerHTML"
+            hx-indicator="#pl-calendar-loading">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
+</div>
+
+{# Week grid #}
+<div class="pl-calendar-grid pl-calendar-grid--week" x-show="calView === 'week'">
+    {% for day in week_days %}
+    <div class="pl-calendar-grid__day{% if day.is_today %} pl-calendar-grid__day--today{% endif %}">
+        <div class="pl-calendar-grid__day-header">
+            <span class="pl-calendar-grid__day-name">{{ day.date|date:"D" }}</span>
+            <span class="pl-calendar-grid__day-num{% if day.is_today %} pl-calendar-grid__day-num--today{% endif %}">{{ day.date|date:"j" }}</span>
+        </div>
+        <div class="pl-calendar-grid__day-dots">
+            {% for event in day.events %}
+            {% with src=event.source_key %}
+            <span class="pl-calendar-grid__dot"
+                  x-show="isActive('{{ src }}')"
+                  style="background: {{ source_colors|get_item:src|default:'#888888' }};"
+                  title="{{ event.title }}"></span>
+            {% endwith %}
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{# Month navigation #}
+<div class="pl-calendar-nav" x-show="calView === 'month'">
+    <button class="pl-calendar-nav__btn"
+            hx-get="{% url 'hub_community_calendar_events' %}?week_offset={{ week_offset }}&amp;month_offset={{ month_offset|add:-1 }}"
+            hx-target="#pl-calendar-events-area"
+            hx-swap="innerHTML"
+            hx-indicator="#pl-calendar-loading">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <span class="pl-calendar-nav__label">{{ month_label }}</span>
+    <button class="pl-calendar-nav__btn"
+            hx-get="{% url 'hub_community_calendar_events' %}?week_offset={{ week_offset }}&amp;month_offset={{ month_offset|add:1 }}"
+            hx-target="#pl-calendar-events-area"
+            hx-swap="innerHTML"
+            hx-indicator="#pl-calendar-loading">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
+</div>
+
+{# Month grid #}
+<div class="pl-calendar-grid pl-calendar-grid--month" x-show="calView === 'month'">
+    {% for header in month_headers %}
+    <div class="pl-calendar-grid__week-header">{{ header }}</div>
+    {% endfor %}
+    {% for day in month_days %}
+    <div class="pl-calendar-grid__day{% if day.is_today %} pl-calendar-grid__day--today{% endif %}{% if not day.in_month %} pl-calendar-grid__day--faded{% endif %}">
+        <div class="pl-calendar-grid__day-header">
+            <span class="pl-calendar-grid__day-num{% if day.is_today %} pl-calendar-grid__day-num--today{% endif %}">{{ day.date|date:"j" }}</span>
+        </div>
+        <div class="pl-calendar-grid__day-dots">
+            {% for event in day.events %}
+            {% with src=event.source_key %}
+            <span class="pl-calendar-grid__dot"
+                  x-show="isActive('{{ src }}')"
+                  style="background: {{ source_colors|get_item:src|default:'#888888' }};"
+                  title="{{ event.title }}"></span>
+            {% endwith %}
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{# Divider #}
+<div class="pl-calendar-divider"></div>
+
+{# Week event list — all events within the navigated week #}
+<div x-show="calView === 'week'">
+    <div class="pl-calendar-list">
+        {% if week_events %}
+        {% for event in week_events %}
+        {% include "hub/partials/calendar_event_item.html" %}
+        {% endfor %}
+        {% else %}
+        <div class="pl-calendar-empty">
+            <p>No events scheduled for this week.</p>
+            <p class="pl-calendar-empty__hint">Guild officers can add a Google Calendar link from their guild page.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{# Month event list — events within the navigated month, paginated #}
+<div x-show="calView === 'month'">
+    <div class="pl-calendar-list">
+        {% if month_events %}
+        {% for event in month_events %}
+        {% include "hub/partials/calendar_event_item.html" %}
+        {% endfor %}
+        {% else %}
+        <div class="pl-calendar-empty">
+            <p>No events scheduled for this month.</p>
+            <p class="pl-calendar-empty__hint">Guild officers can add a Google Calendar link from their guild page.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    {# Pagination (month view only) #}
+    {% if event_total_pages > 1 %}
+    <div class="pl-calendar-pagination">
+        {% if event_page > 1 %}
+        <button class="pl-calendar-pagination__btn"
+                hx-get="{% url 'hub_community_calendar_events' %}?week_offset={{ week_offset }}&amp;month_offset={{ month_offset }}&amp;page={{ event_page|add:-1 }}"
+                hx-target="#pl-calendar-events-area"
+                hx-swap="innerHTML"
+                hx-indicator="#pl-calendar-loading">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            Prev
+        </button>
+        {% else %}
+        <button class="pl-calendar-pagination__btn pl-calendar-pagination__btn--disabled" disabled>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            Prev
+        </button>
+        {% endif %}
+        <span class="pl-calendar-pagination__label">{{ event_page }} / {{ event_total_pages }}</span>
+        {% if event_page < event_total_pages %}
+        <button class="pl-calendar-pagination__btn"
+                hx-get="{% url 'hub_community_calendar_events' %}?week_offset={{ week_offset }}&amp;month_offset={{ month_offset }}&amp;page={{ event_page|add:1 }}"
+                hx-target="#pl-calendar-events-area"
+                hx-swap="innerHTML"
+                hx-indicator="#pl-calendar-loading">
+            Next
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        {% else %}
+        <button class="pl-calendar-pagination__btn pl-calendar-pagination__btn--disabled" disabled>
+            Next
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>

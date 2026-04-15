@@ -41,6 +41,12 @@ def active_nav(context: dict[str, Any], *args: str | int) -> str:
     return ""
 
 
+@register.filter
+def get_item(dictionary: dict, key: str) -> Any:
+    """Look up a key in a dict: {{ my_dict|get_item:key }}"""
+    return dictionary.get(str(key))
+
+
 @register.simple_tag(takes_context=True)
 def has_active_guild(context: dict[str, Any], guilds: QuerySet[Guild]) -> bool:
     """Return True if the current page is a guild detail page."""

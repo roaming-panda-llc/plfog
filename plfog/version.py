@@ -2,9 +2,31 @@
 
 from __future__ import annotations
 
-VERSION = "1.5.7"
+VERSION = "1.6.1"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.6.1",
+        "date": "2026-04-15",
+        "title": "Calendar: Classes sync, configurable colors & pagination",
+        "changes": [
+            "Classes from classes.pastlives.space now show up on the Community Calendar — click the title to go straight to the registration page",
+            "Classes have their own color on the calendar, separate from General events — customize it in Site Settings",
+            "The event list now shows 10 events per page with prev/next arrows so the page doesn't get overwhelmed",
+            "Admins can configure the Classes color in Site Settings → Community Calendar alongside the existing General color",
+        ],
+    },
+    {
+        "version": "1.6.0",
+        "date": "2026-04-15",
+        "title": "Community Calendar",
+        "changes": [
+            "New Community Calendar — see all upcoming makerspace events in one place, with week and month views so you can plan ahead",
+            "Filter events by guild to find workshops, meetups, and events from just the guilds you care about",
+            "Export any event to your personal calendar app (Google, Apple, Outlook — whatever you use) with one click",
+            "Guild officers can now link their guild's Google Calendar so events sync automatically — no more posting events in two places",
+        ],
+    },
     {
         "version": "1.5.7",
         "date": "2026-04-15",
