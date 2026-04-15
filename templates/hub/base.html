@@ -222,6 +222,17 @@
         document.body.addEventListener('htmx:configRequest', function(event) {
             event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
         });
+
+        // When hx-boost follows a redirect to the login page, do a full page
+        // load instead of a partial swap — the login page uses different CSS
+        // and layout so a swap would render it completely unstyled.
+        document.addEventListener('htmx:beforeSwap', function(event) {
+            var url = event.detail.xhr && event.detail.xhr.responseURL;
+            if (url && url.includes('/accounts/login/')) {
+                event.detail.shouldSwap = false;
+                window.location.href = url;
+            }
+        });
     </script>
     <script defer src="{% static 'js/alpine.min.js' %}"></script>
     <script>
