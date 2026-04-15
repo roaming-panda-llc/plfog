@@ -22,41 +22,10 @@ the modal wrapper handles the chrome.
                   placeholder="Tell members what this guild is about...">{{ guild_edit_form.about.value|default_if_none:'' }}</textarea>
     </div>
 
-    <p style="font-size:0.75rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--hub-text-muted,#96ACBB);margin:1.25rem 0 0.75rem;">Calendar Integration</p>
+    <p class="pl-modal-section-label">Calendar Integration</p>
 
-    <div class="pl-form-group">
-        <label class="pl-form-label" for="{{ guild_edit_form.calendar_url.id_for_label }}">
-            {{ guild_edit_form.calendar_url.label }}
-        </label>
-        {{ guild_edit_form.calendar_url }}
-        {% if guild_edit_form.calendar_url.errors %}
-        <ul class="pl-field-errors">
-            {% for error in guild_edit_form.calendar_url.errors %}
-            <li class="pl-field-error">{{ error }}</li>
-            {% endfor %}
-        </ul>
-        {% endif %}
-        {% if guild_edit_form.calendar_url.help_text %}
-        <p class="pl-field-hint">{{ guild_edit_form.calendar_url.help_text }}</p>
-        {% endif %}
-    </div>
-
-    <div class="pl-form-group">
-        <label class="pl-form-label" for="{{ guild_edit_form.calendar_color.id_for_label }}">
-            {{ guild_edit_form.calendar_color.label }}
-        </label>
-        <div style="display:flex;align-items:center;gap:0.75rem;">
-            {{ guild_edit_form.calendar_color }}
-            <span class="pl-field-hint" style="margin:0;">{{ guild_edit_form.calendar_color.help_text }}</span>
-        </div>
-        {% if guild_edit_form.calendar_color.errors %}
-        <ul class="pl-field-errors">
-            {% for error in guild_edit_form.calendar_color.errors %}
-            <li class="pl-field-error">{{ error }}</li>
-            {% endfor %}
-        </ul>
-        {% endif %}
-    </div>
+    {% include "components/form_field.html" with field=guild_edit_form.calendar_url %}
+    {% include "components/form_field.html" with field=guild_edit_form.calendar_color %}
 
     <div class="pl-guild-edit-form__actions">
         <button type="button"

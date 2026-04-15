@@ -27,7 +27,7 @@ class GuildEditForm(forms.ModelForm):
             ),
             "calendar_url": forms.URLInput(attrs={"placeholder": "https://calendar.google.com/calendar/ical/..."}),
             "calendar_color": forms.TextInput(
-                attrs={"type": "color", "style": "width: 56px; height: 36px; padding: 2px;"},
+                attrs={"type": "color", "class": "pl-color-input"},
             ),
         }
         labels = {

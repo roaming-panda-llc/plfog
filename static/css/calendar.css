@@ -347,6 +347,21 @@
     box-shadow: 0 4px 16px rgba(0,0,0,0.12);
 }
 
+.pl-modal-section-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--hub-text-muted, #96ACBB);
+    margin: 1.25rem 0 0.75rem;
+}
+
+.pl-color-input {
+    width: 56px;
+    height: 36px;
+    padding: 2px;
+}
+
 @media (max-width: 600px) {
     .pl-calendar-grid__day-name {
         display: none;
