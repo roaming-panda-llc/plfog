@@ -123,3 +123,35 @@ def describe_ProductRevenueSplit():
                 percent=Decimal("100"),
             )
             assert ProductRevenueSplit.objects.filter(guild=guild).count() == 2
+
+    def describe_str():
+        def it_renders_admin_rows(db):
+            product = ProductFactory(with_default_splits=False)
+            split = ProductRevenueSplit.objects.create(
+                product=product,
+                recipient_type=ProductRevenueSplit.RecipientType.ADMIN,
+                guild=None,
+                percent=Decimal("25"),
+            )
+            assert str(split) == "Admin 25%"
+
+        def it_renders_guild_rows(db):
+            guild = GuildFactory(name="Woodshop")
+            product = ProductFactory(with_default_splits=False)
+            split = ProductRevenueSplit.objects.create(
+                product=product,
+                recipient_type=ProductRevenueSplit.RecipientType.GUILD,
+                guild=guild,
+                percent=Decimal("75"),
+            )
+            assert str(split) == "Woodshop 75%"
+
+        def it_renders_guild_rows_with_missing_guild_safely():
+            # Built but never persisted — bypasses the DB constraint so we can
+            # exercise the defensive ``Guild?`` fallback in __str__.
+            split = ProductRevenueSplit(
+                recipient_type=ProductRevenueSplit.RecipientType.GUILD,
+                guild=None,
+                percent=Decimal("50"),
+            )
+            assert str(split) == "Guild? 50%"

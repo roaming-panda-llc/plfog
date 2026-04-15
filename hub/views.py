@@ -200,7 +200,7 @@ def _can_edit_guild(request: HttpRequest, guild: Guild) -> bool:
 
     Handles anonymous users and users with no linked Member gracefully.
     """
-    if not request.user.is_authenticated:
+    if not request.user.is_authenticated:  # pragma: no cover — defensive; callers are @login_required
         return False
     member: Member | None = getattr(request.user, "member", None)
     if member is None:
@@ -297,7 +297,9 @@ def _surface_product_errors(request: HttpRequest, form: Any, formset: Any) -> No
         for field, errors in form_errors.items():
             for error in errors:
                 messages.error(request, f"Split row {idx + 1} ({field}): {error}")
-    if not (form.errors or formset.non_form_errors() or any(formset.errors)):
+    if not (
+        form.errors or formset.non_form_errors() or any(formset.errors)
+    ):  # pragma: no cover — defensive; is_valid()=False implies at least one error source
         messages.error(request, "Could not add product — see errors below.")
 
 

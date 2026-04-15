@@ -190,6 +190,76 @@ def describe_guild_edit():
         guild.refresh_from_db()
         assert guild.name == "Keep"
 
+    def it_surfaces_form_errors_when_invalid(client: Client):
+        # name is required → posting an empty name surfaces a form error message.
+        _user_with_role("admin_einv", fog_role=Member.FogRole.ADMIN)
+        guild = GuildFactory(name="Keep")
+        client.login(username="admin_einv", password="pass")
+        url = reverse("hub_guild_edit", args=[guild.pk])
+        response = client.post(url, data={"name": "", "about": "new about"}, follow=True)
+        assert response.status_code == 200
+        # Guild was not changed
+        guild.refresh_from_db()
+        assert guild.name == "Keep"
+        # An error message was flashed
+        msgs = [str(m) for m in response.context["messages"]]
+        assert any("name" in m.lower() for m in msgs)
+
+
+@pytest.mark.django_db
+def describe_guild_product_create_errors():
+    def it_flashes_form_errors_when_required_fields_missing(client: Client):
+        _user_with_role("admin_pcerr", fog_role=Member.FogRole.ADMIN)
+        guild = GuildFactory()
+        client.login(username="admin_pcerr", password="pass")
+        url = reverse("hub_guild_product_create", args=[guild.pk])
+        # Missing name + price → ProductForm errors. Splits formset is empty.
+        data = {
+            "name": "",
+            "price": "",
+            "guild": str(guild.pk),
+            "splits-TOTAL_FORMS": "1",
+            "splits-INITIAL_FORMS": "0",
+            "splits-MIN_NUM_FORMS": "1",
+            "splits-MAX_NUM_FORMS": "1000",
+            "splits-0-recipient_type": "admin",
+            "splits-0-guild": "",
+            "splits-0-percent": "100",
+        }
+        response = client.post(url, data=data, follow=True)
+        assert response.status_code == 200
+        msgs = [str(m) for m in response.context["messages"]]
+        # Flash messages should mention at least one of the missing fields
+        assert any("name" in m.lower() or "price" in m.lower() for m in msgs)
+        assert Product.objects.count() == 0
+
+    def it_flashes_non_form_errors_when_splits_dont_sum_to_100(client: Client):
+        _user_with_role("admin_pcsum", fog_role=Member.FogRole.ADMIN)
+        guild = GuildFactory()
+        client.login(username="admin_pcsum", password="pass")
+        url = reverse("hub_guild_product_create", args=[guild.pk])
+        data = _product_post_payload(guild)
+        data["splits-1-percent"] = "70"  # 20 + 70 = 90 ≠ 100
+        response = client.post(url, data=data, follow=True)
+        assert response.status_code == 200
+        msgs = [str(m) for m in response.context["messages"]]
+        assert any("100" in m or "Splits" in m for m in msgs)
+        assert Product.objects.count() == 0
+
+    def it_flashes_per_row_errors_when_a_row_is_invalid(client: Client):
+        _user_with_role("admin_pcrow", fog_role=Member.FogRole.ADMIN)
+        guild = GuildFactory()
+        client.login(username="admin_pcrow", password="pass")
+        url = reverse("hub_guild_product_create", args=[guild.pk])
+        data = _product_post_payload(guild)
+        # Make row 0 invalid: blank percent
+        data["splits-0-percent"] = ""
+        response = client.post(url, data=data, follow=True)
+        assert response.status_code == 200
+        msgs = [str(m) for m in response.context["messages"]]
+        assert any("Split row" in m for m in msgs)
+        assert Product.objects.count() == 0
+
 
 @pytest.mark.django_db
 def describe_guild_detail_edit_buttons():

@@ -33,18 +33,6 @@ VALID_CONTEXTS = {
 }
 
 
-def _user_can_edit_split(user: UserLike) -> bool:
-    """True if user is a guild officer, fog admin, or Django superuser."""
-    if user is None:
-        return False
-    if getattr(user, "is_superuser", False):
-        return True
-    member = getattr(user, "member", None)
-    if member is None:
-        return False
-    return bool(getattr(member, "is_fog_admin", False) or getattr(member, "is_guild_officer", False))
-
-
 class TabItemForm(forms.Form):
     """Unified tab-item entry form for admin and member contexts.
 
@@ -115,7 +103,9 @@ class TabItemForm(forms.Form):
                 empty_label="— Manual entry (no product) —",
                 label="Product",
             )
-        elif context == CONTEXT_MEMBER_GUILD_PAGE:
+        elif (
+            context == CONTEXT_MEMBER_GUILD_PAGE
+        ):  # pragma: no branch — VALID_CONTEXTS guard makes other branch unreachable
             if guild is None:
                 raise ValueError("member_guild_page context requires guild=<Guild>")
             self.fields["description"].required = True
@@ -252,7 +242,7 @@ class _BaseCustomSplitFormSet(forms.BaseFormSet):
         if any(self.errors):
             return
         active = [f.cleaned_data for f in self.forms if f.cleaned_data and not f.cleaned_data.get("DELETE", False)]
-        if not active:
+        if not active:  # pragma: no cover — defensive; validate_min=True raises before clean() runs
             raise forms.ValidationError("At least one split row is required.")
         total = sum((row["percent"] for row in active), Decimal("0"))
         if total != Decimal("100"):
@@ -400,7 +390,7 @@ class _BaseProductSplitFormSet(BaseInlineFormSet):
             return  # let per-form errors surface first
 
         active_rows = [f.cleaned_data for f in self.forms if f.cleaned_data and not f.cleaned_data.get("DELETE", False)]
-        if not active_rows:
+        if not active_rows:  # pragma: no cover — defensive; validate_min=True raises before clean() runs
             raise forms.ValidationError("At least one revenue split row is required.")
 
         self._check_total(active_rows)
@@ -420,13 +410,13 @@ class _BaseProductSplitFormSet(BaseInlineFormSet):
             rtype = row["recipient_type"]
             guild = row.get("guild")
             if rtype == ProductRevenueSplit.RecipientType.ADMIN:
-                if guild is not None:
+                if guild is not None:  # pragma: no cover — model CheckConstraint catches this per-row before clean()
                     raise forms.ValidationError("Admin rows must not select a guild.")
                 if seen_admin:
                     raise forms.ValidationError("Only one Admin row is allowed per product.")
                 seen_admin = True
             elif rtype == ProductRevenueSplit.RecipientType.GUILD:
-                if guild is None:
+                if guild is None:  # pragma: no cover — model CheckConstraint catches this per-row before clean()
                     raise forms.ValidationError("Guild rows must select a guild.")
                 if guild.pk in seen_guilds:
                     raise forms.ValidationError(

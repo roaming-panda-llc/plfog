@@ -117,3 +117,29 @@ def describe_TabEntry_snapshot_splits():
         only = entry.splits.first()
         assert only.recipient_type == TabEntrySplit.RecipientType.ADMIN
         assert only.guild_id is None
+
+
+def describe_TabEntrySplit_str():
+    def it_renders_admin_rows(db):
+        entry = TabEntryFactory(amount=Decimal("10.00"))
+        entry.snapshot_splits([_split_input("admin", "100")])
+        admin = entry.splits.first()
+        assert str(admin) == "Admin $10.00 (100.00%)"
+
+    def it_renders_guild_rows(db):
+        guild = GuildFactory(name="Metalshop")
+        entry = TabEntryFactory(amount=Decimal("10.00"))
+        entry.snapshot_splits([_split_input("guild", "100", guild=guild)])
+        guild_split = entry.splits.first()
+        assert str(guild_split) == "Metalshop $10.00 (100.00%)"
+
+    def it_renders_guild_rows_with_missing_guild_safely():
+        # Build but do not persist — DB constraint would normally reject this.
+        # Exercises the defensive ``Guild?`` fallback in __str__.
+        split = TabEntrySplit(
+            recipient_type=TabEntrySplit.RecipientType.GUILD,
+            guild=None,
+            percent=Decimal("100"),
+            amount=Decimal("3.50"),
+        )
+        assert str(split) == "Guild? $3.50 (100%)"

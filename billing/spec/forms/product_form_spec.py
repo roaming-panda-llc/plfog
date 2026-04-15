@@ -172,3 +172,57 @@ def describe_ProductForm():
             formset.save()
             assert product.splits.count() == 2
             assert ProductRevenueSplit.objects.filter(product=product, recipient_type="admin").exists()
+
+        def it_deletes_a_split_row_when_marked_for_deletion(db):
+            # Exercises the ``delete=True`` branch in the _split_post helper.
+            owning_guild = GuildFactory()
+            product = Product.objects.create(name="Bag", price=Decimal("12.00"), guild=owning_guild)
+            initial_admin = ProductRevenueSplit.objects.create(
+                product=product,
+                recipient_type=ProductRevenueSplit.RecipientType.ADMIN,
+                guild=None,
+                percent=Decimal("20"),
+            )
+            ProductRevenueSplit.objects.create(
+                product=product,
+                recipient_type=ProductRevenueSplit.RecipientType.GUILD,
+                guild=owning_guild,
+                percent=Decimal("80"),
+            )
+            # Re-post with the admin row marked DELETE and the guild row at 100%.
+            prefix = "splits"
+            data = {
+                "name": "Bag",
+                "price": "12.00",
+                "guild": str(owning_guild.pk),
+                f"{prefix}-TOTAL_FORMS": "2",
+                f"{prefix}-INITIAL_FORMS": "2",
+                f"{prefix}-MIN_NUM_FORMS": "1",
+                f"{prefix}-MAX_NUM_FORMS": "1000",
+            }
+            data.update(
+                _split_post(
+                    prefix,
+                    0,
+                    recipient_type="admin",
+                    guild_id=None,
+                    percent=Decimal("20"),
+                    delete=True,
+                )
+            )
+            data[f"{prefix}-0-id"] = str(initial_admin.pk)
+            data.update(
+                _split_post(
+                    prefix,
+                    1,
+                    recipient_type="guild",
+                    guild_id=owning_guild.pk,
+                    percent=Decimal("100"),
+                )
+            )
+            data[f"{prefix}-1-id"] = str(product.splits.get(recipient_type="guild").pk)
+            formset = build_product_split_formset(data=data, instance=product)
+            assert formset.is_valid(), formset.errors
+            formset.save()
+            assert product.splits.count() == 1
+            assert not product.splits.filter(recipient_type="admin").exists()

@@ -243,3 +243,21 @@ def describe_Tab_add_entry_with_splits():
 
         entry.refresh_from_db()
         assert entry.splits.count() == 2  # unchanged
+
+    def it_raises_TabLockedError_when_tab_is_locked(db):
+        from billing.exceptions import TabLockedError
+        from tests.billing.factories import ProductFactory
+
+        product = ProductFactory()
+        tab = TabFactory(is_locked=True, locked_reason="Payment failed")
+        with pytest.raises(TabLockedError, match="Payment failed"):
+            tab.add_entry(description="x", amount=Decimal("5.00"), product=product)
+
+    def it_raises_TabLimitExceededError_when_entry_would_exceed_limit(db):
+        from billing.exceptions import TabLimitExceededError
+        from tests.billing.factories import ProductFactory
+
+        product = ProductFactory(price=Decimal("10.00"))
+        tab = TabFactory(tab_limit=Decimal("5.00"))
+        with pytest.raises(TabLimitExceededError, match="exceed tab limit"):
+            tab.add_entry(description="x", amount=Decimal("10.00"), product=product)
