@@ -436,6 +436,22 @@ class Guild(models.Model):
         help_text="Member-facing description or announcement shown on the guild page.",
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    calendar_url = models.URLField(
+        blank=True,
+        default="",
+        help_text="Public iCal URL for this guild's Google Calendar (File → Share → Get shareable iCal link).",
+    )
+    calendar_color = models.CharField(
+        max_length=7,
+        default="#4B9FEE",
+        blank=True,
+        help_text="Hex color code for this guild's events on the Community Calendar (e.g. #4B9FEE).",
+    )
+    calendar_last_fetched_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this guild's iCal feed was last synced. Set by the calendar service.",
+    )
     leases = GenericRelation(
         "Lease",
         content_type_field="content_type",
