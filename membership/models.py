@@ -947,7 +947,9 @@ class CalendarEvent(models.Model):
         ordering = ["start_dt"]
         indexes = [
             models.Index(fields=["start_dt", "end_dt"], name="idx_calendarevent_start_end"),
-            models.Index(fields=["guild", "uid"], name="idx_calendarevent_guild_uid"),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=["guild", "uid"], name="uq_calendarevent_guild_uid"),
         ]
         verbose_name = "Calendar Event"
         verbose_name_plural = "Calendar Events"

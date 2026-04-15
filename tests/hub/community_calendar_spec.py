@@ -422,3 +422,47 @@ def describe_calendar_export_ics_view():
         response = client.get("/calendar/export.ics")
         assert b"Glaze Workshop" in response.content
         assert b"BEGIN:VEVENT" in response.content
+
+    def it_escapes_newlines_in_description(client: Client):
+        from datetime import timedelta as td
+
+        _logged_in_user(client, username="caluser7")
+        guild = GuildFactory(name="Printmaking", calendar_url="https://example.com/b.ics")
+        now = timezone.now()
+        CalendarEvent.objects.create(
+            guild=guild,
+            uid="escape-001",
+            title="Printmaking Open Night",
+            description="Line one\nLine two\nLine three",
+            start_dt=now + td(days=2),
+            end_dt=now + td(days=2, hours=2),
+            fetched_at=now,
+        )
+        response = client.get("/calendar/export.ics")
+        content = response.content.decode()
+        # Escaped newlines must appear; bare newlines in the middle of a field must not
+        assert "\\n" in content
+        # The description field should contain the escaped version
+        assert "DESCRIPTION:Line one\\nLine two\\nLine three" in content
+
+    def it_exports_all_day_events_with_date_format(client: Client):
+        from datetime import timedelta as td
+
+        _logged_in_user(client, username="caluser8")
+        guild = GuildFactory(name="Fiber Arts", calendar_url="https://example.com/c.ics")
+        now = timezone.now()
+        CalendarEvent.objects.create(
+            guild=guild,
+            uid="allday-export-001",
+            title="All Day Fiber Fest",
+            all_day=True,
+            start_dt=now + td(days=5),
+            end_dt=now + td(days=6),
+            fetched_at=now,
+        )
+        response = client.get("/calendar/export.ics")
+        content = response.content.decode()
+        assert "DTSTART;VALUE=DATE:" in content
+        assert "DTEND;VALUE=DATE:" in content
+        # Should NOT export as datetime format for all-day events
+        assert "DTSTART:20" not in content or "DTSTART;VALUE=DATE:" in content

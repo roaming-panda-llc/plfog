@@ -803,6 +803,14 @@ def calendar_events_partial(request: HttpRequest) -> HttpResponse:
     return render(request, "hub/partials/calendar_content.html", cal_ctx)
 
 
+def _ical_escape(value: str) -> str:
+    """Escape special characters per RFC 5545 §3.3.11."""
+    value = value.replace("\\", "\\\\")
+    value = value.replace("\r\n", "\\n").replace("\n", "\\n").replace("\r", "\\n")
+    value = value.replace(";", "\\;").replace(",", "\\,")
+    return value
+
+
 @login_required
 def calendar_export_ics(request: HttpRequest) -> HttpResponse:
     """Download a combined iCal file of all upcoming events."""
@@ -829,12 +837,20 @@ def calendar_export_ics(request: HttpRequest) -> HttpResponse:
         lines += [
             "BEGIN:VEVENT",
             f"UID:{evt.uid}",
-            f"SUMMARY:{evt.title}",
-            f"DTSTART:{evt.start_dt.strftime('%Y%m%dT%H%M%SZ')}",
-            f"DTEND:{evt.end_dt.strftime('%Y%m%dT%H%M%SZ')}",
+            f"SUMMARY:{_ical_escape(evt.title)}",
         ]
+        if evt.all_day:
+            lines += [
+                f"DTSTART;VALUE=DATE:{evt.start_dt.strftime('%Y%m%d')}",
+                f"DTEND;VALUE=DATE:{evt.end_dt.strftime('%Y%m%d')}",
+            ]
+        else:
+            lines += [
+                f"DTSTART:{evt.start_dt.strftime('%Y%m%dT%H%M%SZ')}",
+                f"DTEND:{evt.end_dt.strftime('%Y%m%dT%H%M%SZ')}",
+            ]
         if evt.description:
-            lines.append(f"DESCRIPTION:{evt.description[:250]}")
+            lines.append(f"DESCRIPTION:{_ical_escape(evt.description[:250])}")
         if evt.location:
             lines.append(f"LOCATION:{evt.location}")
         lines.append("END:VEVENT")
