@@ -1,5 +1,8 @@
+from allauth.account.views import EmailView
 from django.contrib import admin
-from django.urls import include, path
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import redirect
+from django.urls import include, path, reverse_lazy
 
 from plfog.admin_views import (
     invite_member,
@@ -48,8 +51,25 @@ admin_custom_urls = [
     ),
 ]
 
+
+class HubEmailView(EmailView):
+    """Override allauth's email management view to redirect into the hub's User Settings page.
+
+    POSTs (add, make primary, re-send, remove) still run through allauth's
+    EmailView logic; only the success_url and GET rendering change so the user
+    always lands on /settings/?tab=emails instead of the legacy themed page.
+    """
+
+    success_url = reverse_lazy("hub_user_settings")
+
+    def get(self, request: HttpRequest, *args: object, **kwargs: object) -> HttpResponse:
+        return redirect("/settings/?tab=emails")
+
+
 urlpatterns = admin_custom_urls + [
     path("admin/", admin.site.urls),
+    # Must precede the allauth include so our override wins URL resolution.
+    path("accounts/email/", HubEmailView.as_view(), name="account_email"),
     path("accounts/", include("allauth.urls")),
     path("billing/", include("billing.urls")),
     # Member hub

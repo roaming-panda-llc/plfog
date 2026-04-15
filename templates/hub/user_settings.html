@@ -1,0 +1,136 @@
+{% extends "hub/base.html" %}
+{% block title %}User Settings{% endblock %}
+
+{% block content %}
+<h1 class="hub-page-title">User Settings</h1>
+
+<div x-data="{ tab: '{{ active_tab|default:"profile" }}' }">
+    <div style="display: flex; border-bottom: 1px solid var(--hub-border); gap: 0; margin-bottom: 1.25rem; flex-wrap: wrap;">
+        <button type="button"
+                @click="tab = 'profile'"
+                :class="{ 'vote-tab--active': tab === 'profile' }"
+                class="vote-tab">
+            Profile
+        </button>
+        <button type="button"
+                @click="tab = 'emails'"
+                :class="{ 'vote-tab--active': tab === 'emails' }"
+                class="vote-tab">
+            Emails
+        </button>
+    </div>
+
+    {# -------- Profile tab -------- #}
+    <div x-show="tab === 'profile'" x-cloak>
+        <div class="hub-card">
+            {% if member %}
+            <form method="post" class="hub-form">
+                {% csrf_token %}
+                <input type="hidden" name="form_id" value="profile">
+                <div class="hub-form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" value="{{ user.email }}" disabled>
+                    <span class="hub-field-hint">Manage your emails in the Emails tab.</span>
+                </div>
+                {% for field in profile_form %}
+                    {% include "components/form_field.html" with field=field %}
+                {% endfor %}
+                {% if profile_form.non_field_errors %}
+                <ul class="hub-field-errors">
+                    {% for error in profile_form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+                </ul>
+                {% endif %}
+                <div style="margin-top: 1.5rem;">
+                    <button type="submit" class="hub-btn hub-btn--primary">Save Profile</button>
+                </div>
+            </form>
+            {% else %}
+            <p class="hub-text-muted">Your account is not linked to a membership profile. Contact an admin for help.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {# -------- Emails tab -------- #}
+    <div x-show="tab === 'emails'" x-cloak>
+        {# --- Manage Email Addresses card --- #}
+        <div class="hub-card" style="margin-bottom: 1.5rem;"
+             x-data='{ selectedVerified: {{ primary_verified_json|default:"true" }} }'>
+            <h2 style="font-size: 1rem; font-weight: 600; margin: 0 0 0.25rem;">Manage Email Addresses</h2>
+            <p class="hub-text-muted" style="margin-bottom: 1rem; font-size: 0.85rem;">
+                Each verified email can be used to log in. The primary email receives account notifications.
+            </p>
+
+            {% if email_addresses %}
+            <form method="post" action="{% url 'account_email' %}" class="hub-form">
+                {% csrf_token %}
+                <ul class="hub-email-list">
+                    {% for ea in email_addresses %}
+                    <li class="hub-email-list__item">
+                        <label>
+                            <input type="radio" name="email" value="{{ ea.email }}"
+                                   @change="selectedVerified = {{ ea.verified|yesno:'true,false' }}"
+                                   {% if ea.primary %}checked{% endif %}>
+                            <span class="hub-email-list__addr">{{ ea.email }}</span>
+                            {% if ea.verified %}
+                                <span class="hub-pill hub-pill--ok">Verified</span>
+                            {% else %}
+                                <span class="hub-pill hub-pill--warn">Unverified</span>
+                            {% endif %}
+                            {% if ea.primary %}
+                                <span class="hub-pill hub-pill--primary">Primary</span>
+                            {% endif %}
+                        </label>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem;">
+                    <button type="submit" name="action_primary" class="hub-btn hub-btn--secondary">Make Primary</button>
+                    <button type="submit" name="action_send" class="hub-btn hub-btn--secondary"
+                            x-show="!selectedVerified" x-cloak>
+                        Re-send Verification
+                    </button>
+                    <button type="submit" name="action_remove" class="hub-btn hub-btn--danger"
+                            onclick="return confirm('Remove this email from your account?');">Remove</button>
+                </div>
+            </form>
+            {% else %}
+            <p class="hub-text-muted">No email addresses on file yet.</p>
+            {% endif %}
+
+            <h3 style="font-size: 0.95rem; font-weight: 600; margin: 1.75rem 0 0.75rem;">Add an Email Address</h3>
+            <form method="post" action="{% url 'account_email' %}" class="hub-form">
+                {% csrf_token %}
+                {% for field in add_email_form %}
+                    {% include "components/form_field.html" with field=field %}
+                {% endfor %}
+                <div style="margin-top: 0.75rem;">
+                    <button type="submit" name="action_add" class="hub-btn hub-btn--primary">Add Email</button>
+                </div>
+            </form>
+        </div>
+
+        {# --- Email Preferences card --- #}
+        <div class="hub-card">
+            <h2 style="font-size: 1rem; font-weight: 600; margin: 0 0 0.25rem;">Email Preferences</h2>
+            <p class="hub-text-muted" style="margin-bottom: 1rem; font-size: 0.85rem;">
+                Which emails should we send you from Past Lives Makerspace?
+            </p>
+            <form method="post" class="hub-form">
+                {% csrf_token %}
+                <input type="hidden" name="form_id" value="email_prefs">
+                {% include "components/toggle.html" with field=prefs_form.voting_results toggle_label="Voting Result Emails" toggle_description="Get notified when guild voting results are published" %}
+                {% if prefs_form.errors %}
+                <ul class="hub-field-errors">
+                    {% for field_errors in prefs_form.errors.values %}
+                        {% for error in field_errors %}<li>{{ error }}</li>{% endfor %}
+                    {% endfor %}
+                </ul>
+                {% endif %}
+                <div style="margin-top: 1.25rem;">
+                    <button type="submit" class="hub-btn hub-btn--primary">Save Preferences</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

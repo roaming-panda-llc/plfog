@@ -11,7 +11,7 @@ from django.contrib.auth.models import User
 from django.test import Client
 
 from hub.forms import VotePreferenceForm
-from hub.views import _compute_live_standings
+from hub.views import _compute_live_standings, _compute_new_votes_since
 from membership.cycle import get_cycle_context
 from membership.models import Member, VotePreference
 from tests.membership.factories import (
@@ -495,3 +495,96 @@ def describe_compute_live_standings():
         assert by_name["Popular"]["total_points"] == 10
         assert by_name["Moderate"]["total_points"] == 5
         assert by_name["Niche"]["total_points"] == 5
+
+    def it_is_used_for_context_under_new_vote_standings_key(client: Client):
+        User.objects.create_user(username="ctxviewer", password="pass")
+        g1 = GuildFactory(name="CtxA")
+        g2 = GuildFactory(name="CtxB")
+        g3 = GuildFactory(name="CtxC")
+        VotePreferenceFactory(guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        client.login(username="ctxviewer", password="pass")
+
+        response = client.get("/guilds/voting/")
+
+        assert "new_vote_standings" in response.context
+        assert response.context["new_vote_standings"]
+
+    def it_excludes_votes_from_members_without_linked_user():
+        """Votes backfilled from Airtable for unlinked members must not inflate standings."""
+        g1 = GuildFactory(name="Signed Up Pick")
+        g2 = GuildFactory(name="Signed Up 2nd")
+        g3 = GuildFactory(name="Signed Up 3rd")
+        g_backfill = GuildFactory(name="Backfill Only")
+
+        # One vote from a signed-up member (factory auto-links a User)
+        VotePreferenceFactory(guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        # One vote from an Airtable-imported member who never signed up
+        unlinked = MemberFactory(user=None)
+        VotePreferenceFactory(
+            member=unlinked,
+            guild_1st=g_backfill,
+            guild_2nd=g_backfill,  # dup ok at the model level; validation is in the form
+            guild_3rd=g_backfill,
+            signed_up=False,
+        )
+
+        result = _compute_live_standings()
+
+        names = {r["guild_name"] for r in result}
+        assert "Backfill Only" not in names
+        assert names == {"Signed Up Pick", "Signed Up 2nd", "Signed Up 3rd"}
+
+
+# ---------------------------------------------------------------------------
+# describe_compute_new_votes_since
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def describe_compute_new_votes_since():
+    def it_returns_all_signed_up_votes_when_since_is_none():
+        g1 = GuildFactory(name="Fresh 1st")
+        g2 = GuildFactory(name="Fresh 2nd")
+        g3 = GuildFactory(name="Fresh 3rd")
+        VotePreferenceFactory(guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+
+        result = _compute_new_votes_since(None)
+
+        names = {r["guild_name"] for r in result}
+        assert names == {"Fresh 1st", "Fresh 2nd", "Fresh 3rd"}
+
+    def it_excludes_votes_older_than_since():
+        g1 = GuildFactory(name="Old Pick")
+        g2 = GuildFactory(name="Shared")
+        g3 = GuildFactory(name="Also Shared")
+        old_vote = VotePreferenceFactory(guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+        # Force old_vote to look like it was cast before the cutoff
+        old_ts = dt.datetime(2025, 12, 1, tzinfo=dt.timezone.utc)
+        VotePreference.objects.filter(pk=old_vote.pk).update(updated_at=old_ts)
+
+        cutoff = dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc)
+        result = _compute_new_votes_since(cutoff)
+
+        assert result == []
+
+    def it_includes_votes_newer_than_since():
+        g1 = GuildFactory(name="New Top")
+        g2 = GuildFactory(name="New Mid")
+        g3 = GuildFactory(name="New Low")
+        # New vote: auto_now sets updated_at=now → newer than the historic cutoff
+        VotePreferenceFactory(guild_1st=g1, guild_2nd=g2, guild_3rd=g3)
+
+        cutoff = dt.datetime(2025, 1, 1, tzinfo=dt.timezone.utc)
+        result = _compute_new_votes_since(cutoff)
+
+        by_name = {r["guild_name"]: r for r in result}
+        assert by_name["New Top"]["total_points"] == 5
+
+    def it_excludes_votes_from_members_without_linked_user():
+        unlinked = MemberFactory(user=None)
+        g1 = GuildFactory(name="Unlinked Pick")
+        VotePreferenceFactory(member=unlinked, guild_1st=g1, guild_2nd=g1, guild_3rd=g1, signed_up=False)
+
+        result = _compute_new_votes_since(None)
+
+        assert result == []

@@ -1,0 +1,19 @@
+<div style="margin-bottom: 0.75rem;">
+    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.3rem;">
+        <span style="font-weight: 500; font-size: 0.9rem;">
+            {% if forloop_first %}&#x1f947;{% elif forloop_counter == 2 %}&#x1f948;{% elif forloop_counter == 3 %}&#x1f949;{% endif %}
+            {{ row.guild_name }}
+        </span>
+        <span class="hub-text-muted" style="font-size: 0.8rem;">{{ row.total_points }} pts</span>
+    </div>
+    <div style="background: var(--hub-input-bg, #0a1929); border-radius: 4px; height: 22px; overflow: hidden;">
+        <div style="
+            width: {{ row.bar_pct }}%;
+            height: 100%;
+            background: linear-gradient(90deg, var(--color-tuscan-yellow, #EEB44B), var(--color-yellow-hover, #d4a043));
+            border-radius: 4px;
+            transition: width 0.3s ease;
+            min-width: {% if row.total_points %}2px{% else %}0{% endif %};
+        "></div>
+    </div>
+</div>

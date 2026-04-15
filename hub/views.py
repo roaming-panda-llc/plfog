@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any, TypedDict
 
 from allauth.account.models import EmailAddress
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.db.models import Count, Prefetch
+from django.db.models import Count, Prefetch, Q
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST, require_http_methods
@@ -62,9 +63,11 @@ def guild_voting(request: HttpRequest) -> HttpResponse:
         preference = getattr(member, "vote_preference", None)
 
     latest_snapshot = FundingSnapshot.objects.order_by("-snapshot_at").first()
+    since = latest_snapshot.snapshot_at if latest_snapshot else None
 
     # Live vote standings: tally points from all current VotePreference records
     vote_standings = _compute_live_standings()
+    new_vote_standings = _compute_new_votes_since(since)
 
     if member is None:
         messages.info(request, "Your account is not linked to a membership.")
@@ -79,6 +82,7 @@ def guild_voting(request: HttpRequest) -> HttpResponse:
                 "preference": None,
                 "latest_snapshot": latest_snapshot,
                 "vote_standings": vote_standings,
+                "new_vote_standings": new_vote_standings,
             },
         )
 
@@ -117,20 +121,65 @@ def guild_voting(request: HttpRequest) -> HttpResponse:
             "preference": preference,
             "latest_snapshot": latest_snapshot,
             "vote_standings": vote_standings,
+            "new_vote_standings": new_vote_standings,
         },
     )
 
 
 def _compute_live_standings() -> list[VoteStanding]:
-    """Tally live vote points from all current VotePreference records.
+    """Tally live vote points from current VotePreference records.
+
+    Only counts votes from members with a linked User — members imported from
+    Airtable who never signed up to the app are excluded. See
+    ``VotePreferenceQuerySet.from_signed_up_members``.
 
     Returns a list of dicts sorted by total points descending:
         [{"guild_name": str, "total_points": int, "bar_pct": float}, ...]
     """
+    signed_up_1st = Q(first_choice_votes__member__user__isnull=False)
+    signed_up_2nd = Q(second_choice_votes__member__user__isnull=False)
+    signed_up_3rd = Q(third_choice_votes__member__user__isnull=False)
     guilds = Guild.objects.filter(is_active=True).annotate(
-        first=Count("first_choice_votes"),
-        second=Count("second_choice_votes"),
-        third=Count("third_choice_votes"),
+        first=Count("first_choice_votes", filter=signed_up_1st),
+        second=Count("second_choice_votes", filter=signed_up_2nd),
+        third=Count("third_choice_votes", filter=signed_up_3rd),
+    )
+
+    results: list[VoteStanding] = []
+    for g in guilds:
+        points = g.first * 5 + g.second * 3 + g.third * 2
+        if points > 0:
+            results.append(VoteStanding(guild_name=g.name, total_points=points))
+
+    if not results:
+        return []
+
+    results.sort(key=lambda x: x["total_points"], reverse=True)
+    max_points = results[0]["total_points"]
+    for r in results:
+        r["bar_pct"] = round(r["total_points"] / max_points * 100, 1)
+    return results
+
+
+def _compute_new_votes_since(since: datetime | None) -> list[VoteStanding]:
+    """Tally points from VotePreferences updated after ``since``.
+
+    Represents the "new votes this month" view — votes cast or changed since
+    the last snapshot was taken. If ``since`` is None (no prior snapshot),
+    every signed-up vote is considered new.
+    """
+    first_q = Q(first_choice_votes__member__user__isnull=False)
+    second_q = Q(second_choice_votes__member__user__isnull=False)
+    third_q = Q(third_choice_votes__member__user__isnull=False)
+    if since is not None:
+        first_q &= Q(first_choice_votes__updated_at__gt=since)
+        second_q &= Q(second_choice_votes__updated_at__gt=since)
+        third_q &= Q(third_choice_votes__updated_at__gt=since)
+
+    guilds = Guild.objects.filter(is_active=True).annotate(
+        first=Count("first_choice_votes", filter=first_q),
+        second=Count("second_choice_votes", filter=second_q),
+        third=Count("third_choice_votes", filter=third_q),
     )
 
     results: list[VoteStanding] = []
@@ -491,41 +540,67 @@ def guild_eyop_form(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
-def profile_settings(request: HttpRequest) -> HttpResponse:
-    """Profile settings page."""
+def user_settings(request: HttpRequest) -> HttpResponse:
+    """Tabbed user settings page — Profile + Emails (manage addresses + preferences).
+
+    Two forms POST to this endpoint, disambiguated by the ``form_id`` hidden field:
+    ``profile`` (member info) and ``email_prefs`` (notification toggles). Email
+    address management (add, primary, verify, remove) POSTs to allauth's
+    ``account_email`` URL, which is overridden in ``plfog.urls`` to redirect back
+    here after each action.
+    """
+    from allauth.account.forms import AddEmailForm
+    from allauth.account.models import EmailAddress
+
+    ctx = _get_hub_context(request)
     member = _get_member(request)
-    ctx = _get_hub_context(request)
 
-    if member is None:
-        messages.info(request, "Your account is not linked to a membership.")
-        return render(request, "hub/profile_settings.html", {**ctx, "member": None, "form": None})
-
-    if request.method == "POST":
-        form = ProfileSettingsForm(request.POST, instance=member)
-        if form.is_valid():
-            form.save()
+    profile_form: ProfileSettingsForm | None
+    if request.method == "POST" and request.POST.get("form_id") == "profile":
+        if member is None:
+            messages.error(request, "Your account is not linked to a membership.")
+            return redirect("hub_user_settings")
+        profile_form = ProfileSettingsForm(request.POST, instance=member)
+        if profile_form.is_valid():
+            profile_form.save()
             messages.success(request, "Profile updated.")
-            return redirect("hub_profile_settings")
+            return redirect(f"{request.path}?tab=profile")
+    elif member is not None:
+        profile_form = ProfileSettingsForm(instance=member)
     else:
-        form = ProfileSettingsForm(instance=member)
+        profile_form = None
 
-    return render(request, "hub/profile_settings.html", {**ctx, "member": member, "form": form})
-
-
-@login_required
-def email_preferences(request: HttpRequest) -> HttpResponse:
-    """Email preferences page."""
-    ctx = _get_hub_context(request)
-
-    if request.method == "POST":
-        form = EmailPreferencesForm(request.POST)
-        if form.is_valid():
+    prefs_form: EmailPreferencesForm
+    if request.method == "POST" and request.POST.get("form_id") == "email_prefs":
+        prefs_form = EmailPreferencesForm(request.POST)
+        if prefs_form.is_valid():
             messages.success(request, "Email preferences updated.")
-            return redirect("hub_email_preferences")
+            return redirect(f"{request.path}?tab=emails")
     else:
-        form = EmailPreferencesForm(initial={"voting_results": True})
+        prefs_form = EmailPreferencesForm(initial={"voting_results": True})
 
-    return render(request, "hub/email_preferences.html", {**ctx, "form": form})
+    add_email_form = AddEmailForm(user=request.user)
+    email_addresses = list(EmailAddress.objects.filter(user=request.user).order_by("-primary", "email"))
+    primary_email = next((ea for ea in email_addresses if ea.primary), None)
+    primary_verified_json = "true" if primary_email is None or primary_email.verified else "false"
+
+    if member is None and request.method == "GET" and not request.GET.get("tab"):
+        messages.info(request, "Your account is not linked to a membership.")
+
+    return render(
+        request,
+        "hub/user_settings.html",
+        {
+            **ctx,
+            "member": member,
+            "profile_form": profile_form,
+            "prefs_form": prefs_form,
+            "add_email_form": add_email_form,
+            "email_addresses": email_addresses,
+            "primary_verified_json": primary_verified_json,
+            "active_tab": request.GET.get("tab", "profile"),
+        },
+    )
 
 
 @login_required

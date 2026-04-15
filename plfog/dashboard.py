@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.http import HttpRequest
 from django.utils import timezone
 
@@ -25,8 +25,9 @@ class GuildStanding(TypedDict, total=False):
 def dashboard_callback(request: HttpRequest, context: dict) -> dict:
     """Populate voting stats for the admin dashboard."""
     active_members = Member.objects.filter(status=Member.Status.ACTIVE).count()
-    total_voters = VotePreference.objects.count()
-    paying_voters = VotePreference.objects.filter(
+    signed_up_votes = VotePreference.objects.from_signed_up_members()
+    total_voters = signed_up_votes.count()
+    paying_voters = signed_up_votes.filter(
         member__member_type=Member.MemberType.STANDARD,
     ).count()
     active_guilds = Guild.objects.filter(is_active=True).count()
@@ -34,13 +35,16 @@ def dashboard_callback(request: HttpRequest, context: dict) -> dict:
     projected_pool = max(contributed_pool, MINIMUM_FUNDING_POOL_FLOOR)
     participation_pct = round(total_voters / active_members * 100) if active_members else 0
 
-    # Current vote leaders
+    # Current vote leaders — only votes from signed-up members count
+    signed_up_1st = Q(first_choice_votes__member__user__isnull=False)
+    signed_up_2nd = Q(second_choice_votes__member__user__isnull=False)
+    signed_up_3rd = Q(third_choice_votes__member__user__isnull=False)
     guilds = (
         Guild.objects.filter(is_active=True)
         .annotate(
-            first=Count("first_choice_votes"),
-            second=Count("second_choice_votes"),
-            third=Count("third_choice_votes"),
+            first=Count("first_choice_votes", filter=signed_up_1st),
+            second=Count("second_choice_votes", filter=signed_up_2nd),
+            third=Count("third_choice_votes", filter=signed_up_3rd),
         )
         .order_by("-first", "-second", "-third")
     )

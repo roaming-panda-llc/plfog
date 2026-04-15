@@ -274,9 +274,104 @@ class PayingMemberFilter(admin.SimpleListFilter):
 
 @admin.register(VotePreference)
 class VotePreferenceAdmin(ModelAdmin):
-    list_display = ["member", "guild_1st", "guild_2nd", "guild_3rd", "updated_at"]
+    list_display = ["member", "guild_1st", "guild_2nd", "guild_3rd", "updated_at", "snapshots_participated"]
     list_filter = [PayingMemberFilter]
     search_fields = ["member__full_legal_name", "member__preferred_name"]
+    readonly_fields = ["voting_history"]
+
+    def get_fieldsets(self, request: HttpRequest, obj: VotePreference | None = None) -> list[tuple[str, dict]]:
+        fields: list[str] = ["member", "guild_1st", "guild_2nd", "guild_3rd", "updated_at"]
+        sections: list[tuple[str, dict]] = [("Current Vote", {"fields": fields})]
+        if obj is not None:
+            sections.append(("Historical Votes", {"fields": ["voting_history"]}))
+        return sections
+
+    def get_readonly_fields(self, request: HttpRequest, obj: VotePreference | None = None) -> tuple[str, ...]:
+        base = tuple(super().get_readonly_fields(request, obj))
+        if obj is not None:
+            return (*base, "updated_at")
+        return base
+
+    @admin.display(description="Snapshots")
+    def snapshots_participated(self, obj: VotePreference) -> str:
+        """Count of snapshots where this member's vote appears (for list view)."""
+        return str(_count_member_snapshots(obj.member_id))
+
+    @admin.display(description="Past votes from funding snapshots")
+    def voting_history(self, obj: VotePreference) -> str:
+        """Render each snapshot where this member voted with their picks at that time.
+
+        Reads ``FundingSnapshot.raw_votes`` (a denormalized JSON list of per-vote
+        dicts captured at snapshot time) and filters to entries matching this
+        member. Lets admins audit how their vote contributed to past point totals
+        across cycles.
+        """
+        from django.utils.html import format_html_join
+
+        rows = _member_snapshot_rows(obj.member_id)
+        if not rows:
+            return mark_safe(  # noqa: S308
+                '<span style="color:#888">No snapshots recorded yet for this member.</span>'
+            )
+        header = (
+            "<tr>"
+            "<th style='text-align:left;padding:6px 10px'>Cycle</th>"
+            "<th style='text-align:left;padding:6px 10px'>1st (5 pts)</th>"
+            "<th style='text-align:left;padding:6px 10px'>2nd (3 pts)</th>"
+            "<th style='text-align:left;padding:6px 10px'>3rd (2 pts)</th>"
+            "<th style='text-align:left;padding:6px 10px'>Counted toward pool?</th>"
+            "</tr>"
+        )
+        body = format_html_join(
+            "",
+            "<tr>"
+            "<td style='padding:6px 10px'><a href='{}'>{}</a></td>"
+            "<td style='padding:6px 10px'>{}</td>"
+            "<td style='padding:6px 10px'>{}</td>"
+            "<td style='padding:6px 10px'>{}</td>"
+            "<td style='padding:6px 10px'>{}</td>"
+            "</tr>",
+            rows,
+        )
+        return mark_safe(  # noqa: S308
+            f"<table style='border-collapse:collapse;width:100%'><thead>{header}</thead><tbody>{body}</tbody></table>"
+        )
+
+
+def _count_member_snapshots(member_id: int) -> int:
+    """Count snapshots whose raw_votes contain this member."""
+    total = 0
+    for snap in FundingSnapshot.objects.only("raw_votes").iterator():
+        if any(v.get("member_id") == member_id for v in snap.raw_votes or []):
+            total += 1
+    return total
+
+
+def _member_snapshot_rows(member_id: int) -> list[tuple]:
+    """Build the per-snapshot row tuples for the voting_history readonly field."""
+    from django.urls import reverse
+
+    rows: list[tuple] = []
+    snapshots = FundingSnapshot.objects.order_by("-snapshot_at").only("pk", "cycle_label", "raw_votes")
+    for snap in snapshots:
+        match = next(
+            (v for v in snap.raw_votes or [] if v.get("member_id") == member_id),
+            None,
+        )
+        if match is None:
+            continue
+        url = reverse("admin_snapshot_detail", args=[snap.pk])
+        rows.append(
+            (
+                url,
+                snap.cycle_label,
+                match.get("guild_1st_name", ""),
+                match.get("guild_2nd_name", ""),
+                match.get("guild_3rd_name", ""),
+                "Yes" if match.get("is_paying") else "No (allocation only)",
+            )
+        )
+    return rows
 
 
 # ---------------------------------------------------------------------------

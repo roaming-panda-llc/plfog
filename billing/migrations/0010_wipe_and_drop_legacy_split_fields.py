@@ -30,6 +30,13 @@ def cannot_reverse(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    # PostgreSQL raises "cannot ALTER TABLE ... because it has pending trigger events"
+    # when DML (the wipe below) and DDL (RemoveConstraint/RemoveField) share the same
+    # transaction — FK cascade triggers queued by the DELETEs can't fire while an
+    # ALTER TABLE is in flight. atomic=False commits each operation separately so
+    # the triggers drain before the ALTERs run.
+    atomic = False
+
     dependencies = [
         ("billing", "0009_product_revenue_split_tabentry_split"),
     ]

@@ -106,89 +106,107 @@
 </div>
 {% endif %}
 
-{# --- Current Vote Standings --- #}
-{% if vote_standings %}
-<div class="hub-card" style="margin-bottom: 1.5rem;">
-    <h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem;">Current Vote Standings</h2>
-    <p class="hub-text-muted" style="margin-bottom: 1.25rem; font-size: 0.8rem;">
-        Live tally of all member votes this cycle.
-    </p>
-    {% for row in vote_standings %}
-    <div style="margin-bottom: 0.75rem;">
-        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.3rem;">
-            <span style="font-weight: 500; font-size: 0.9rem;">
-                {% if forloop.first %}&#x1f947;{% elif forloop.counter == 2 %}&#x1f948;{% elif forloop.counter == 3 %}&#x1f949;{% endif %}
-                {{ row.guild_name }}
-            </span>
-            <span class="hub-text-muted" style="font-size: 0.8rem;">{{ row.total_points }} pts</span>
-        </div>
-        <div style="background: var(--hub-input-bg, #0a1929); border-radius: 4px; height: 22px; overflow: hidden;">
-            <div style="
-                width: {{ row.bar_pct }}%;
-                height: 100%;
-                background: linear-gradient(90deg, var(--color-tuscan-yellow, #EEB44B), var(--color-yellow-hover, #d4a043));
-                border-radius: 4px;
-                transition: width 0.3s ease;
-                min-width: {% if row.total_points %}2px{% else %}0{% endif %};
-            "></div>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-{% endif %}
-
-{# --- Funding Results --- #}
-<div class="hub-card" style="margin-bottom: 1.5rem;">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-        <h2 style="font-size: 1.1rem; font-weight: 600; margin: 0;">Funding Results</h2>
-        <a href="{% url 'hub_snapshot_history' %}" class="hub-btn hub-btn--secondary" style="font-size: 0.8rem; padding: 0.3rem 0.75rem;">
-            View Full History
-        </a>
+{# --- Tabbed Standings / New Votes / Last Month --- #}
+<div class="hub-card" style="margin-bottom: 1.5rem;" x-data="{ tab: 'standings' }">
+    <div class="vote-tab-nav" style="display: flex; border-bottom: 1px solid var(--hub-border); gap: 0; margin-bottom: 1.25rem; flex-wrap: wrap;">
+        <button type="button"
+                @click="tab = 'standings'"
+                :class="{ 'vote-tab--active': tab === 'standings' }"
+                class="vote-tab">
+            Current Standings
+        </button>
+        <button type="button"
+                @click="tab = 'new'"
+                :class="{ 'vote-tab--active': tab === 'new' }"
+                class="vote-tab">
+            New Votes This Month
+        </button>
+        <button type="button"
+                @click="tab = 'last'"
+                :class="{ 'vote-tab--active': tab === 'last' }"
+                class="vote-tab">
+            Last Month's Results
+        </button>
     </div>
 
-    {% if latest_snapshot %}
-    <p class="hub-text-muted" style="margin-bottom: 1rem; font-size: 0.85rem;">
-        {{ latest_snapshot.cycle_label }} snapshot &mdash;
-        pool: <strong>${{ latest_snapshot.funding_pool }}</strong> &mdash;
-        taken {{ latest_snapshot.snapshot_at|date:"N j, Y" }} &mdash;
-        <a href="{% url 'hub_snapshot_detail' latest_snapshot.pk %}">View Details</a>
-    </p>
-
-    {% with results=latest_snapshot.results.results %}
-    {% if results %}
-    <table style="width: 100%; border-collapse: collapse;">
-        <thead>
-            <tr>
-                <th style="text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--hub-border); font-weight: 500;">Guild</th>
-                <th style="text-align: right; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--hub-border); font-weight: 500;">Points</th>
-                <th style="text-align: right; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--hub-border); font-weight: 500;">Share</th>
-                <th style="text-align: right; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--hub-border); font-weight: 500;">Funding</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for row in results %}
-            <tr>
-                <td style="padding: 0.5rem 0.75rem;">{{ row.guild_name }}</td>
-                <td style="padding: 0.5rem 0.75rem; text-align: right;">{{ row.total_points }}</td>
-                <td style="padding: 0.5rem 0.75rem; text-align: right;">{{ row.share_pct }}%</td>
-                <td style="padding: 0.5rem 0.75rem; text-align: right;">${{ row.funding }}</td>
-            </tr>
+    {# --- Current Standings tab --- #}
+    <div x-show="tab === 'standings'" x-cloak>
+        <p class="hub-text-muted" style="margin-bottom: 1.25rem; font-size: 0.8rem;">
+            Live tally of votes from signed-up members.
+        </p>
+        {% if vote_standings %}
+            {% for row in vote_standings %}
+            {% include "hub/_vote_bar.html" with row=row forloop_first=forloop.first forloop_counter=forloop.counter %}
             {% endfor %}
-        </tbody>
-        <tfoot>
-            <tr>
-                <td colspan="3" style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--hub-border); font-weight: 600;">Total Pool</td>
-                <td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--hub-border); text-align: right; font-weight: 600;">${{ latest_snapshot.funding_pool }}</td>
-            </tr>
-        </tfoot>
-    </table>
-    {% else %}
-    <p class="hub-text-muted">No guild results in this snapshot.</p>
-    {% endif %}
-    {% endwith %}
+        {% else %}
+        <p class="hub-text-muted">No votes yet this cycle.</p>
+        {% endif %}
+    </div>
 
-    {% else %}
-    <p class="hub-text-muted">No funding results yet. Check back after the next snapshot is taken.</p>
-    {% endif %}
+    {# --- New Votes This Month tab --- #}
+    <div x-show="tab === 'new'" x-cloak>
+        <p class="hub-text-muted" style="margin-bottom: 1.25rem; font-size: 0.8rem;">
+            Votes cast or updated since
+            {% if latest_snapshot %}the {{ latest_snapshot.cycle_label }} snapshot on {{ latest_snapshot.snapshot_at|date:"N j, Y" }}{% else %}the start of this cycle{% endif %}.
+        </p>
+        {% if new_vote_standings %}
+            {% for row in new_vote_standings %}
+            {% include "hub/_vote_bar.html" with row=row forloop_first=forloop.first forloop_counter=forloop.counter %}
+            {% endfor %}
+        {% else %}
+        <p class="hub-text-muted">No new or changed votes yet this month.</p>
+        {% endif %}
+    </div>
+
+    {# --- Last Month's Results tab --- #}
+    <div x-show="tab === 'last'" x-cloak>
+        {% if latest_snapshot %}
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+            <p class="hub-text-muted" style="margin: 0; font-size: 0.85rem;">
+                {{ latest_snapshot.cycle_label }} snapshot &mdash;
+                pool: <strong>${{ latest_snapshot.funding_pool }}</strong> &mdash;
+                taken {{ latest_snapshot.snapshot_at|date:"N j, Y" }}
+            </p>
+            <div style="display: flex; gap: 0.5rem;">
+                <a href="{% url 'hub_snapshot_detail' latest_snapshot.pk %}" class="hub-btn hub-btn--secondary" style="font-size: 0.8rem; padding: 0.3rem 0.75rem;">Details</a>
+                <a href="{% url 'hub_snapshot_history' %}" class="hub-btn hub-btn--secondary" style="font-size: 0.8rem; padding: 0.3rem 0.75rem;">Full History</a>
+            </div>
+        </div>
+        {% with results=latest_snapshot.results.results %}
+        {% if results %}
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th style="text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--hub-border); font-weight: 500;">Guild</th>
+                    <th style="text-align: right; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--hub-border); font-weight: 500;">Points</th>
+                    <th style="text-align: right; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--hub-border); font-weight: 500;">Share</th>
+                    <th style="text-align: right; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--hub-border); font-weight: 500;">Funding</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in results %}
+                <tr>
+                    <td style="padding: 0.5rem 0.75rem;">{{ row.guild_name }}</td>
+                    <td style="padding: 0.5rem 0.75rem; text-align: right;">{{ row.total_points }}</td>
+                    <td style="padding: 0.5rem 0.75rem; text-align: right;">{{ row.share_pct }}%</td>
+                    <td style="padding: 0.5rem 0.75rem; text-align: right;">${{ row.funding }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="3" style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--hub-border); font-weight: 600;">Total Pool</td>
+                    <td style="padding: 0.5rem 0.75rem; border-top: 1px solid var(--hub-border); text-align: right; font-weight: 600;">${{ latest_snapshot.funding_pool }}</td>
+                </tr>
+            </tfoot>
+        </table>
+        {% else %}
+        <p class="hub-text-muted">No guild results in last month's snapshot.</p>
+        {% endif %}
+        {% endwith %}
+        {% else %}
+        <p class="hub-text-muted">No previous snapshot yet. Check back after the next cycle closes.</p>
+        {% endif %}
+    </div>
 </div>
 {% endblock %}
