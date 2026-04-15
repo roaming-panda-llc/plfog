@@ -16,11 +16,6 @@
                     @click="$dispatch('open-modal', 'edit-guild')">
                 Edit Guild Page
             </button>
-            <button type="button"
-                    class="pl-btn pl-btn--primary"
-                    @click="$dispatch('open-modal', 'add-product')">
-                Add Product
-            </button>
         </div>
         {% endif %}
     </div>
@@ -114,7 +109,18 @@
 
 {# Products card #}
 <div class="hub-card" style="margin-top:1.5rem;">
-    <h3 class="hub-detail-label" style="margin:0 0 1rem;">Products</h3>
+    <div class="pl-guild-header">
+        <h3 class="hub-detail-label" style="margin:0;">Products</h3>
+        {% if can_edit_this_guild %}
+        <div class="pl-guild-header__actions">
+            <button type="button"
+                    class="pl-btn pl-btn--primary"
+                    @click="$dispatch('open-modal', 'add-product')">
+                Add Product
+            </button>
+        </div>
+        {% endif %}
+    </div>
     <div class="guild-product-grid">
         {% if tab and tab.can_add_entry %}
         <div class="guild-product-card guild-product-card--eyop">
@@ -173,7 +179,7 @@
     <p class="hub-text-muted">Your tab is locked. Contact an admin.</p>
     {% else %}
     <p class="hub-text-muted">
-        You need a saved payment method before you can add items.
+        You need a saved payment method before you can add items to your tab.
         <a href="{% url 'billing_setup_payment_method' %}">Add a card &rarr;</a>
     </p>
     {% endif %}

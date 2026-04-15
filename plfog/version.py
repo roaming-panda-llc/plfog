@@ -2,20 +2,22 @@
 
 from __future__ import annotations
 
-VERSION = "1.6.0"
+VERSION = "1.5.4"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
     {
-        "version": "1.6.0",
+        "version": "1.5.4",
         "date": "2026-04-14",
         "title": "Edit Your Guild Page Directly",
         "changes": [
-            "Guild leads can now edit their guild's page without going through the admin — just open your guild page and you'll see 'Edit Guild Page' and 'Add Product' buttons at the top",
+            "Guild leads can now edit their guild's page without going through the admin — just open your guild page and you'll see an 'Edit Guild Page' button next to the title and an 'Add Product' button in the Products section",
             "Admins and guild officers see the same edit buttons on every guild page",
             "Changing the guild name or description happens right in a pop-up window on the guild page",
-            "Adding a new product now opens a pop-up with the revenue-split builder instead of sending you to the admin panel",
+            "Adding a new product now opens a pop-up with the revenue-split builder instead of sending you to the admin panel — closing and re-opening the pop-up resets it cleanly",
             "Existing products show a small delete button in the corner so you can remove them without leaving the page",
             "The old 'Guilds' entry in the admin panel is gone — everything guild-related lives on the public guild pages now",
+            "My Tab page now has a hoverable '?' next to the title that explains how tabs work, and the next-charge date shows as subtext below the heading instead of buried in the middle of the card",
+            "Small copy fix on guild pages so the payment-method prompt reads 'add items to your tab' instead of just 'add items'",
         ],
     },
     {

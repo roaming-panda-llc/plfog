@@ -21,7 +21,9 @@ submits splits-N-recipient_type, splits-N-guild, splits-N-percent.
             { recipient: 'guild:{{ guild.pk }}', percent: 80 }
         ],
         price: 0
-     })">
+     })"
+     @open-modal.window="if ($event.detail === 'add-product') reset()"
+     @close-modal.window="if ($event.detail === 'add-product') reset()">
     <form method="post" action="{% url 'hub_guild_product_create' guild.pk %}">
         {% csrf_token %}
 
@@ -120,6 +122,19 @@ function productSplitForm({ guildId, guildName, recipients, defaults, price }) {
 
         init() {
             this.rows.forEach((_, i) => this.syncRow(i));
+        },
+
+        reset() {
+            this.rows = JSON.parse(JSON.stringify(this.defaults));
+            this.price = 0;
+            this.$nextTick(() => {
+                this.rows.forEach((_, i) => this.syncRow(i));
+                const form = this.$root.querySelector('form');
+                if (form) {
+                    const nameInput = form.querySelector('#id_product_name');
+                    if (nameInput) nameInput.value = '';
+                }
+            });
         },
 
         get totalPercent() {
