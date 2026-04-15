@@ -39,12 +39,15 @@ def dashboard_callback(request: HttpRequest, context: dict) -> dict:
     signed_up_1st = Q(first_choice_votes__member__user__isnull=False)
     signed_up_2nd = Q(second_choice_votes__member__user__isnull=False)
     signed_up_3rd = Q(third_choice_votes__member__user__isnull=False)
+    # distinct=True: without it, the three reverse-FK Counts cross-join and
+    # each count is multiplied by the other two (see hub/views.py
+    # _compute_live_standings for the detailed explanation).
     guilds = (
         Guild.objects.filter(is_active=True)
         .annotate(
-            first=Count("first_choice_votes", filter=signed_up_1st),
-            second=Count("second_choice_votes", filter=signed_up_2nd),
-            third=Count("third_choice_votes", filter=signed_up_3rd),
+            first=Count("first_choice_votes", filter=signed_up_1st, distinct=True),
+            second=Count("second_choice_votes", filter=signed_up_2nd, distinct=True),
+            third=Count("third_choice_votes", filter=signed_up_3rd, distinct=True),
         )
         .order_by("-first", "-second", "-third")
     )
