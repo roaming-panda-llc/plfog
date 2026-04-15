@@ -336,6 +336,43 @@ def guild_product_create(request: HttpRequest, pk: int) -> HttpResponse:
 
 @login_required
 @require_POST
+def guild_product_update(request: HttpRequest, pk: int, product_pk: int) -> HttpResponse:
+    """POST-only — update a Product (and its revenue splits) for this guild.
+
+    Permission: admin / guild_officer / this guild's lead.
+    """
+    from billing.forms import ProductForm, build_product_split_formset
+    from billing.models import Product
+
+    guild = get_object_or_404(Guild, pk=pk)
+    forbidden = _require_can_edit_guild(request, guild)
+    if forbidden is not None:
+        return forbidden
+
+    product = get_object_or_404(Product, pk=product_pk, guild=guild)
+    form = ProductForm(data=request.POST, instance=product)
+    # The Alpine modal posts fresh splits rows (no PKs) regardless of mode, so
+    # we replace the existing splits wholesale rather than diffing them. Build
+    # the formset against an unsaved Product instance so it treats every row
+    # as new; the actual link to ``product`` happens on save() below.
+    formset = build_product_split_formset(data=request.POST, instance=Product())
+
+    if form.is_valid() and formset.is_valid():
+        updated = form.save(commit=False)
+        updated.guild = guild  # always bind to the page's guild
+        updated.save()
+        updated.splits.all().delete()
+        formset.instance = updated
+        formset.save()
+        messages.success(request, f"Updated product '{updated.name}'.")
+    else:
+        _surface_product_errors(request, form, formset)
+
+    return redirect("hub_guild_detail", pk=guild.pk)
+
+
+@login_required
+@require_POST
 def guild_product_delete(request: HttpRequest, pk: int, product_pk: int) -> HttpResponse:
     """POST-only — delete a product from this guild. Permission same as guild_edit."""
     from billing.models import Product

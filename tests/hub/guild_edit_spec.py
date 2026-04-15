@@ -106,6 +106,121 @@ def describe_guild_product_create():
 
 
 @pytest.mark.django_db
+def describe_guild_product_update():
+    def _make_product(guild, *, name: str = "Original", price: str = "5.00") -> Product:
+        product = Product.objects.create(name=name, price=Decimal(price), guild=guild)
+        ProductRevenueSplit.objects.create(
+            product=product,
+            recipient_type="admin",
+            guild=None,
+            percent=Decimal("20"),
+        )
+        ProductRevenueSplit.objects.create(
+            product=product,
+            recipient_type="guild",
+            guild=guild,
+            percent=Decimal("80"),
+        )
+        return product
+
+    def _update_payload(guild, *, name: str = "Renamed", price: str = "20.00") -> dict:
+        data = _product_post_payload(guild)
+        data["name"] = name
+        data["price"] = price
+        return data
+
+    def it_updates_a_product_as_admin(client: Client):
+        _user_with_role("admin_upd", fog_role=Member.FogRole.ADMIN)
+        guild = GuildFactory()
+        product = _make_product(guild)
+        client.login(username="admin_upd", password="pass")
+        url = reverse("hub_guild_product_update", args=[guild.pk, product.pk])
+        response = client.post(url, data=_update_payload(guild))
+        assert response.status_code == 302
+        product.refresh_from_db()
+        assert product.name == "Renamed"
+        assert product.price == Decimal("20.00")
+        assert Product.objects.count() == 1
+
+    def it_allows_guild_officer_to_update(client: Client):
+        _user_with_role("officer_upd", fog_role=Member.FogRole.GUILD_OFFICER)
+        guild = GuildFactory()
+        product = _make_product(guild)
+        client.login(username="officer_upd", password="pass")
+        url = reverse("hub_guild_product_update", args=[guild.pk, product.pk])
+        response = client.post(url, data=_update_payload(guild, name="OfficerEdit"))
+        assert response.status_code == 302
+        product.refresh_from_db()
+        assert product.name == "OfficerEdit"
+
+    def it_allows_the_guild_lead_to_update(client: Client):
+        user = _user_with_role("lead_upd", fog_role=Member.FogRole.MEMBER)
+        guild = GuildFactory(guild_lead=user.member)
+        product = _make_product(guild)
+        client.login(username="lead_upd", password="pass")
+        url = reverse("hub_guild_product_update", args=[guild.pk, product.pk])
+        response = client.post(url, data=_update_payload(guild, name="LeadEdit"))
+        assert response.status_code == 302
+        product.refresh_from_db()
+        assert product.name == "LeadEdit"
+
+    def it_rejects_a_regular_member_with_403(client: Client):
+        _user_with_role("reg_upd", fog_role=Member.FogRole.MEMBER)
+        guild = GuildFactory()
+        product = _make_product(guild)
+        client.login(username="reg_upd", password="pass")
+        url = reverse("hub_guild_product_update", args=[guild.pk, product.pk])
+        response = client.post(url, data=_update_payload(guild, name="Hacked"))
+        assert response.status_code == 403
+        product.refresh_from_db()
+        assert product.name == "Original"
+
+    def it_rejects_get_requests_with_405(client: Client):
+        _user_with_role("admin_get", fog_role=Member.FogRole.ADMIN)
+        guild = GuildFactory()
+        product = _make_product(guild)
+        client.login(username="admin_get", password="pass")
+        url = reverse("hub_guild_product_update", args=[guild.pk, product.pk])
+        response = client.get(url)
+        assert response.status_code == 405
+
+    def it_shows_form_errors_and_redirects_back_when_invalid(client: Client):
+        _user_with_role("admin_inv", fog_role=Member.FogRole.ADMIN)
+        guild = GuildFactory()
+        product = _make_product(guild)
+        client.login(username="admin_inv", password="pass")
+        url = reverse("hub_guild_product_update", args=[guild.pk, product.pk])
+        data = _update_payload(guild)
+        data["name"] = ""  # required
+        response = client.post(url, data=data, follow=True)
+        assert response.status_code == 200
+        product.refresh_from_db()
+        assert product.name == "Original"
+        msgs = [str(m) for m in response.context["messages"]]
+        assert any("name" in m.lower() for m in msgs)
+
+    def it_updates_the_revenue_splits_when_they_change(client: Client):
+        _user_with_role("admin_split", fog_role=Member.FogRole.ADMIN)
+        guild = GuildFactory()
+        product = _make_product(guild)
+        # Original: 20% admin / 80% guild. Flip to 50/50.
+        client.login(username="admin_split", password="pass")
+        url = reverse("hub_guild_product_update", args=[guild.pk, product.pk])
+        data = _update_payload(guild)
+        data["splits-0-percent"] = "50"
+        data["splits-1-percent"] = "50"
+        response = client.post(url, data=data)
+        assert response.status_code == 302
+        product.refresh_from_db()
+        assert product.splits.count() == 2
+        admin_split = product.splits.get(recipient_type="admin")
+        guild_split = product.splits.get(recipient_type="guild")
+        assert admin_split.percent == Decimal("50.00")
+        assert guild_split.percent == Decimal("50.00")
+        assert guild_split.guild_id == guild.pk
+
+
+@pytest.mark.django_db
 def describe_guild_product_delete():
     def _make_product(guild):
         product = Product.objects.create(name="x", price=Decimal("5.00"), guild=guild)
@@ -269,7 +384,7 @@ def describe_guild_detail_edit_buttons():
         client.login(username="admin_btn", password="pass")
         response = client.get(f"/guilds/{guild.pk}/")
         assert response.status_code == 200
-        assert b"open-modal', 'add-product'" in response.content
+        assert b'@click="openProductCreateModal()"' in response.content
         assert b"open-modal', 'edit-guild'" in response.content
 
     def it_shows_edit_buttons_for_guild_lead(client: Client):
@@ -277,7 +392,7 @@ def describe_guild_detail_edit_buttons():
         guild = GuildFactory(guild_lead=user.member)
         client.login(username="lead_btn", password="pass")
         response = client.get(f"/guilds/{guild.pk}/")
-        assert b"open-modal', 'add-product'" in response.content
+        assert b'@click="openProductCreateModal()"' in response.content
         assert b"open-modal', 'edit-guild'" in response.content
 
     def it_hides_edit_buttons_for_regular_member(client: Client):
@@ -288,5 +403,5 @@ def describe_guild_detail_edit_buttons():
         # Check the Alpine dispatch strings — the literal button labels
         # ("Edit Guild Page" / "Add Product") also appear in the changelog
         # modal rendered on every page, so those aren't reliable markers.
-        assert b"open-modal', 'add-product'" not in response.content
+        assert b'@click="openProductCreateModal()"' not in response.content
         assert b"open-modal', 'edit-guild'" not in response.content

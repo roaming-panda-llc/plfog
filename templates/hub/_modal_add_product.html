@@ -1,10 +1,17 @@
 {% comment %}
-Body for the Add Product modal. Ported from the old admin
-_inline_product_form.html but restyled for the public hub design system.
+Body for the product modal. Handles BOTH create and edit modes.
 
-The splits formset field names must match
-billing.forms.build_product_split_formset() with prefix="splits": each row
-submits splits-N-recipient_type, splits-N-guild, splits-N-percent.
+The outer modal state lives on the `guildCart` Alpine component:
+  - productModalMode: 'create' | 'edit'
+  - productModalInitial: { pk, name, price, action, splits: [{recipient_type, guild, percent}] }
+
+When mode === 'create', the form posts to hub_guild_product_create and the
+splits start at the default admin/guild split. When mode === 'edit', the
+form posts to hub_guild_product_update and splits load from the product.
+
+The splits formset field names match billing.forms.build_product_split_formset()
+with prefix="splits": each row submits splits-N-recipient_type, splits-N-guild,
+splits-N-percent.
 {% endcomment %}
 <div class="pl-product-form"
      x-data="productSplitForm({
@@ -20,17 +27,17 @@ submits splits-N-recipient_type, splits-N-guild, splits-N-percent.
             { recipient: 'admin', percent: 20 },
             { recipient: 'guild:{{ guild.pk }}', percent: 80 }
         ],
-        price: 0
+        createUrl: '{% url 'hub_guild_product_create' guild.pk %}'
      })"
-     @open-modal.window="if ($event.detail === 'add-product') reset()"
-     @close-modal.window="if ($event.detail === 'add-product') reset()">
-    <form method="post" action="{% url 'hub_guild_product_create' guild.pk %}">
+     @open-modal.window="if ($event.detail === 'product-modal') applyInitial(productModalMode, productModalInitial)"
+     @close-modal.window="if ($event.detail === 'product-modal') reset()">
+    <form method="post" :action="formAction">
         {% csrf_token %}
 
         <div class="pl-product-form__row">
             <div class="pl-form-group">
                 <label class="pl-form-label" for="id_product_name">Name</label>
-                <input type="text" id="id_product_name" name="name" required>
+                <input type="text" id="id_product_name" name="name" x-model="name" required>
             </div>
             <div class="pl-form-group">
                 <label class="pl-form-label" for="id_product_price">Price ($)</label>
@@ -106,34 +113,58 @@ submits splits-N-recipient_type, splits-N-guild, splits-N-percent.
         <div class="pl-product-form__actions">
             <button type="button"
                     class="pl-btn pl-btn--secondary"
-                    @click="$dispatch('close-modal', 'add-product')">Cancel</button>
-            <button type="submit" class="pl-btn pl-btn--primary" :disabled="!canSave()">Save product</button>
+                    @click="$dispatch('close-modal', 'product-modal')">Cancel</button>
+            <button type="submit" class="pl-btn pl-btn--primary" :disabled="!canSave()" x-text="mode === 'edit' ? 'Save changes' : 'Save product'"></button>
         </div>
     </form>
 </div>
 
 <script>
-function productSplitForm({ guildId, guildName, recipients, defaults, price }) {
+function productSplitForm({ guildId, guildName, recipients, defaults, createUrl }) {
     return {
         recipients,
         defaults,
-        price,
+        createUrl,
+        mode: 'create',
+        name: '',
+        price: 0,
+        formAction: createUrl,
         rows: JSON.parse(JSON.stringify(defaults)),
 
         init() {
             this.rows.forEach((_, i) => this.syncRow(i));
         },
 
-        reset() {
-            this.rows = JSON.parse(JSON.stringify(this.defaults));
-            this.price = 0;
+        applyInitial(mode, initial) {
+            this.mode = mode || 'create';
+            if (this.mode === 'edit' && initial) {
+                this.name = initial.name || '';
+                this.price = parseFloat(initial.price) || 0;
+                this.formAction = initial.action || this.createUrl;
+                const splits = (initial.splits || []).map(s => ({
+                    recipient: s.recipient_type === 'admin' ? 'admin' : ('guild:' + s.guild),
+                    percent: parseFloat(s.percent) || 0
+                }));
+                this.rows = splits.length > 0 ? splits : JSON.parse(JSON.stringify(this.defaults));
+            } else {
+                this.name = '';
+                this.price = 0;
+                this.formAction = this.createUrl;
+                this.rows = JSON.parse(JSON.stringify(this.defaults));
+            }
             this.$nextTick(() => {
                 this.rows.forEach((_, i) => this.syncRow(i));
-                const form = this.$root.querySelector('form');
-                if (form) {
-                    const nameInput = form.querySelector('#id_product_name');
-                    if (nameInput) nameInput.value = '';
-                }
+            });
+        },
+
+        reset() {
+            this.mode = 'create';
+            this.name = '';
+            this.price = 0;
+            this.formAction = this.createUrl;
+            this.rows = JSON.parse(JSON.stringify(this.defaults));
+            this.$nextTick(() => {
+                this.rows.forEach((_, i) => this.syncRow(i));
             });
         },
 

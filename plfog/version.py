@@ -2,9 +2,18 @@
 
 from __future__ import annotations
 
-VERSION = "1.5.4"
+VERSION = "1.5.5"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.5.5",
+        "date": "2026-04-14",
+        "title": "Edit products in place",
+        "changes": [
+            "You can now edit a product right from your guild page — click the small pencil on a product card and the same pop-up you use to add products opens up pre-filled with that product's name, price, and revenue split",
+            "Saving updates the product in place — no need to delete and re-add it just to fix a typo or change the percentages",
+        ],
+    },
     {
         "version": "1.5.4",
         "date": "2026-04-14",

@@ -17,6 +17,11 @@ urlpatterns = [
         name="hub_guild_product_create",
     ),
     path(
+        "guilds/<int:pk>/products/<int:product_pk>/edit/",
+        views.guild_product_update,
+        name="hub_guild_product_update",
+    ),
+    path(
         "guilds/<int:pk>/products/<int:product_pk>/delete/",
         views.guild_product_delete,
         name="hub_guild_product_delete",

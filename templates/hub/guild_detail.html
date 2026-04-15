@@ -115,7 +115,7 @@
         <div class="pl-guild-header__actions">
             <button type="button"
                     class="pl-btn pl-btn--primary"
-                    @click="$dispatch('open-modal', 'add-product')">
+                    @click="openProductCreateModal()">
                 Add Product
             </button>
         </div>
@@ -140,6 +140,15 @@
         {% for product in products %}
         <div class="guild-product-card">
             {% if can_edit_this_guild %}
+            <button type="button"
+                    class="guild-product-card__edit-btn"
+                    aria-label="Edit {{ product.name|escapejs }}"
+                    title="Edit"
+                    @click="openProductEditModal({{ product.pk }}, '{{ product.name|escapejs }}', '{{ product.price }}', '{% url 'hub_guild_product_update' guild.pk product.pk %}', [{% for split in product.splits.all %}{&quot;recipient_type&quot;:&quot;{{ split.recipient_type }}&quot;,&quot;guild&quot;:{% if split.guild %}{{ split.guild.pk }}{% else %}null{% endif %},&quot;percent&quot;:&quot;{{ split.percent }}&quot;}{% if not forloop.last %},{% endif %}{% endfor %}])">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                </svg>
+            </button>
             <button type="button"
                     class="guild-product-card__delete-btn"
                     aria-label="Delete {{ product.name|escapejs }}"
@@ -295,25 +304,23 @@
     </div>
 </div>
 
-{# Add Product modal #}
-<div x-data="{ open: false }"
-     x-show="open"
+{# Product modal — handles both Add and Edit #}
+<div x-show="productModalOpen"
      x-transition:enter="modal-enter"
      x-transition:leave="modal-leave"
-     @open-modal.window="if ($event.detail === 'add-product') open = true"
-     @close-modal.window="if ($event.detail === 'add-product') open = false"
-     @keydown.escape.window="open = false"
+     @close-modal.window="if ($event.detail === 'product-modal') productModalOpen = false"
+     @keydown.escape.window="productModalOpen = false"
      class="pl-modal-backdrop"
      style="display: none;"
      role="dialog"
      aria-modal="true"
-     aria-labelledby="add-product-title">
-    <div class="pl-modal pl-modal--lg" @click.outside="open = false">
+     aria-labelledby="product-modal-title">
+    <div class="pl-modal pl-modal--lg" @click.outside="productModalOpen = false">
         <div class="pl-modal__header">
-            <h2 class="pl-modal__title" id="add-product-title">Add Product</h2>
-            <button type="button" @click="open = false" class="pl-modal__close" aria-label="Close">&times;</button>
+            <h2 class="pl-modal__title" id="product-modal-title" x-text="productModalMode === 'edit' ? 'Edit Product' : 'Add Product'"></h2>
+            <button type="button" @click="$dispatch('close-modal', 'product-modal')" class="pl-modal__close" aria-label="Close">&times;</button>
         </div>
-        <div class="pl-modal__body" id="add-product-body">
+        <div class="pl-modal__body" id="product-modal-body">
             {% include "hub/_modal_add_product.html" %}
         </div>
     </div>
@@ -360,6 +367,9 @@ function guildCart(guildPk) {
         submitting: false,
         deleteModalOpen: false,
         deleteTarget: {pk: 0, name: '', url: ''},
+        productModalOpen: false,
+        productModalMode: 'create',
+        productModalInitial: null,
 
         openAddModal(pk, name, price) {
             this.addModalProduct = {pk: pk, name: name, price: parseFloat(price)};
@@ -370,6 +380,20 @@ function guildCart(guildPk) {
         openDeleteModal(pk, name, url) {
             this.deleteTarget = {pk: pk, name: name, url: url};
             this.deleteModalOpen = true;
+        },
+
+        openProductCreateModal() {
+            this.productModalMode = 'create';
+            this.productModalInitial = null;
+            this.productModalOpen = true;
+            window.dispatchEvent(new CustomEvent('open-modal', {detail: 'product-modal'}));
+        },
+
+        openProductEditModal(pk, name, price, action, splits) {
+            this.productModalMode = 'edit';
+            this.productModalInitial = {pk: pk, name: name, price: price, action: action, splits: splits};
+            this.productModalOpen = true;
+            window.dispatchEvent(new CustomEvent('open-modal', {detail: 'product-modal'}));
         },
 
         addToCart() {
