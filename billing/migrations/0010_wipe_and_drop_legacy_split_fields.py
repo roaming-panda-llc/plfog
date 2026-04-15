@@ -30,7 +30,6 @@ def cannot_reverse(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("billing", "0009_product_revenue_split_tabentry_split"),
     ]

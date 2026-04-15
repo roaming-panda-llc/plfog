@@ -111,11 +111,15 @@ def describe_ProductRevenueSplit():
             p1 = ProductFactory(with_default_splits=False)
             p2 = ProductFactory(with_default_splits=False)
             ProductRevenueSplit.objects.create(
-                product=p1, recipient_type=ProductRevenueSplit.RecipientType.GUILD,
-                guild=guild, percent=Decimal("100"),
+                product=p1,
+                recipient_type=ProductRevenueSplit.RecipientType.GUILD,
+                guild=guild,
+                percent=Decimal("100"),
             )
             ProductRevenueSplit.objects.create(
-                product=p2, recipient_type=ProductRevenueSplit.RecipientType.GUILD,
-                guild=guild, percent=Decimal("100"),
+                product=p2,
+                recipient_type=ProductRevenueSplit.RecipientType.GUILD,
+                guild=guild,
+                percent=Decimal("100"),
             )
             assert ProductRevenueSplit.objects.filter(guild=guild).count() == 2

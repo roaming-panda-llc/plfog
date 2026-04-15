@@ -209,9 +209,7 @@ class TabItemForm(forms.Form):
         The admin dashboard path must always post an explicit splits formset.
         """
         if self.context != CONTEXT_MEMBER_GUILD_PAGE or self.fixed_guild is None:
-            raise ValueError(
-                "Custom entries outside member_guild_page require explicit splits."
-            )
+            raise ValueError("Custom entries outside member_guild_page require explicit splits.")
         admin_percent: Decimal = BillingSettings.load().default_admin_percent
         guild_percent = Decimal("100") - admin_percent
         return [
@@ -253,18 +251,12 @@ class _BaseCustomSplitFormSet(forms.BaseFormSet):
         super().clean()
         if any(self.errors):
             return
-        active = [
-            f.cleaned_data
-            for f in self.forms
-            if f.cleaned_data and not f.cleaned_data.get("DELETE", False)
-        ]
+        active = [f.cleaned_data for f in self.forms if f.cleaned_data and not f.cleaned_data.get("DELETE", False)]
         if not active:
             raise forms.ValidationError("At least one split row is required.")
         total = sum((row["percent"] for row in active), Decimal("0"))
         if total != Decimal("100"):
-            raise forms.ValidationError(
-                f"Splits must sum to 100% — currently {total}%."
-            )
+            raise forms.ValidationError(f"Splits must sum to 100% — currently {total}%.")
         seen_admin = False
         seen_guilds: set[int] = set()
         for row in active:
@@ -280,9 +272,7 @@ class _BaseCustomSplitFormSet(forms.BaseFormSet):
                 if guild is None:
                     raise forms.ValidationError("Guild rows must select a guild.")
                 if guild.pk in seen_guilds:
-                    raise forms.ValidationError(
-                        f"Guild '{guild.name}' appears more than once."
-                    )
+                    raise forms.ValidationError(f"Guild '{guild.name}' appears more than once.")
                 seen_guilds.add(guild.pk)
 
     def to_split_dicts(self) -> list[dict[str, Any]]:
@@ -409,11 +399,7 @@ class _BaseProductSplitFormSet(BaseInlineFormSet):
         if any(self.errors):
             return  # let per-form errors surface first
 
-        active_rows = [
-            f.cleaned_data
-            for f in self.forms
-            if f.cleaned_data and not f.cleaned_data.get("DELETE", False)
-        ]
+        active_rows = [f.cleaned_data for f in self.forms if f.cleaned_data and not f.cleaned_data.get("DELETE", False)]
         if not active_rows:
             raise forms.ValidationError("At least one revenue split row is required.")
 
@@ -424,9 +410,7 @@ class _BaseProductSplitFormSet(BaseInlineFormSet):
     def _check_total(active_rows: list[dict[str, Any]]) -> None:
         total = sum((row["percent"] for row in active_rows), Decimal("0"))
         if total != Decimal("100"):
-            raise forms.ValidationError(
-                f"Revenue splits must sum to 100% — currently {total}%."
-            )
+            raise forms.ValidationError(f"Revenue splits must sum to 100% — currently {total}%.")
 
     @staticmethod
     def _check_recipient_rules(active_rows: list[dict[str, Any]]) -> None:
@@ -446,8 +430,7 @@ class _BaseProductSplitFormSet(BaseInlineFormSet):
                     raise forms.ValidationError("Guild rows must select a guild.")
                 if guild.pk in seen_guilds:
                     raise forms.ValidationError(
-                        f"Guild '{guild.name}' appears more than once. "
-                        f"Each guild may only appear in one split row."
+                        f"Guild '{guild.name}' appears more than once. Each guild may only appear in one split row."
                     )
                 seen_guilds.add(guild.pk)
 

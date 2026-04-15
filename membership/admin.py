@@ -278,9 +278,7 @@ class GuildAdmin(ModelAdmin):
         guild = self.get_object(request, object_id)
         if guild is not None:
             extra_context["existing_products"] = (
-                Product.objects.filter(guild=guild)
-                .prefetch_related("splits__guild")
-                .order_by("name")
+                Product.objects.filter(guild=guild).prefetch_related("splits__guild").order_by("name")
             )
             extra_context["all_guilds"] = type(guild).objects.order_by("name")
             extra_context["editing_guild"] = guild

@@ -40,6 +40,12 @@ def remove_default_plan_and_backfilled_members(apps: Apps, schema_editor: BaseDa
         plan.delete()
 
 
+# NOTE: reverse data migration tested manually until billing/0010 is squashed
+# away. billing migration 0010 is intentionally irreversible (it wipes legacy
+# product/tab-entry split data during the v1.7 splits refactor), which blocks
+# rolling back past this migration in a test DB. The automated reverse-check
+# that used to live in ``tests/membership/migration_0011_spec.py`` was removed
+# when the splits feature shipped; see that file's git history for the shape.
 class Migration(migrations.Migration):
     dependencies = [
         ("membership", "0010_alter_guild_is_active"),

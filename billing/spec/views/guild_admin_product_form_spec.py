@@ -1,6 +1,5 @@
 from decimal import Decimal
 
-import pytest
 from django.urls import reverse
 
 from billing.models import Product, ProductRevenueSplit
@@ -71,7 +70,10 @@ def describe_admin_delete_product():
         # Create product directly so the test doesn't depend on factory defaults
         product = Product.objects.create(name="x", price=Decimal("5.00"), guild=guild)
         ProductRevenueSplit.objects.create(
-            product=product, recipient_type="admin", guild=None, percent=Decimal("100"),
+            product=product,
+            recipient_type="admin",
+            guild=None,
+            percent=Decimal("100"),
         )
         url = reverse("billing_admin_delete_product", args=[product.pk])
         response = client.post(url)

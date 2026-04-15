@@ -323,21 +323,6 @@ def describe_admin_add_tab_entry():
         assert response.status_code == 200
         assert "form" in response.context
 
-    # TODO(splits): rewrite in Task 7 — custom admin entries now require an
-    # explicit splits payload. Task 7 rebuilds the admin-add-entry form + view
-    # on top of ``ProductRevenueSplit`` and restores these tests.
-    # def it_creates_entry_on_valid_post(client: Client): ...
-    # def it_shows_errors_on_invalid_post(client: Client): ...
-    # def it_shows_error_when_tab_add_entry_raises(client: Client): ...
-
-    def it_admin_add_entry_placeholder(client: Client):
-        """Placeholder so describe_admin_add_tab_entry still has a test while the
-        real path is parked. Remove when Task 7 restores the suite above.
-        """
-        _create_superuser(client)
-        response = client.get("/billing/admin/add-entry/")
-        assert response.status_code in (200, 302)
-
 
 def describe_billing_test_platform_connection():
     def it_requires_staff(client: Client):

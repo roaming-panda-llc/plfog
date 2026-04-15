@@ -50,20 +50,6 @@ def describe_guild_detail():
         response = client.get(f"/guilds/{guild.pk}/")
         assert b"Nothing here yet" in response.content
 
-    # TODO(splits): rewrite in Task 6 — `Product.is_active` was dropped. Task 6
-    # reintroduces a per-product visibility mechanism (likely via splits being
-    # non-empty) and this test should then check that hidden products are
-    # filtered from the guild detail page.
-    # def it_shows_active_products_only(client: Client):
-    #     User.objects.create_user(username="v4", password="pass")
-    #     guild = GuildFactory()
-    #     ProductFactory(guild=guild, name="Laser Cutter", is_active=True)
-    #     ProductFactory(guild=guild, name="Hidden", is_active=False)
-    #     client.login(username="v4", password="pass")
-    #     response = client.get(f"/guilds/{guild.pk}/")
-    #     assert b"Laser Cutter" in response.content
-    #     assert b"Hidden" not in response.content
-
     def it_shows_no_products_placeholder_when_empty(client: Client):
         User.objects.create_user(username="v5", password="pass")
         guild = GuildFactory()

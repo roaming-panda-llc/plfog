@@ -15,19 +15,23 @@ def describe_TabEntry_snapshot_splits():
     def it_writes_one_TabEntrySplit_per_input_row(db):
         entry = TabEntryFactory(amount=Decimal("10.00"))
         guild = GuildFactory()
-        entry.snapshot_splits([
-            _split_input("admin", "20"),
-            _split_input("guild", "80", guild=guild),
-        ])
+        entry.snapshot_splits(
+            [
+                _split_input("admin", "20"),
+                _split_input("guild", "80", guild=guild),
+            ]
+        )
         assert entry.splits.count() == 2
 
     def it_rounds_each_split_amount_with_round_half_up(db):
         entry = TabEntryFactory(amount=Decimal("10.00"))
         guild = GuildFactory()
-        entry.snapshot_splits([
-            _split_input("admin", "20", guild=None),
-            _split_input("guild", "80", guild=guild),
-        ])
+        entry.snapshot_splits(
+            [
+                _split_input("admin", "20", guild=None),
+                _split_input("guild", "80", guild=guild),
+            ]
+        )
         admin = entry.splits.get(recipient_type="admin")
         g = entry.splits.get(recipient_type="guild")
         assert admin.amount == Decimal("2.00")
@@ -40,11 +44,13 @@ def describe_TabEntry_snapshot_splits():
         entry = TabEntryFactory(amount=Decimal("0.10"))
         g1 = GuildFactory()
         g2 = GuildFactory()
-        entry.snapshot_splits([
-            _split_input("admin", "33", guild=None),
-            _split_input("guild", "33", guild=g1),
-            _split_input("guild", "34", guild=g2),
-        ])
+        entry.snapshot_splits(
+            [
+                _split_input("admin", "33", guild=None),
+                _split_input("guild", "33", guild=g1),
+                _split_input("guild", "34", guild=g2),
+            ]
+        )
         amounts = sorted(entry.splits.values_list("amount", flat=True))
         assert amounts == [Decimal("0.03"), Decimal("0.03"), Decimal("0.04")]
         # 34% row absorbs the penny
@@ -54,10 +60,12 @@ def describe_TabEntry_snapshot_splits():
     def it_keeps_sum_equal_to_entry_amount_for_one_cent_50_50(db):
         entry = TabEntryFactory(amount=Decimal("0.01"))
         g = GuildFactory()
-        entry.snapshot_splits([
-            _split_input("admin", "50"),
-            _split_input("guild", "50", guild=g),
-        ])
+        entry.snapshot_splits(
+            [
+                _split_input("admin", "50"),
+                _split_input("guild", "50", guild=g),
+            ]
+        )
         total = sum((s.amount for s in entry.splits.all()), Decimal("0"))
         assert total == Decimal("0.01")
 
@@ -76,10 +84,12 @@ def describe_TabEntry_snapshot_splits():
         # in the input list absorbs the penny adjustment.
         entry = TabEntryFactory(amount=Decimal("0.03"))
         g = GuildFactory()
-        entry.snapshot_splits([
-            _split_input("admin", "50"),
-            _split_input("guild", "50", guild=g),
-        ])
+        entry.snapshot_splits(
+            [
+                _split_input("admin", "50"),
+                _split_input("guild", "50", guild=g),
+            ]
+        )
         admin_split = entry.splits.get(recipient_type="admin")
         guild_split = entry.splits.get(recipient_type="guild")
         # 0.03 * 0.5 = 0.015 -> ROUND_HALF_UP -> 0.02 each, raw sum 0.04.
@@ -94,10 +104,12 @@ def describe_TabEntry_snapshot_splits():
         # asserts internally as defense in depth.
         entry = TabEntryFactory(amount=Decimal("10.00"))
         with pytest.raises(AssertionError):
-            entry.snapshot_splits([
-                _split_input("admin", "50"),
-                # Missing other 50% — sums to 50, not 100
-            ])
+            entry.snapshot_splits(
+                [
+                    _split_input("admin", "50"),
+                    # Missing other 50% — sums to 50, not 100
+                ]
+            )
 
     def it_creates_admin_split_with_null_guild(db):
         entry = TabEntryFactory(amount=Decimal("5.00"))

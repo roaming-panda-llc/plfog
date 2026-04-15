@@ -205,7 +205,6 @@ def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
         pk=pk,
     )
     ctx = _get_hub_context(request)
-    # TODO(splits): Task 6 reintroduces per-product visibility. For now show all products.
     products = guild.products.order_by("name").prefetch_related("splits__guild")
     member = _get_member(request)
 
@@ -252,7 +251,6 @@ def guild_cart_confirm(request: HttpRequest, pk: int) -> HttpResponse:
     if not items:
         return JsonResponse({"error": "Cart is empty."}, status=400)
 
-    # TODO(splits): Task 6 reintroduces per-product visibility. For now show all products.
     active_products = {p.pk: p for p in guild.products.all()}
     entries_created = 0
 
