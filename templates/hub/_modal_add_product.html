@@ -1,12 +1,13 @@
-{% load static %}
-{# Inline Add Product form — Alpine.js drives dynamic split rows + live preview.
+{% comment %}
+Body for the Add Product modal. Ported from the old admin
+_inline_product_form.html but restyled for the public hub design system.
 
-   The splits formset field names match the ProductRevenueSplitFormSet built
-   by billing.forms.build_product_split_formset() (prefix="splits"). Each row
-   submits: splits-N-recipient_type, splits-N-guild, splits-N-percent.
-#}
-
-<div class="pl-add-product-form" x-data="productSplitForm({
+The splits formset field names must match
+billing.forms.build_product_split_formset() with prefix="splits": each row
+submits splits-N-recipient_type, splits-N-guild, splits-N-percent.
+{% endcomment %}
+<div class="pl-product-form"
+     x-data="productSplitForm({
         guildId: {{ guild.pk }},
         guildName: '{{ guild.name|escapejs }}',
         recipients: [
@@ -21,33 +22,31 @@
         ],
         price: 0
      })">
-
-    <h3 class="pl-add-product-title">Add a product</h3>
-
-    <form method="post" action="{% url 'billing_admin_add_product_for_guild' guild.pk %}" class="pl-add-product-form__form">
+    <form method="post" action="{% url 'hub_guild_product_create' guild.pk %}">
         {% csrf_token %}
 
-        <div class="pl-add-product-row">
-            <label class="pl-add-product-field">
-                Name
-                <input type="text" name="name" required>
-            </label>
-            <label class="pl-add-product-field">
-                Price $
-                <input type="number" step="0.01" min="0.01" name="price" x-model.number="price" required>
-            </label>
+        <div class="pl-product-form__row">
+            <div class="pl-form-group">
+                <label class="pl-form-label" for="id_product_name">Name</label>
+                <input type="text" id="id_product_name" name="name" required>
+            </div>
+            <div class="pl-form-group">
+                <label class="pl-form-label" for="id_product_price">Price ($)</label>
+                <input type="number" id="id_product_price" step="0.01" min="0.01" name="price"
+                       x-model.number="price" required>
+            </div>
             <input type="hidden" name="guild" value="{{ guild.pk }}">
         </div>
 
-        <fieldset class="pl-splits-fieldset">
-            <legend>Revenue Split &mdash; must sum to 100%</legend>
+        <fieldset class="pl-product-form__splits">
+            <legend>Revenue split &mdash; must sum to 100%</legend>
 
             <input type="hidden" name="splits-TOTAL_FORMS" :value="rows.length">
             <input type="hidden" name="splits-INITIAL_FORMS" value="0">
             <input type="hidden" name="splits-MIN_NUM_FORMS" value="1">
             <input type="hidden" name="splits-MAX_NUM_FORMS" value="1000">
 
-            <table class="pl-splits-table">
+            <table class="pl-splits">
                 <thead>
                     <tr><th>Recipient</th><th>Percent</th><th></th></tr>
                 </thead>
@@ -55,7 +54,6 @@
                     <template x-for="(row, i) in rows" :key="i">
                         <tr>
                             <td>
-                                {# Hidden inputs the Django formset actually reads #}
                                 <input type="hidden" :name="`splits-${i}-recipient_type`" :value="row.recipientType">
                                 <input type="hidden" :name="`splits-${i}-guild`" :value="row.guildId">
                                 <input type="hidden" :name="`splits-${i}-id`" value="">
@@ -67,42 +65,47 @@
                                     </template>
                                 </select>
                             </td>
-                            <td>
+                            <td class="pl-splits__percent">
                                 <input type="number" step="0.01" min="0.01" max="100"
                                        :name="`splits-${i}-percent`"
                                        x-model.number="row.percent"
                                        required>%
                             </td>
-                            <td>
-                                <button type="button" @click="removeRow(i)" aria-label="Remove row" class="pl-product-btn pl-product-btn--delete">&times;</button>
+                            <td class="pl-splits__actions">
+                                <button type="button"
+                                        @click="removeRow(i)"
+                                        aria-label="Remove row"
+                                        class="pl-splits__remove">&times;</button>
                             </td>
                         </tr>
                     </template>
                 </tbody>
             </table>
 
-            <button type="button" @click="addRow()" :disabled="!hasUnpickedRecipient()" class="pl-product-btn">
+            <button type="button"
+                    @click="addRow()"
+                    :disabled="!hasUnpickedRecipient()"
+                    class="pl-btn pl-btn--secondary pl-splits__add">
                 + Add recipient
             </button>
 
-            <p class="pl-splits-preview" x-show="price > 0">
+            <p class="pl-splits__preview" x-show="price > 0">
                 Live preview: $<span x-text="price.toFixed(2)"></span> &rarr;
                 <template x-for="(row, i) in rows" :key="i">
                     <span><span x-text="recipientLabel(row.recipient)"></span> $<span x-text="((price * (parseFloat(row.percent) || 0)) / 100).toFixed(2)"></span><span x-show="i < rows.length - 1">, </span></span>
                 </template>
             </p>
 
-            <p :class="{'pl-splits-total': true, 'pl-splits-total--ok': totalPercent === 100, 'pl-splits-total--bad': totalPercent !== 100}">
+            <p :class="{'pl-splits__total': true, 'pl-splits__total--ok': totalPercent === 100, 'pl-splits__total--bad': totalPercent !== 100}">
                 Total: <span x-text="totalPercent"></span>% <span x-text="totalPercent === 100 ? '\u2713' : '\u2717'"></span>
             </p>
         </fieldset>
 
-        <div class="pl-add-product-actions">
-            <button type="submit" class="pl-btn pl-btn--primary" :disabled="!canSave()">Save Product</button>
-            <button type="reset" class="pl-btn pl-btn--secondary"
-                    @click="rows = JSON.parse(JSON.stringify(defaults)); price = 0; $nextTick(() => rows.forEach((_, i) => syncRow(i)))">
-                Reset
-            </button>
+        <div class="pl-product-form__actions">
+            <button type="button"
+                    class="pl-btn pl-btn--secondary"
+                    @click="$dispatch('close-modal', 'add-product')">Cancel</button>
+            <button type="submit" class="pl-btn pl-btn--primary" :disabled="!canSave()">Save product</button>
         </div>
     </form>
 </div>
@@ -120,7 +123,6 @@ function productSplitForm({ guildId, guildName, recipients, defaults, price }) {
         },
 
         get totalPercent() {
-            // Round to 2 decimals to avoid floating point surprises in UI
             const total = this.rows.reduce((sum, r) => sum + (parseFloat(r.percent) || 0), 0);
             return Math.round(total * 100) / 100;
         },

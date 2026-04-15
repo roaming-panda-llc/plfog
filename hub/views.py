@@ -16,7 +16,7 @@ from django.views.decorators.http import require_POST, require_http_methods
 
 from billing.exceptions import NoPaymentMethodError, TabLimitExceededError, TabLockedError
 from billing.models import BillingSettings, Tab, TabCharge
-from hub.forms import BetaFeedbackForm, EmailPreferencesForm, ProfileSettingsForm, VotePreferenceForm
+from hub.forms import BetaFeedbackForm, EmailPreferencesForm, GuildEditForm, ProfileSettingsForm, VotePreferenceForm
 from membership.cycle import get_cycle_context
 from membership.models import FundingSnapshot, Guild, Member, VotePreference
 
@@ -195,10 +195,24 @@ def snapshot_detail(request: HttpRequest, pk: int) -> HttpResponse:
     return render(request, "hub/snapshot_detail.html", {**ctx, "snapshot": snapshot})
 
 
+def _can_edit_guild(request: HttpRequest, guild: Guild) -> bool:
+    """Return True when the request's user may edit this guild.
+
+    Handles anonymous users and users with no linked Member gracefully.
+    """
+    if not request.user.is_authenticated:
+        return False
+    member: Member | None = getattr(request.user, "member", None)
+    if member is None:
+        return False
+    return member.can_edit_guild(guild)
+
+
 @login_required
 def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Guild detail page — shows about text, active products, and cart interface."""
-    from billing.forms import CONTEXT_MEMBER_GUILD_PAGE, TabItemForm
+    from billing.forms import CONTEXT_MEMBER_GUILD_PAGE, TabItemForm, build_product_split_formset
+    from billing.models import Product
 
     guild = get_object_or_404(
         Guild.objects.prefetch_related("products__splits__guild"),
@@ -214,6 +228,18 @@ def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
 
     eyop_form = TabItemForm(context=CONTEXT_MEMBER_GUILD_PAGE, user=request.user, guild=guild)
 
+    can_edit_this_guild = _can_edit_guild(request, guild)
+    guild_edit_form = GuildEditForm(instance=guild) if can_edit_this_guild else None
+    product_form = None
+    product_splits_formset = None
+    all_guilds = None
+    if can_edit_this_guild:
+        from billing.forms import ProductForm
+
+        product_form = ProductForm()
+        product_splits_formset = build_product_split_formset(instance=Product())
+        all_guilds = Guild.objects.filter(is_active=True).order_by("name")
+
     return render(
         request,
         "hub/guild_detail.html",
@@ -223,8 +249,105 @@ def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "products": products,
             "tab": tab,
             "eyop_form": eyop_form,
+            "can_edit_this_guild": can_edit_this_guild,
+            "guild_edit_form": guild_edit_form,
+            "product_form": product_form,
+            "product_splits_formset": product_splits_formset,
+            "all_guilds": all_guilds,
         },
     )
+
+
+def _require_can_edit_guild(request: HttpRequest, guild: Guild) -> HttpResponse | None:
+    """Return a 403 response if the user cannot edit ``guild``, else None."""
+    if not _can_edit_guild(request, guild):
+        return HttpResponse("Forbidden", status=403)
+    return None
+
+
+@login_required
+@require_POST
+def guild_edit(request: HttpRequest, pk: int) -> HttpResponse:
+    """POST-only — update the guild's name and about text. Admin, officer, or that guild's lead only."""
+    guild = get_object_or_404(Guild, pk=pk)
+    forbidden = _require_can_edit_guild(request, guild)
+    if forbidden is not None:
+        return forbidden
+
+    form = GuildEditForm(request.POST, instance=guild)
+    if form.is_valid():
+        form.save()
+        messages.success(request, "Guild updated.")
+    else:
+        for field, errors in form.errors.items():
+            for error in errors:
+                messages.error(request, f"{field}: {error}")
+    return redirect("hub_guild_detail", pk=guild.pk)
+
+
+def _surface_product_errors(request: HttpRequest, form: Any, formset: Any) -> None:
+    """Flash per-field form + formset errors onto ``request`` as messages."""
+    if form.errors:
+        for field, errors in form.errors.items():
+            for error in errors:
+                messages.error(request, f"{field}: {error}")
+    for non_form_error in formset.non_form_errors():
+        messages.error(request, f"Splits: {non_form_error}")
+    for idx, form_errors in enumerate(formset.errors):
+        for field, errors in form_errors.items():
+            for error in errors:
+                messages.error(request, f"Split row {idx + 1} ({field}): {error}")
+    if not (form.errors or formset.non_form_errors() or any(formset.errors)):
+        messages.error(request, "Could not add product — see errors below.")
+
+
+@login_required
+@require_POST
+def guild_product_create(request: HttpRequest, pk: int) -> HttpResponse:
+    """POST-only — create a Product for this guild with its revenue splits.
+
+    Permission: admin / guild_officer / this guild's lead.
+    """
+    from billing.forms import ProductForm, build_product_split_formset
+    from billing.models import Product
+
+    guild = get_object_or_404(Guild, pk=pk)
+    forbidden = _require_can_edit_guild(request, guild)
+    if forbidden is not None:
+        return forbidden
+
+    form = ProductForm(data=request.POST)
+    formset = build_product_split_formset(data=request.POST, instance=Product())
+
+    if form.is_valid() and formset.is_valid():
+        product = form.save(commit=False)
+        product.guild = guild  # always bind to the page's guild
+        product.save()
+        formset.instance = product
+        formset.save()
+        messages.success(request, f"Added product '{product.name}'.")
+    else:
+        _surface_product_errors(request, form, formset)
+
+    return redirect("hub_guild_detail", pk=guild.pk)
+
+
+@login_required
+@require_POST
+def guild_product_delete(request: HttpRequest, pk: int, product_pk: int) -> HttpResponse:
+    """POST-only — delete a product from this guild. Permission same as guild_edit."""
+    from billing.models import Product
+
+    guild = get_object_or_404(Guild, pk=pk)
+    forbidden = _require_can_edit_guild(request, guild)
+    if forbidden is not None:
+        return forbidden
+
+    product = get_object_or_404(Product, pk=product_pk, guild=guild)
+    name = product.name
+    product.delete()
+    messages.success(request, f"Deleted product '{name}'.")
+    return redirect("hub_guild_detail", pk=guild.pk)
 
 
 @login_required

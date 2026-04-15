@@ -169,9 +169,9 @@ class TabChargeAdmin(ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(ModelAdmin):
-    # Splits are managed via the inline Product form on the Guild admin edit
-    # page (see ``templates/admin/membership/guild_product_inline.html``);
-    # this change-form is read-mostly for quick lookup/deletion.
+    # Splits are managed via the public guild detail page
+    # (``templates/hub/_modal_add_product.html``) for admins / officers /
+    # guild leads; this admin change-form is read-mostly for quick lookup/deletion.
     list_display = ["name", "guild_name", "price"]
     list_filter = ["guild"]
     search_fields = ["name", "guild__name"]

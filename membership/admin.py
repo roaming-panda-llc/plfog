@@ -2,15 +2,13 @@ from __future__ import annotations
 
 from django.contrib import admin
 from django.db.models import QuerySet
-from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
+from django.http import HttpRequest
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 from unfold.admin import ModelAdmin, TabularInline
-from unfold.decorators import action
 
-from billing.models import Product
 from .forms import MemberAdminForm
-from .models import FundingSnapshot, Guild, Member, MemberEmail, VotePreference
+from .models import FundingSnapshot, Member, MemberEmail, VotePreference
 
 
 # ---------------------------------------------------------------------------
@@ -247,65 +245,6 @@ class MemberAdmin(ModelAdmin):
         if days_ago == 1:
             return "Yesterday"
         return f"{days_ago} days ago"
-
-
-# ---------------------------------------------------------------------------
-# GuildAdmin
-# ---------------------------------------------------------------------------
-
-
-@admin.register(Guild)
-class GuildAdmin(ModelAdmin):
-    change_form_template = "admin/membership/guild/change_form.html"
-    list_display = ["name", "guild_lead", "notes_preview"]
-    search_fields = ["name"]
-    autocomplete_fields = ["guild_lead"]
-    actions_detail = ["view_guild_page"]
-
-    @action(description="View Guild Page", icon="open_in_new")
-    def view_guild_page(self, request: HttpRequest, object_id: int) -> HttpResponseRedirect:
-        return HttpResponseRedirect(f"/guilds/{object_id}/")
-
-    def change_view(
-        self,
-        request: HttpRequest,
-        object_id: str,
-        form_url: str = "",
-        extra_context: dict | None = None,
-    ) -> HttpResponse:
-        """Inject products context for the custom change_form template."""
-        extra_context = extra_context or {}
-        guild = self.get_object(request, object_id)
-        if guild is not None:
-            extra_context["existing_products"] = (
-                Product.objects.filter(guild=guild).prefetch_related("splits__guild").order_by("name")
-            )
-            extra_context["all_guilds"] = type(guild).objects.order_by("name")
-            extra_context["editing_guild"] = guild
-        return super().change_view(request, object_id, form_url, extra_context)
-
-    def formfield_for_foreignkey(self, db_field: object, request: HttpRequest, **kwargs: object) -> object:  # type: ignore[override]
-        if db_field.name == "guild_lead":  # type: ignore[attr-defined]
-            kwargs["empty_label"] = "Unassigned"
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)  # type: ignore[arg-type]
-
-    def formfield_for_dbfield(self, db_field: object, request: HttpRequest, **kwargs: object) -> object:  # type: ignore[override]
-        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)  # type: ignore[arg-type]
-        if db_field.name == "guild_lead" and hasattr(formfield, "widget"):  # type: ignore[attr-defined]
-            formfield.widget.can_add_related = False
-            formfield.widget.can_change_related = False
-            formfield.widget.can_delete_related = False
-            formfield.widget.can_view_related = False
-        return formfield
-
-    def response_change(self, request: HttpRequest, obj: Guild) -> HttpResponseRedirect:  # type: ignore[override]
-        return HttpResponseRedirect(request.path + "#pl-products-section")
-
-    @admin.display(description="Notes")
-    def notes_preview(self, obj: Guild) -> str:
-        if len(obj.notes) > 80:
-            return obj.notes[:80] + "..."
-        return obj.notes
 
 
 # ---------------------------------------------------------------------------

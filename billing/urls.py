@@ -16,16 +16,6 @@ urlpatterns = [
     path("admin/reports/", views.admin_reports, name="billing_admin_reports"),
     path("admin/reports/export/csv/", views.admin_reports_csv, name="billing_admin_reports_csv"),
     path(
-        "admin/products/add/<int:guild_id>/",
-        views.admin_add_product_for_guild,
-        name="billing_admin_add_product_for_guild",
-    ),
-    path(
-        "admin/products/<int:product_id>/delete/",
-        views.admin_delete_product,
-        name="billing_admin_delete_product",
-    ),
-    path(
         "admin/connect-platform/test/",
         views.billing_test_platform_connection,
         name="billing_test_platform_connection",

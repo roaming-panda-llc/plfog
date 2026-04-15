@@ -7,7 +7,23 @@
 
 {# Guild info card #}
 <div class="hub-card">
-    <h1 class="hub-page-title">{{ guild.name }}</h1>
+    <div class="pl-guild-header">
+        <h1 class="hub-page-title">{{ guild.name }}</h1>
+        {% if can_edit_this_guild %}
+        <div class="pl-guild-header__actions">
+            <button type="button"
+                    class="pl-btn pl-btn--secondary"
+                    @click="$dispatch('open-modal', 'edit-guild')">
+                Edit Guild Page
+            </button>
+            <button type="button"
+                    class="pl-btn pl-btn--primary"
+                    @click="$dispatch('open-modal', 'add-product')">
+                Add Product
+            </button>
+        </div>
+        {% endif %}
+    </div>
     <div class="hub-detail-section">
         <h3 class="hub-detail-label">About</h3>
         {% if guild.about %}
@@ -117,6 +133,18 @@
         {% endif %}
         {% for product in products %}
         <div class="guild-product-card">
+            {% if can_edit_this_guild %}
+            <form method="post"
+                  action="{% url 'hub_guild_product_delete' guild.pk product.pk %}"
+                  class="guild-product-card__delete-form"
+                  onsubmit="return confirm('Delete {{ product.name|escapejs }}?');">
+                {% csrf_token %}
+                <button type="submit"
+                        class="guild-product-card__delete-btn"
+                        aria-label="Delete {{ product.name|escapejs }}"
+                        title="Delete">&times;</button>
+            </form>
+            {% endif %}
             <div class="guild-product-card__name">{{ product.name }}</div>
             <div class="guild-product-card__price">${{ product.price }}</div>
             {% if product.splits.all %}
@@ -206,6 +234,56 @@
             <div style="font-size:0.9375rem;font-weight:600;color:var(--hub-text, #F4EFDD);margin-bottom:1.25rem;"
                  x-text="'Total: $' + (addModalProduct.price * addModalQty).toFixed(2)"></div>
             <button class="pl-btn pl-btn--primary" style="width:100%;" @click="addToCart()">Add to Cart</button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# Edit Guild modal #}
+{% if can_edit_this_guild %}
+<div x-data="{ open: false }"
+     x-show="open"
+     x-transition:enter="modal-enter"
+     x-transition:leave="modal-leave"
+     @open-modal.window="if ($event.detail === 'edit-guild') open = true"
+     @close-modal.window="if ($event.detail === 'edit-guild') open = false"
+     @keydown.escape.window="open = false"
+     class="pl-modal-backdrop"
+     style="display: none;"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="edit-guild-title">
+    <div class="pl-modal pl-modal--md" @click.outside="open = false">
+        <div class="pl-modal__header">
+            <h2 class="pl-modal__title" id="edit-guild-title">Edit Guild Page</h2>
+            <button type="button" @click="open = false" class="pl-modal__close" aria-label="Close">&times;</button>
+        </div>
+        <div class="pl-modal__body" id="edit-guild-body">
+            {% include "hub/_modal_edit_guild.html" %}
+        </div>
+    </div>
+</div>
+
+{# Add Product modal #}
+<div x-data="{ open: false }"
+     x-show="open"
+     x-transition:enter="modal-enter"
+     x-transition:leave="modal-leave"
+     @open-modal.window="if ($event.detail === 'add-product') open = true"
+     @close-modal.window="if ($event.detail === 'add-product') open = false"
+     @keydown.escape.window="open = false"
+     class="pl-modal-backdrop"
+     style="display: none;"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="add-product-title">
+    <div class="pl-modal pl-modal--lg" @click.outside="open = false">
+        <div class="pl-modal__header">
+            <h2 class="pl-modal__title" id="add-product-title">Add Product</h2>
+            <button type="button" @click="open = false" class="pl-modal__close" aria-label="Close">&times;</button>
+        </div>
+        <div class="pl-modal__body" id="add-product-body">
+            {% include "hub/_modal_add_product.html" %}
         </div>
     </div>
 </div>

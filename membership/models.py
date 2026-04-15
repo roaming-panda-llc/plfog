@@ -308,6 +308,10 @@ class Member(models.Model):
         """True when fog_role is guild_officer (admin access without site settings)."""
         return self.fog_role == self.FogRole.GUILD_OFFICER
 
+    def can_edit_guild(self, guild: Guild) -> bool:
+        """True when this member may edit the given guild (admin, officer, or that guild's lead)."""
+        return self.is_fog_admin or self.is_guild_officer or guild.guild_lead_id == self.pk
+
     def set_fog_role(self, new_role: str, *, changed_by: Member) -> None:
         """Change this member's fog_role with permission checks.
 

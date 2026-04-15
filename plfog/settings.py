@@ -349,11 +349,6 @@ UNFOLD = {
                         "link": reverse_lazy("admin:membership_member_changelist"),
                     },
                     {
-                        "title": "Guilds",
-                        "icon": "groups",
-                        "link": reverse_lazy("admin:membership_guild_changelist"),
-                    },
-                    {
                         "title": "Site Settings",
                         "icon": "settings",
                         "link": reverse_lazy("admin:core_siteconfiguration_changelist"),

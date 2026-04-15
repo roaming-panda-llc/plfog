@@ -1,0 +1,222 @@
+"""BDD specs for the hub guild edit + product create/delete views."""
+
+from __future__ import annotations
+
+from decimal import Decimal
+
+import pytest
+from django.contrib.auth.models import User
+from django.test import Client
+from django.urls import reverse
+
+from billing.models import Product, ProductRevenueSplit
+from membership.models import Member
+from tests.membership.factories import GuildFactory, MembershipPlanFactory
+
+
+def _user_with_role(username: str, *, fog_role: str = Member.FogRole.MEMBER) -> User:
+    """Create a user and set the linked Member's fog_role."""
+    MembershipPlanFactory()
+    user = User.objects.create_user(username=username, password="pass")
+    member = user.member  # auto-linked via signal
+    member.fog_role = fog_role
+    member.save(update_fields=["fog_role"])
+    member.sync_user_permissions()
+    return user
+
+
+def _product_post_payload(guild) -> dict:
+    return {
+        "name": "Test Bag",
+        "price": "12.00",
+        "guild": str(guild.pk),
+        "splits-TOTAL_FORMS": "2",
+        "splits-INITIAL_FORMS": "0",
+        "splits-MIN_NUM_FORMS": "1",
+        "splits-MAX_NUM_FORMS": "1000",
+        "splits-0-recipient_type": "admin",
+        "splits-0-guild": "",
+        "splits-0-percent": "20",
+        "splits-1-recipient_type": "guild",
+        "splits-1-guild": str(guild.pk),
+        "splits-1-percent": "80",
+    }
+
+
+@pytest.mark.django_db
+def describe_guild_product_create():
+    def it_admin_can_create_a_product(client: Client):
+        _user_with_role("admin1", fog_role=Member.FogRole.ADMIN)
+        guild = GuildFactory()
+        client.login(username="admin1", password="pass")
+        url = reverse("hub_guild_product_create", args=[guild.pk])
+        response = client.post(url, data=_product_post_payload(guild))
+        assert response.status_code == 302
+        assert Product.objects.count() == 1
+        product = Product.objects.first()
+        assert product.guild == guild
+        assert product.splits.count() == 2
+
+    def it_guild_officer_can_create_a_product(client: Client):
+        _user_with_role("officer1", fog_role=Member.FogRole.GUILD_OFFICER)
+        guild = GuildFactory()
+        client.login(username="officer1", password="pass")
+        url = reverse("hub_guild_product_create", args=[guild.pk])
+        response = client.post(url, data=_product_post_payload(guild))
+        assert response.status_code == 302
+        assert Product.objects.count() == 1
+
+    def it_guild_lead_can_create_a_product_for_their_guild(client: Client):
+        user = _user_with_role("lead1", fog_role=Member.FogRole.MEMBER)
+        guild = GuildFactory(guild_lead=user.member)
+        client.login(username="lead1", password="pass")
+        url = reverse("hub_guild_product_create", args=[guild.pk])
+        response = client.post(url, data=_product_post_payload(guild))
+        assert response.status_code == 302
+        assert Product.objects.count() == 1
+
+    def it_regular_member_cannot_create_a_product(client: Client):
+        _user_with_role("reg1", fog_role=Member.FogRole.MEMBER)
+        guild = GuildFactory()
+        client.login(username="reg1", password="pass")
+        url = reverse("hub_guild_product_create", args=[guild.pk])
+        response = client.post(url, data=_product_post_payload(guild))
+        assert response.status_code == 403
+        assert Product.objects.count() == 0
+
+    def it_anonymous_user_is_redirected_to_login(client: Client):
+        guild = GuildFactory()
+        url = reverse("hub_guild_product_create", args=[guild.pk])
+        response = client.post(url, data=_product_post_payload(guild))
+        # @login_required redirects before the permission check fires.
+        assert response.status_code == 302
+        assert "/accounts/login/" in response["Location"]
+        assert Product.objects.count() == 0
+
+    def it_rejects_invalid_sum_and_does_not_create(client: Client):
+        _user_with_role("adminbad", fog_role=Member.FogRole.ADMIN)
+        guild = GuildFactory()
+        client.login(username="adminbad", password="pass")
+        url = reverse("hub_guild_product_create", args=[guild.pk])
+        data = _product_post_payload(guild)
+        data["splits-1-percent"] = "70"  # total 90 != 100
+        response = client.post(url, data=data)
+        assert response.status_code == 302
+        assert Product.objects.count() == 0
+
+
+@pytest.mark.django_db
+def describe_guild_product_delete():
+    def _make_product(guild):
+        product = Product.objects.create(name="x", price=Decimal("5.00"), guild=guild)
+        ProductRevenueSplit.objects.create(
+            product=product,
+            recipient_type="admin",
+            guild=None,
+            percent=Decimal("100"),
+        )
+        return product
+
+    def it_admin_can_delete_a_product(client: Client):
+        _user_with_role("admin_del", fog_role=Member.FogRole.ADMIN)
+        guild = GuildFactory()
+        product = _make_product(guild)
+        client.login(username="admin_del", password="pass")
+        url = reverse("hub_guild_product_delete", args=[guild.pk, product.pk])
+        response = client.post(url)
+        assert response.status_code == 302
+        assert Product.objects.count() == 0
+
+    def it_guild_lead_can_delete_their_products(client: Client):
+        user = _user_with_role("lead_del", fog_role=Member.FogRole.MEMBER)
+        guild = GuildFactory(guild_lead=user.member)
+        product = _make_product(guild)
+        client.login(username="lead_del", password="pass")
+        url = reverse("hub_guild_product_delete", args=[guild.pk, product.pk])
+        response = client.post(url)
+        assert response.status_code == 302
+        assert Product.objects.count() == 0
+
+    def it_regular_member_cannot_delete(client: Client):
+        _user_with_role("reg_del", fog_role=Member.FogRole.MEMBER)
+        guild = GuildFactory()
+        product = _make_product(guild)
+        client.login(username="reg_del", password="pass")
+        url = reverse("hub_guild_product_delete", args=[guild.pk, product.pk])
+        response = client.post(url)
+        assert response.status_code == 403
+        assert Product.objects.count() == 1
+
+
+@pytest.mark.django_db
+def describe_guild_edit():
+    def it_admin_can_edit_name_and_about(client: Client):
+        _user_with_role("admin_e", fog_role=Member.FogRole.ADMIN)
+        guild = GuildFactory(name="Old", about="Old about")
+        client.login(username="admin_e", password="pass")
+        url = reverse("hub_guild_edit", args=[guild.pk])
+        response = client.post(url, data={"name": "New Name", "about": "New about"})
+        assert response.status_code == 302
+        guild.refresh_from_db()
+        assert guild.name == "New Name"
+        assert guild.about == "New about"
+
+    def it_guild_lead_can_edit_their_guild(client: Client):
+        user = _user_with_role("lead_e", fog_role=Member.FogRole.MEMBER)
+        guild = GuildFactory(guild_lead=user.member, name="Old")
+        client.login(username="lead_e", password="pass")
+        url = reverse("hub_guild_edit", args=[guild.pk])
+        response = client.post(url, data={"name": "Lead Edit", "about": ""})
+        assert response.status_code == 302
+        guild.refresh_from_db()
+        assert guild.name == "Lead Edit"
+
+    def it_regular_member_cannot_edit(client: Client):
+        _user_with_role("reg_e", fog_role=Member.FogRole.MEMBER)
+        guild = GuildFactory(name="Keep")
+        client.login(username="reg_e", password="pass")
+        url = reverse("hub_guild_edit", args=[guild.pk])
+        response = client.post(url, data={"name": "Hacked", "about": ""})
+        assert response.status_code == 403
+        guild.refresh_from_db()
+        assert guild.name == "Keep"
+
+    def it_anonymous_is_redirected_to_login(client: Client):
+        guild = GuildFactory(name="Keep")
+        url = reverse("hub_guild_edit", args=[guild.pk])
+        response = client.post(url, data={"name": "X", "about": ""})
+        assert response.status_code == 302
+        assert "/accounts/login/" in response["Location"]
+        guild.refresh_from_db()
+        assert guild.name == "Keep"
+
+
+@pytest.mark.django_db
+def describe_guild_detail_edit_buttons():
+    def it_shows_edit_buttons_for_admin(client: Client):
+        _user_with_role("admin_btn", fog_role=Member.FogRole.ADMIN)
+        guild = GuildFactory()
+        client.login(username="admin_btn", password="pass")
+        response = client.get(f"/guilds/{guild.pk}/")
+        assert response.status_code == 200
+        assert b"open-modal', 'add-product'" in response.content
+        assert b"open-modal', 'edit-guild'" in response.content
+
+    def it_shows_edit_buttons_for_guild_lead(client: Client):
+        user = _user_with_role("lead_btn", fog_role=Member.FogRole.MEMBER)
+        guild = GuildFactory(guild_lead=user.member)
+        client.login(username="lead_btn", password="pass")
+        response = client.get(f"/guilds/{guild.pk}/")
+        assert b"open-modal', 'add-product'" in response.content
+        assert b"open-modal', 'edit-guild'" in response.content
+
+    def it_hides_edit_buttons_for_regular_member(client: Client):
+        _user_with_role("reg_btn", fog_role=Member.FogRole.MEMBER)
+        guild = GuildFactory()
+        client.login(username="reg_btn", password="pass")
+        response = client.get(f"/guilds/{guild.pk}/")
+        # Check the Alpine dispatch strings — the literal button labels
+        # ("Edit Guild Page" / "Add Product") also appear in the changelog
+        # modal rendered on every page, so those aren't reliable markers.
+        assert b"open-modal', 'add-product'" not in response.content
+        assert b"open-modal', 'edit-guild'" not in response.content

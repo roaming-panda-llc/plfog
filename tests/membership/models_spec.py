@@ -778,6 +778,28 @@ def describe_member_fog_roles():
             member = MemberFactory(fog_role=Member.FogRole.MEMBER)
             assert member.is_guild_officer is False
 
+    def describe_can_edit_guild():
+        def it_is_true_for_admin_on_any_guild():
+            member = MemberFactory(fog_role=Member.FogRole.ADMIN)
+            guild = GuildFactory()
+            assert member.can_edit_guild(guild) is True
+
+        def it_is_true_for_guild_officer_on_any_guild():
+            member = MemberFactory(fog_role=Member.FogRole.GUILD_OFFICER)
+            guild = GuildFactory()
+            assert member.can_edit_guild(guild) is True
+
+        def it_is_true_for_the_guilds_own_lead():
+            lead = MemberFactory(fog_role=Member.FogRole.MEMBER)
+            guild = GuildFactory(guild_lead=lead)
+            assert lead.can_edit_guild(guild) is True
+
+        def it_is_false_for_regular_members_other_guilds():
+            member = MemberFactory(fog_role=Member.FogRole.MEMBER)
+            other_lead = MemberFactory(fog_role=Member.FogRole.MEMBER)
+            guild = GuildFactory(guild_lead=other_lead)
+            assert member.can_edit_guild(guild) is False
+
     def describe_sync_user_permissions():
         def it_grants_full_admin_for_admin_fog_role():
             user = User.objects.create_user(username="sync_adm", email="sync_adm@example.com", password="pass")
