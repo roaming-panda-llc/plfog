@@ -43,3 +43,91 @@ def describe_SiteConfiguration_calendar_fields():
 
         config = SiteConfiguration.load()
         assert config.general_calendar_last_fetched_at is None
+
+
+def describe_CalendarEvent():
+    def it_can_be_created_for_a_guild():
+        from membership.models import CalendarEvent
+        from django.utils import timezone
+
+        guild = GuildFactory()
+        now = timezone.now()
+        event = CalendarEvent.objects.create(
+            guild=guild,
+            uid="abc123@google.com",
+            title="Open Studio",
+            start_dt=now,
+            end_dt=now,
+            fetched_at=now,
+        )
+        assert event.guild == guild
+        assert str(event) == "Open Studio"
+
+    def it_can_be_created_without_a_guild_for_general_events():
+        from membership.models import CalendarEvent
+        from django.utils import timezone
+
+        now = timezone.now()
+        event = CalendarEvent.objects.create(
+            guild=None,
+            uid="general-123@google.com",
+            title="Potluck Night",
+            start_dt=now,
+            end_dt=now,
+            fetched_at=now,
+        )
+        assert event.guild is None
+
+    def it_orders_by_start_dt():
+        from membership.models import CalendarEvent
+        from django.utils import timezone
+        from datetime import timedelta
+
+        now = timezone.now()
+        guild = GuildFactory()
+        CalendarEvent.objects.create(
+            guild=guild,
+            uid="later",
+            title="B",
+            start_dt=now + timedelta(hours=2),
+            end_dt=now + timedelta(hours=3),
+            fetched_at=now,
+        )
+        CalendarEvent.objects.create(
+            guild=guild,
+            uid="earlier",
+            title="A",
+            start_dt=now,
+            end_dt=now + timedelta(hours=1),
+            fetched_at=now,
+        )
+        titles = list(CalendarEvent.objects.values_list("title", flat=True))
+        assert titles == ["A", "B"]
+
+    def describe_upcoming():
+        def it_returns_events_whose_end_time_is_in_the_future():
+            from membership.models import CalendarEvent
+            from datetime import timedelta
+            from django.utils import timezone
+
+            now = timezone.now()
+            guild = GuildFactory()
+            CalendarEvent.objects.create(
+                guild=guild,
+                uid="past",
+                title="Past",
+                start_dt=now - timedelta(days=1),
+                end_dt=now - timedelta(hours=23),
+                fetched_at=now,
+            )
+            CalendarEvent.objects.create(
+                guild=guild,
+                uid="future",
+                title="Future",
+                start_dt=now + timedelta(days=1),
+                end_dt=now + timedelta(days=1, hours=1),
+                fetched_at=now,
+            )
+            results = list(CalendarEvent.objects.upcoming())
+            assert len(results) == 1
+            assert results[0].title == "Future"

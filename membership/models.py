@@ -904,3 +904,53 @@ class Lease(models.Model):
 
     # Lease records are managed in Airtable and pulled into Django via airtable_pull.
     # No save()/delete() sync overrides — this model is read-only from Airtable's perspective.
+
+
+# ---------------------------------------------------------------------------
+# CalendarEvent
+# ---------------------------------------------------------------------------
+
+
+class CalendarEventQuerySet(models.QuerySet):
+    def upcoming(self) -> CalendarEventQuerySet:
+        """Events whose end time is now or in the future."""
+        return self.filter(end_dt__gte=timezone.now())
+
+
+class CalendarEvent(models.Model):
+    """Cached calendar event fetched from a guild's or the general makerspace's iCal feed.
+
+    Treat as a read-through cache — do not edit records directly; re-sync from the source.
+    """
+
+    guild = models.ForeignKey(
+        "Guild",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="calendar_events",
+        help_text="Guild this event belongs to. Null for general makerspace events.",
+    )
+    uid = models.CharField(max_length=500, db_index=True, help_text="iCal UID, unique within a source.")
+    title = models.CharField(max_length=500, help_text="Event title from iCal SUMMARY field.")
+    description = models.TextField(blank=True, help_text="Event description from iCal DESCRIPTION field.")
+    location = models.CharField(max_length=500, blank=True, help_text="Event location from iCal LOCATION field.")
+    url = models.URLField(blank=True, help_text="Event URL from iCal URL field.")
+    start_dt = models.DateTimeField(help_text="Event start time, UTC-normalized.")
+    end_dt = models.DateTimeField(help_text="Event end time, UTC-normalized.")
+    all_day = models.BooleanField(default=False, help_text="True for all-day events (DATE not DATETIME in iCal).")
+    fetched_at = models.DateTimeField(help_text="When this record was last synced from the iCal source.")
+
+    objects = CalendarEventQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["start_dt"]
+        indexes = [
+            models.Index(fields=["start_dt", "end_dt"], name="idx_calendarevent_start_end"),
+            models.Index(fields=["guild", "uid"], name="idx_calendarevent_guild_uid"),
+        ]
+        verbose_name = "Calendar Event"
+        verbose_name_plural = "Calendar Events"
+
+    def __str__(self) -> str:
+        return self.title
