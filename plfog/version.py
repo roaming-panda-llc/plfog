@@ -18,6 +18,7 @@ CHANGELOG: list[dict[str, str | list[str]]] = [
             "The old 'Guilds' entry in the admin panel is gone — everything guild-related lives on the public guild pages now",
             "My Tab page now has a hoverable '?' next to the title that explains how tabs work, and the next-charge date shows as subtext below the heading instead of buried in the middle of the card",
             "Small copy fix on guild pages so the payment-method prompt reads 'add items to your tab' instead of just 'add items'",
+            "Sidebar 'Guilds' section starts expanded by default, and remembers your preference if you collapse it",
         ],
     },
     {

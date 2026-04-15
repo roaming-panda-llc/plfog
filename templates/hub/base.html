@@ -75,8 +75,8 @@
                 My Tab
             </a>
 
-            {% has_active_guild guilds as guild_is_active %}
-            <div x-data="{ open: {{ guild_is_active|yesno:'true,false' }} }">
+            <div x-data="{ open: localStorage.getItem('hubGuildsOpen') === null ? true : localStorage.getItem('hubGuildsOpen') === '1' }"
+                 x-init="$watch('open', v => localStorage.setItem('hubGuildsOpen', v ? '1' : '0'))">
                 <button class="hub-sidebar__section-toggle" @click="open = !open" :aria-expanded="open">
                     <span>Guilds</span>
                     <svg class="hub-sidebar__chevron" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
