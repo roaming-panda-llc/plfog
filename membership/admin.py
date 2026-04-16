@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from django.contrib import admin
 from django.db.models import QuerySet
 from django.http import HttpRequest
@@ -8,7 +10,7 @@ from django.utils.safestring import mark_safe
 from unfold.admin import ModelAdmin, TabularInline
 
 from .forms import MemberAdminForm
-from .models import FundingSnapshot, Member, MemberEmail, VotePreference
+from .models import FundingSnapshot, Guild, Member, MemberEmail, VotePreference
 
 
 # ---------------------------------------------------------------------------
@@ -172,10 +174,18 @@ class MemberAdmin(ModelAdmin):
                 },
             ),
             (
-                "Guild Leaderships",
-                {"fields": ["guild_leaderships"]},
+                "Guild Leadership",
+                {"fields": ["guild_leadership"]},
             ),
         ]
+
+    def save_related(self, request: HttpRequest, form: MemberAdminForm, formsets: Any, change: bool) -> None:  # type: ignore[override]
+        """Sync the guild_leadership dropdown back to the guild_leaderships M2M."""
+        super().save_related(request, form, formsets, change)
+        selected: Guild | None = form.cleaned_data.get("guild_leadership")
+        form.instance.guild_leaderships.clear()
+        if selected is not None:
+            form.instance.guild_leaderships.add(selected)
 
     def save_model(self, request: HttpRequest, obj: Member, form: MemberAdminForm, change: bool) -> None:
         """Optionally create a User account when adding a new member with 'Create login' checked."""

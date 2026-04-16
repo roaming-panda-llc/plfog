@@ -144,7 +144,7 @@ def describe_MemberAdmin():
         assert "create_user" not in personal_fields
 
     @pytest.mark.django_db
-    def it_includes_guild_leaderships_fieldset():
+    def it_includes_guild_leadership_fieldset():
         from django.test import RequestFactory
 
         rf = RequestFactory()
@@ -154,14 +154,14 @@ def describe_MemberAdmin():
         member_admin = admin.site._registry[Member]
         fieldsets = member_admin.get_fieldsets(request, obj=member)
         fieldset_names = [name for name, _ in fieldsets]
-        assert "Guild Leaderships" in fieldset_names
+        assert "Guild Leadership" in fieldset_names
 
     @pytest.mark.django_db
-    def it_shows_guild_leaderships_widget_on_change_view(admin_client):
+    def it_shows_guild_leadership_dropdown_on_change_view(admin_client):
         member = MemberFactory()
         resp = admin_client.get(f"/admin/membership/member/{member.pk}/change/")
         assert resp.status_code == 200
-        assert b"guild_leaderships" in resp.content
+        assert b"id_guild_leadership" in resp.content
 
 
 def describe_MemberEmailInline():

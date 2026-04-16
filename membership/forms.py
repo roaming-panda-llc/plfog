@@ -9,7 +9,7 @@ from django.core.exceptions import ValidationError
 
 from core.models import Invite
 
-from .models import Member
+from .models import Guild, Member
 
 
 class MemberAdminForm(forms.ModelForm):
@@ -21,9 +21,22 @@ class MemberAdminForm(forms.ModelForm):
         help_text="Creates a User account so this person can log in right away.",
     )
 
+    guild_leadership = forms.ModelChoiceField(
+        queryset=Guild.objects.filter(is_active=True).order_by("name"),
+        required=False,
+        empty_label="— No guild —",
+        label="Guild Lead For",
+        help_text="Guild this member currently leads, if any.",
+    )
+
     class Meta:
         model = Member
-        fields = "__all__"
+        exclude = ["guild_leaderships"]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields["guild_leadership"].initial = self.instance.guild_leaderships.first()
 
 
 class InviteMemberForm(forms.Form):
