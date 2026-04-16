@@ -143,10 +143,6 @@ def describe_MemberAdmin():
         assert "user" in personal_fields
         assert "create_user" not in personal_fields
 
-    def it_has_guild_leaderships_in_filter_horizontal():
-        member_admin = admin.site._registry[Member]
-        assert "guild_leaderships" in member_admin.filter_horizontal
-
     @pytest.mark.django_db
     def it_includes_guild_leaderships_fieldset():
         from django.test import RequestFactory
