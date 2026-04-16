@@ -84,6 +84,7 @@ class HasUserFilter(admin.SimpleListFilter):
 class MemberAdmin(ModelAdmin):
     change_list_template = "admin/membership/member/change_list.html"
     form = MemberAdminForm
+    filter_horizontal = ["guild_leaderships"]
     inlines = [MemberEmailInline]
     readonly_fields = ["email_aliases_link"]
     list_display = [
@@ -170,6 +171,10 @@ class MemberAdmin(ModelAdmin):
                 {
                     "fields": ["notes"],
                 },
+            ),
+            (
+                "Guild Leaderships",
+                {"fields": ["guild_leaderships"]},
             ),
         ]
 

@@ -143,6 +143,30 @@ def describe_MemberAdmin():
         assert "user" in personal_fields
         assert "create_user" not in personal_fields
 
+    def it_has_guild_leaderships_in_filter_horizontal():
+        member_admin = admin.site._registry[Member]
+        assert "guild_leaderships" in member_admin.filter_horizontal
+
+    @pytest.mark.django_db
+    def it_includes_guild_leaderships_fieldset():
+        from django.test import RequestFactory
+
+        rf = RequestFactory()
+        request = rf.get("/admin/membership/member/1/change/")
+        request.user = User(is_staff=True, is_superuser=True)
+        member = MemberFactory()
+        member_admin = admin.site._registry[Member]
+        fieldsets = member_admin.get_fieldsets(request, obj=member)
+        fieldset_names = [name for name, _ in fieldsets]
+        assert "Guild Leaderships" in fieldset_names
+
+    @pytest.mark.django_db
+    def it_shows_guild_leaderships_widget_on_change_view(admin_client):
+        member = MemberFactory()
+        resp = admin_client.get(f"/admin/membership/member/{member.pk}/change/")
+        assert resp.status_code == 200
+        assert b"guild_leaderships" in resp.content
+
 
 def describe_MemberEmailInline():
     def it_is_attached_to_member_admin():
