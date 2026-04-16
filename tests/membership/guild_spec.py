@@ -51,6 +51,24 @@ def describe_Guild():
         guild = GuildFactory()
         assert guild.created_at is not None
 
+    def it_supports_multiple_guild_leads():
+        member1 = MemberFactory()
+        member2 = MemberFactory()
+        guild = GuildFactory()
+        guild.guild_leads.add(member1, member2)
+        assert guild.guild_leads.count() == 2
+        assert member1 in guild.guild_leads.all()
+        assert member2 in guild.guild_leads.all()
+
+    def it_member_can_lead_multiple_guilds():
+        member = MemberFactory()
+        guild1 = GuildFactory()
+        guild2 = GuildFactory()
+        member.guild_leaderships.add(guild1, guild2)
+        assert member.guild_leaderships.count() == 2
+        assert guild1 in member.guild_leaderships.all()
+        assert guild2 in member.guild_leaderships.all()
+
     def it_enforces_unique_name():
         GuildFactory(name="Unique Guild")
         with pytest.raises(IntegrityError):

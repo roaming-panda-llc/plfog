@@ -800,6 +800,17 @@ def describe_member_fog_roles():
             guild = GuildFactory(guild_lead=other_lead)
             assert member.can_edit_guild(guild) is False
 
+        def it_is_true_for_guild_lead_assigned_via_m2m():
+            lead = MemberFactory(fog_role=Member.FogRole.MEMBER)
+            guild = GuildFactory()
+            guild.guild_leads.add(lead)
+            assert lead.can_edit_guild(guild) is True
+
+        def it_is_false_when_member_not_in_guild_leads():
+            member = MemberFactory(fog_role=Member.FogRole.MEMBER)
+            guild = GuildFactory()
+            assert member.can_edit_guild(guild) is False
+
     def describe_sync_user_permissions():
         def it_grants_full_admin_for_admin_fog_role():
             user = User.objects.create_user(username="sync_adm", email="sync_adm@example.com", password="pass")

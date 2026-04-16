@@ -200,6 +200,12 @@ class Member(models.Model):
         content_type_field="content_type",
         object_id_field="object_id",
     )
+    guild_leaderships = models.ManyToManyField(
+        "Guild",
+        blank=True,
+        related_name="guild_leads",
+        help_text="Guilds this member leads.",
+    )
 
     objects = MemberQuerySet.as_manager()
 
@@ -310,7 +316,7 @@ class Member(models.Model):
 
     def can_edit_guild(self, guild: Guild) -> bool:
         """True when this member may edit the given guild (admin, officer, or that guild's lead)."""
-        return self.is_fog_admin or self.is_guild_officer or guild.guild_lead_id == self.pk
+        return self.is_fog_admin or self.is_guild_officer or self.guild_leaderships.filter(pk=guild.pk).exists()
 
     def set_fog_role(self, new_role: str, *, changed_by: Member) -> None:
         """Change this member's fog_role with permission checks.
@@ -422,13 +428,6 @@ class Guild(models.Model):
 
     name = models.CharField(max_length=255, unique=True)
     is_active = models.BooleanField(default=True, help_text="Whether this guild is eligible for voting and display.")
-    guild_lead = models.ForeignKey(
-        Member,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="led_guilds",
-    )
     notes = models.TextField(blank=True)
     about = models.TextField(
         blank=True,
