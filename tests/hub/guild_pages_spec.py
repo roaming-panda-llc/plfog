@@ -90,3 +90,43 @@ def describe_guild_detail():
 
             assert response.status_code == 200
             assert response.context["tab"] is None
+
+
+@pytest.mark.django_db
+def describe_guild_lead_section():
+    def it_shows_no_lead_section_when_guild_has_no_leads(client: Client):
+        User.objects.create_user(username="lead_none", password="pass")
+        guild = GuildFactory()
+        client.login(username="lead_none", password="pass")
+        response = client.get(f"/guilds/{guild.pk}/")
+        assert response.status_code == 200
+        assert b"Guild Lead" not in response.content
+
+    def it_shows_guild_lead_singular_for_one_lead(client: Client):
+        from tests.membership.factories import MemberFactory
+        User.objects.create_user(username="lead_one_viewer", password="pass")
+        lead = MemberFactory(preferred_name="LeadPerson")
+        guild = GuildFactory()
+        guild.guild_leads.add(lead)
+        client.login(username="lead_one_viewer", password="pass")
+        response = client.get(f"/guilds/{guild.pk}/")
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "Guild Lead" in content
+        assert "Guild Leads" not in content
+        assert "LeadPerson" in content
+
+    def it_shows_guild_leads_plural_for_multiple_leads(client: Client):
+        from tests.membership.factories import MemberFactory
+        User.objects.create_user(username="lead_many_viewer", password="pass")
+        lead1 = MemberFactory(preferred_name="Lead Alpha")
+        lead2 = MemberFactory(preferred_name="Lead Beta")
+        guild = GuildFactory()
+        guild.guild_leads.add(lead1, lead2)
+        client.login(username="lead_many_viewer", password="pass")
+        response = client.get(f"/guilds/{guild.pk}/")
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "Guild Leads" in content
+        assert "Lead Alpha" in content
+        assert "Lead Beta" in content

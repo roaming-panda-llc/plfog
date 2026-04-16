@@ -27,27 +27,31 @@
         <p class="hub-text-muted">Nothing here yet.</p>
         {% endif %}
     </div>
-    {% if guild.guild_lead %}
+    {% with leads=guild.guild_leads.all %}
+    {% if leads %}
     <div class="hub-detail-section">
-        <h3 class="hub-detail-label">Guild Lead</h3>
-        <div class="hub-member-row" style="cursor:pointer;" @click="$dispatch('open-modal', 'guild-lead-profile')">
+        <h3 class="hub-detail-label">Guild Lead{% if leads|length > 1 %}s{% endif %}</h3>
+        {% for lead in leads %}
+        <div class="hub-member-row" style="cursor:pointer;" @click="$dispatch('open-modal', 'guild-lead-profile-{{ lead.pk }}')">
             <div class="hub-member-avatar">
-                {{ guild.guild_lead.display_name|make_list|first|upper }}
+                {{ lead.display_name|make_list|first|upper }}
             </div>
             <div class="hub-member-info">
-                <span class="hub-member-name">{{ guild.guild_lead.display_name }}</span>
+                <span class="hub-member-name">{{ lead.display_name }}</span>
                 <span class="hub-badge">Lead</span>
             </div>
         </div>
+        {% endfor %}
     </div>
 
-    {# Guild lead profile modal #}
+    {# Guild lead profile modals — one per lead #}
+    {% for lead in leads %}
     <div x-data="{ open: false }"
          x-show="open"
          x-transition:enter="modal-enter"
          x-transition:leave="modal-leave"
-         @open-modal.window="if ($event.detail === 'guild-lead-profile') open = true"
-         @close-modal.window="if ($event.detail === 'guild-lead-profile') open = false"
+         @open-modal.window="if ($event.detail === 'guild-lead-profile-{{ lead.pk }}') open = true"
+         @close-modal.window="if ($event.detail === 'guild-lead-profile-{{ lead.pk }}') open = false"
          @keydown.escape.window="open = false"
          class="pl-modal-backdrop"
          style="display: none;"
@@ -55,43 +59,43 @@
          aria-modal="true">
         <div class="pl-modal pl-modal--sm" @click.outside="open = false">
             <div class="pl-modal__header">
-                <h2 class="pl-modal__title">{{ guild.guild_lead.display_name }}</h2>
+                <h2 class="pl-modal__title">{{ lead.display_name }}</h2>
                 <button type="button" @click="open = false" class="pl-modal__close" aria-label="Close">&times;</button>
             </div>
             <div class="pl-modal__body">
-                {% if guild.guild_lead.show_in_directory %}
+                {% if lead.show_in_directory %}
                 <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.25rem;">
                     <div class="hub-member-avatar" style="width:48px;height:48px;font-size:1.25rem;">
-                        {{ guild.guild_lead.display_name|make_list|first|upper }}
+                        {{ lead.display_name|make_list|first|upper }}
                     </div>
                     <div>
-                        <div style="font-weight:600;color:var(--hub-text, #F4EFDD);">{{ guild.guild_lead.display_name }}</div>
-                        {% if guild.guild_lead.pronouns and guild.guild_lead.pronouns != "prefer not to share" %}
-                        <div style="font-size:0.8125rem;color:var(--hub-text-muted, #96ACBB);">{{ guild.guild_lead.pronouns }}</div>
+                        <div style="font-weight:600;color:var(--hub-text, #F4EFDD);">{{ lead.display_name }}</div>
+                        {% if lead.pronouns and lead.pronouns != "prefer not to share" %}
+                        <div style="font-size:0.8125rem;color:var(--hub-text-muted, #96ACBB);">{{ lead.pronouns }}</div>
                         {% endif %}
                     </div>
                 </div>
-                {% if guild.guild_lead.about_me %}
-                <p style="font-size:0.875rem;color:var(--hub-text, #F4EFDD);margin:0 0 1rem;">{{ guild.guild_lead.about_me }}</p>
+                {% if lead.about_me %}
+                <p style="font-size:0.875rem;color:var(--hub-text, #F4EFDD);margin:0 0 1rem;">{{ lead.about_me }}</p>
                 {% endif %}
-                {% if guild.guild_lead.primary_email or guild.guild_lead.phone or guild.guild_lead.discord_handle %}
+                {% if lead.primary_email or lead.phone or lead.discord_handle %}
                 <div style="display:flex;flex-direction:column;gap:0.5rem;">
-                    {% if guild.guild_lead.primary_email %}
+                    {% if lead.primary_email %}
                     <div style="display:flex;gap:0.5rem;font-size:0.875rem;">
                         <span style="color:var(--hub-text-muted, #96ACBB);min-width:60px;">Email</span>
-                        <a href="mailto:{{ guild.guild_lead.primary_email }}" style="color:var(--color-tuscan-yellow, #EEB44B);">{{ guild.guild_lead.primary_email }}</a>
+                        <a href="mailto:{{ lead.primary_email }}" style="color:var(--color-tuscan-yellow, #EEB44B);">{{ lead.primary_email }}</a>
                     </div>
                     {% endif %}
-                    {% if guild.guild_lead.phone %}
+                    {% if lead.phone %}
                     <div style="display:flex;gap:0.5rem;font-size:0.875rem;">
                         <span style="color:var(--hub-text-muted, #96ACBB);min-width:60px;">Phone</span>
-                        <span style="color:var(--hub-text, #F4EFDD);">{{ guild.guild_lead.phone }}</span>
+                        <span style="color:var(--hub-text, #F4EFDD);">{{ lead.phone }}</span>
                     </div>
                     {% endif %}
-                    {% if guild.guild_lead.discord_handle %}
+                    {% if lead.discord_handle %}
                     <div style="display:flex;gap:0.5rem;font-size:0.875rem;">
                         <span style="color:var(--hub-text-muted, #96ACBB);min-width:60px;">Discord</span>
-                        <span style="color:var(--hub-text, #F4EFDD);">{{ guild.guild_lead.discord_handle }}</span>
+                        <span style="color:var(--hub-text, #F4EFDD);">{{ lead.discord_handle }}</span>
                     </div>
                     {% endif %}
                 </div>
@@ -104,7 +108,9 @@
             </div>
         </div>
     </div>
+    {% endfor %}
     {% endif %}
+    {% endwith %}
 </div>
 
 {# Products card #}
