@@ -94,13 +94,19 @@ def describe_guild_detail():
 
 @pytest.mark.django_db
 def describe_guild_lead_section():
+    def _guild_card_content(response) -> str:
+        """Return just the guild info card HTML, excluding the changelog modal."""
+        content = response.content.decode()
+        # The changelog modal starts after the main page content — only check the part before it.
+        return content.split('id="changelog-modal"')[0]
+
     def it_shows_no_lead_section_when_guild_has_no_leads(client: Client):
         User.objects.create_user(username="lead_none", password="pass")
         guild = GuildFactory()
         client.login(username="lead_none", password="pass")
         response = client.get(f"/guilds/{guild.pk}/")
         assert response.status_code == 200
-        assert b"Guild Lead" not in response.content
+        assert "Guild Lead" not in _guild_card_content(response)
 
     def it_shows_guild_lead_singular_for_one_lead(client: Client):
         from tests.membership.factories import MemberFactory
@@ -111,10 +117,10 @@ def describe_guild_lead_section():
         client.login(username="lead_one_viewer", password="pass")
         response = client.get(f"/guilds/{guild.pk}/")
         assert response.status_code == 200
-        content = response.content.decode()
-        assert "Guild Lead" in content
-        assert "Guild Leads" not in content
-        assert "LeadPerson" in content
+        card = _guild_card_content(response)
+        assert "Guild Lead" in card
+        assert "Guild Leads" not in card
+        assert "LeadPerson" in card
 
     def it_shows_guild_leads_plural_for_multiple_leads(client: Client):
         from tests.membership.factories import MemberFactory

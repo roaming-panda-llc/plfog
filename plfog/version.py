@@ -2,9 +2,18 @@
 
 from __future__ import annotations
 
-VERSION = "1.6.2"
+VERSION = "1.6.3"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.6.3",
+        "date": "2026-04-16",
+        "title": "Multiple Guild Leads",
+        "changes": [
+            "Guilds can now have more than one lead — admins can assign multiple members as Guild Lead for the same guild from the Members admin page",
+            "Guild pages show all current leads, with profile cards for each",
+        ],
+    },
     {
         "version": "1.6.2",
         "date": "2026-04-15",

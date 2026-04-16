@@ -649,7 +649,6 @@ def _build_fixture_json(acc: FixtureAccumulator) -> list[dict[str, Any]]:
                 "pk": guild_pk,
                 "fields": {
                     "name": guild_name,
-                    "guild_lead": None,
                     "notes": "",
                     "created_at": CREATED_AT,
                 },
