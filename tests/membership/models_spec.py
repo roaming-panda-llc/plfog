@@ -791,13 +791,15 @@ def describe_member_fog_roles():
 
         def it_is_true_for_the_guilds_own_lead():
             lead = MemberFactory(fog_role=Member.FogRole.MEMBER)
-            guild = GuildFactory(guild_lead=lead)
+            guild = GuildFactory()
+            guild.guild_leads.add(lead)
             assert lead.can_edit_guild(guild) is True
 
         def it_is_false_for_regular_members_other_guilds():
             member = MemberFactory(fog_role=Member.FogRole.MEMBER)
             other_lead = MemberFactory(fog_role=Member.FogRole.MEMBER)
-            guild = GuildFactory(guild_lead=other_lead)
+            guild = GuildFactory()
+            guild.guild_leads.add(other_lead)
             assert member.can_edit_guild(guild) is False
 
         def it_is_true_for_guild_lead_assigned_via_m2m():

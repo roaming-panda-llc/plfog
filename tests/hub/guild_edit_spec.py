@@ -68,7 +68,8 @@ def describe_guild_product_create():
 
     def it_guild_lead_can_create_a_product_for_their_guild(client: Client):
         user = _user_with_role("lead1", fog_role=Member.FogRole.MEMBER)
-        guild = GuildFactory(guild_lead=user.member)
+        guild = GuildFactory()
+        guild.guild_leads.add(user.member)
         client.login(username="lead1", password="pass")
         url = reverse("hub_guild_product_create", args=[guild.pk])
         response = client.post(url, data=_product_post_payload(guild))
@@ -155,7 +156,8 @@ def describe_guild_product_update():
 
     def it_allows_the_guild_lead_to_update(client: Client):
         user = _user_with_role("lead_upd", fog_role=Member.FogRole.MEMBER)
-        guild = GuildFactory(guild_lead=user.member)
+        guild = GuildFactory()
+        guild.guild_leads.add(user.member)
         product = _make_product(guild)
         client.login(username="lead_upd", password="pass")
         url = reverse("hub_guild_product_update", args=[guild.pk, product.pk])
@@ -244,7 +246,8 @@ def describe_guild_product_delete():
 
     def it_guild_lead_can_delete_their_products(client: Client):
         user = _user_with_role("lead_del", fog_role=Member.FogRole.MEMBER)
-        guild = GuildFactory(guild_lead=user.member)
+        guild = GuildFactory()
+        guild.guild_leads.add(user.member)
         product = _make_product(guild)
         client.login(username="lead_del", password="pass")
         url = reverse("hub_guild_product_delete", args=[guild.pk, product.pk])
@@ -278,7 +281,8 @@ def describe_guild_edit():
 
     def it_guild_lead_can_edit_their_guild(client: Client):
         user = _user_with_role("lead_e", fog_role=Member.FogRole.MEMBER)
-        guild = GuildFactory(guild_lead=user.member, name="Old")
+        guild = GuildFactory(name="Old")
+        guild.guild_leads.add(user.member)
         client.login(username="lead_e", password="pass")
         url = reverse("hub_guild_edit", args=[guild.pk])
         response = client.post(url, data={"name": "Lead Edit", "about": ""})
@@ -389,7 +393,8 @@ def describe_guild_detail_edit_buttons():
 
     def it_shows_edit_buttons_for_guild_lead(client: Client):
         user = _user_with_role("lead_btn", fog_role=Member.FogRole.MEMBER)
-        guild = GuildFactory(guild_lead=user.member)
+        guild = GuildFactory()
+        guild.guild_leads.add(user.member)
         client.login(username="lead_btn", password="pass")
         response = client.get(f"/guilds/{guild.pk}/")
         assert b'@click="openProductCreateModal()"' in response.content

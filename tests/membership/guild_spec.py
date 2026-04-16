@@ -33,14 +33,9 @@ def describe_Guild():
         guild = GuildFactory(name="Ceramics Guild")
         assert str(guild) == "Ceramics Guild"
 
-    def it_can_have_guild_lead():
-        member = MemberFactory()
-        guild = GuildFactory(guild_lead=member)
-        assert guild.guild_lead == member
-
-    def it_allows_null_guild_lead():
-        guild = GuildFactory(guild_lead=None)
-        assert guild.guild_lead is None
+    def it_has_no_guild_leads_by_default():
+        guild = GuildFactory()
+        assert guild.guild_leads.count() == 0
 
     def it_has_notes_field():
         guild = GuildFactory(name="Notes Guild", notes="Some important notes")
