@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
-VERSION = "1.7.1"
+VERSION = "1.7.2"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.7.2",
+        "date": "2026-04-23",
+        "title": "Fix: logout page styling",
+        "changes": [
+            "Fixed the logout confirmation page so it uses the normal Past Lives site styling instead of showing an unstyled default page",
+        ],
+    },
     {
         "version": "1.7.1",
         "date": "2026-04-21",
