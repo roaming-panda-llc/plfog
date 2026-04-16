@@ -6,7 +6,6 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from django.contrib import admin, messages
-from django.contrib.admin.views.decorators import staff_member_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -18,9 +17,10 @@ from core.models import Invite
 from membership.forms import AddEmailAliasForm, InviteMemberForm
 from membership.models import FundingSnapshot, Member, VotePreference
 from membership.vote_calculator import calculate_results
+from plfog.capabilities import admin_capability_required
 
 
-@staff_member_required
+@admin_capability_required
 def invite_member(request: HttpRequest) -> HttpResponse:
     """Admin view to invite a new member by email."""
     if request.method == "POST":
@@ -204,14 +204,14 @@ def _render_analyzer(
     return render(request, "admin/snapshot_analyzer.html", context)
 
 
-@staff_member_required
+@admin_capability_required
 def snapshot_draft(request: HttpRequest) -> HttpResponse:
     """Analyzer running on live VotePreference data — no snapshot stored yet."""
     raw_votes = _serialize_live_votes()
     return _render_analyzer(request, raw_votes=raw_votes, snapshot=None)
 
 
-@staff_member_required
+@admin_capability_required
 def snapshot_detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Analyzer running on a stored FundingSnapshot's raw_votes."""
     snapshot = get_object_or_404(FundingSnapshot, pk=pk)
@@ -219,7 +219,7 @@ def snapshot_detail(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @require_POST
-@staff_member_required
+@admin_capability_required
 def snapshot_take(request: HttpRequest) -> HttpResponse:
     """Commit a snapshot from current live VotePreference data.
 
@@ -242,7 +242,7 @@ def snapshot_take(request: HttpRequest) -> HttpResponse:
 
 
 @require_POST
-@staff_member_required
+@admin_capability_required
 def snapshot_delete(request: HttpRequest, pk: int) -> HttpResponse:
     """Delete a stored FundingSnapshot and return to the admin changelist."""
     snapshot = get_object_or_404(FundingSnapshot, pk=pk)
@@ -263,7 +263,7 @@ def snapshot_delete(request: HttpRequest, pk: int) -> HttpResponse:
 # See docs/superpowers/specs/2026-04-11-admin-email-aliases-design.md.
 
 
-@staff_member_required
+@admin_capability_required
 def member_aliases(request: HttpRequest, pk: int) -> HttpResponse:
     """GET — render the aliases management page for a linked member."""
     member = get_object_or_404(Member, pk=pk)
@@ -287,7 +287,7 @@ def member_aliases(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @require_POST
-@staff_member_required
+@admin_capability_required
 def member_aliases_add(request: HttpRequest, pk: int) -> HttpResponse:
     """POST — create a verified, non-primary EmailAddress for the member's User."""
     member = get_object_or_404(Member, pk=pk)
@@ -320,7 +320,7 @@ def member_aliases_add(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @require_POST
-@staff_member_required
+@admin_capability_required
 def member_aliases_remove(request: HttpRequest, pk: int, email_pk: int) -> HttpResponse:
     """POST — delete an EmailAddress unless it's the member's only one.
 
@@ -366,7 +366,7 @@ def member_aliases_remove(request: HttpRequest, pk: int, email_pk: int) -> HttpR
 
 
 @require_POST
-@staff_member_required
+@admin_capability_required
 def member_aliases_set_primary(request: HttpRequest, pk: int, email_pk: int) -> HttpResponse:
     """POST — promote a verified alias to primary.
 
@@ -395,7 +395,7 @@ def member_aliases_set_primary(request: HttpRequest, pk: int, email_pk: int) -> 
 
 
 @require_POST
-@staff_member_required
+@admin_capability_required
 def member_aliases_toggle_verified(request: HttpRequest, pk: int, email_pk: int) -> HttpResponse:
     """POST — flip the verified flag on an alias.
 

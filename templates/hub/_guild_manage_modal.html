@@ -1,5 +1,7 @@
-{# Add Product modal for guild managers on the member-facing guild page.
-   Teleported to <body> to escape any ancestor stacking/transform contexts. #}
+{% comment %}
+Add Product modal for guild managers on the member-facing guild page.
+Teleported to <body> to escape any ancestor stacking/transform contexts.
+{% endcomment %}
 
 <style>
 .guild-product-card__edit, .guild-product-card__remove { position: absolute; top: 0.5rem; width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.15); background: transparent; font-size: 0.75rem; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0; transition: opacity 0.15s, background 0.15s; color: #F4EFDD; }
@@ -301,4 +303,5 @@ function guildInfoEditor(cfg) {
         },
     };
 }
+
 </script>

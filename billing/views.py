@@ -6,7 +6,6 @@ import logging
 from decimal import Decimal
 
 from django.contrib import messages as django_messages
-from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.db.models import DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce
@@ -20,6 +19,7 @@ from billing import stripe_utils, webhook_handlers
 from billing.exceptions import TabLimitExceededError, TabLockedError
 from billing.forms import CONTEXT_ADMIN_DASHBOARD, TabItemForm
 from billing.models import BillingSettings, Tab, TabCharge, TabEntry
+from plfog.capabilities import admin_capability_required
 
 logger = logging.getLogger(__name__)
 
@@ -138,10 +138,9 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
 _VALID_TABS = {"overview", "open-tabs", "settings", "stripe"}
 
 
-@staff_member_required
+@admin_capability_required
 def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
     """Admin payments dashboard — five-tab view of billing data."""
-    from django.contrib import admin as django_admin
     from billing.forms import BillingSettingsForm
     from billing.models import BillingSettings, Product
     from membership.models import Guild
@@ -222,7 +221,6 @@ def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
     add_charge_form = TabItemForm(context=CONTEXT_ADMIN_DASHBOARD, user=request.user)
 
     context = {
-        **django_admin.site.each_context(request),
         "active_tab": active_tab,
         "tab_filter": tab_filter,
         # Overview
@@ -248,7 +246,7 @@ def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
     return render(request, "billing/admin_dashboard.html", context)
 
 
-@staff_member_required
+@admin_capability_required
 def admin_add_tab_entry(request: HttpRequest) -> HttpResponse:
     """Admin quick-add: add a charge to any member's tab."""
     from django.contrib import admin
@@ -273,7 +271,7 @@ def admin_add_tab_entry(request: HttpRequest) -> HttpResponse:
     return render(request, "billing/admin_add_entry.html", context)
 
 
-@staff_member_required
+@admin_capability_required
 def billing_admin_tab_detail_api(request: HttpRequest, tab_pk: int) -> JsonResponse:
     """Return JSON tab detail for the tab detail modal."""
     try:
@@ -330,7 +328,7 @@ def billing_admin_tab_detail_api(request: HttpRequest, tab_pk: int) -> JsonRespo
     )
 
 
-@staff_member_required
+@admin_capability_required
 @require_POST
 def billing_admin_save_settings(request: HttpRequest) -> HttpResponse:
     """Save BillingSettings singleton from the Settings tab form."""
@@ -346,7 +344,7 @@ def billing_admin_save_settings(request: HttpRequest) -> HttpResponse:
     return redirect("/billing/admin/dashboard/?tab=settings")
 
 
-@staff_member_required
+@admin_capability_required
 @require_POST
 def billing_admin_retry_charge(request: HttpRequest, charge_pk: int) -> JsonResponse:
     """Immediately retry a single failed charge. Returns JSON with new status."""
@@ -367,15 +365,13 @@ def billing_admin_retry_charge(request: HttpRequest, charge_pk: int) -> JsonResp
     return JsonResponse({"status": "failed"})
 
 
-@staff_member_required
+@admin_capability_required
 def admin_reports(request: HttpRequest) -> HttpResponse:
     """Reports page — filtered entry list + per-guild payout summary.
 
     When opened without any GET params, defaults to the current month so the
     page always shows data immediately.
     """
-    from django.contrib import admin as django_admin
-
     from billing.reports import (
         CHARGE_TYPE_CHOICES,
         STATUS_CHOICES,
@@ -401,7 +397,6 @@ def admin_reports(request: HttpRequest) -> HttpResponse:
     selected_statuses = _getlist("status")
 
     context = {
-        **django_admin.site.each_context(request),
         "filters": effective_filters,
         "selected_guilds": selected_guilds,
         "selected_charge_types": selected_charge_types,
@@ -417,7 +412,7 @@ def admin_reports(request: HttpRequest) -> HttpResponse:
     return render(request, "billing/admin_reports.html", context)
 
 
-@staff_member_required
+@admin_capability_required
 def admin_reports_csv(request: HttpRequest) -> StreamingHttpResponse:
     """Streaming CSV download for the reports page, same filters via GET."""
     from billing.reports import ReportFilterForm, stream_report_csv
@@ -426,7 +421,7 @@ def admin_reports_csv(request: HttpRequest) -> StreamingHttpResponse:
     return stream_report_csv(**filter_form.filter_kwargs())
 
 
-@staff_member_required
+@admin_capability_required
 @require_POST
 def billing_test_platform_connection(request: HttpRequest) -> JsonResponse:
     """AJAX: verify a candidate platform Stripe secret key.
@@ -446,7 +441,7 @@ def billing_test_platform_connection(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"ok": True, **result})
 
 
-@staff_member_required
+@admin_capability_required
 @require_POST
 def billing_save_connect_platform(request: HttpRequest) -> HttpResponse:
     """Save the platform Stripe credentials to BillingSettings."""
@@ -470,7 +465,7 @@ def admin_guild_create_product(request: HttpRequest, guild_pk: int) -> JsonRespo
     """Create a Product (with its RevenueSplit) for a guild.
 
     Permission: admins and the guild's lead (guild officer) can call this —
-    see ``hub.permissions.can_manage_guild``.
+    see ``request.capabilities.can_manage_guild``.
 
     Accepts JSON payload:
         {
@@ -484,13 +479,12 @@ def admin_guild_create_product(request: HttpRequest, guild_pk: int) -> JsonRespo
     import json
 
     from billing.models import Product, RevenueSplit, SplitRecipient
-    from hub.permissions import can_manage_guild
     from membership.models import Guild
 
     guild = Guild.objects.filter(pk=guild_pk).first()
     if guild is None:
         return JsonResponse({"ok": False, "error": "Guild not found."}, status=404)
-    if not can_manage_guild(request.user, guild):
+    if not request.capabilities.can_manage_guild(guild):
         return JsonResponse({"ok": False, "error": "You don't have permission to manage this guild."}, status=403)
 
     try:
@@ -575,18 +569,17 @@ def admin_guild_update_product(request: HttpRequest, guild_pk: int, product_pk: 
     """Update an existing product (and rebuild its revenue split) in place.
 
     Same payload shape as ``admin_guild_create_product``. Permission: admins
-    and guild leads via ``hub.permissions.can_manage_guild``.
+    and guild leads via ``request.capabilities.can_manage_guild``.
     """
     import json
 
     from billing.models import Product, SplitRecipient
-    from hub.permissions import can_manage_guild
     from membership.models import Guild
 
     guild = Guild.objects.filter(pk=guild_pk).first()
     if guild is None:
         return JsonResponse({"ok": False, "error": "Guild not found."}, status=404)
-    if not can_manage_guild(request.user, guild):
+    if not request.capabilities.can_manage_guild(guild):
         return JsonResponse({"ok": False, "error": "You don't have permission to manage this guild."}, status=403)
 
     product = Product.objects.filter(pk=product_pk, guild_id=guild_pk).first()
@@ -668,13 +661,12 @@ def admin_guild_update_product(request: HttpRequest, guild_pk: int, product_pk: 
 def admin_guild_delete_product(request: HttpRequest, guild_pk: int, product_pk: int) -> JsonResponse:
     """Delete a product from a guild. Admin/guild-lead only — see hub.permissions."""
     from billing.models import Product
-    from hub.permissions import can_manage_guild
     from membership.models import Guild
 
     guild = Guild.objects.filter(pk=guild_pk).first()
     if guild is None:
         return JsonResponse({"ok": False, "error": "Guild not found."}, status=404)
-    if not can_manage_guild(request.user, guild):
+    if not request.capabilities.can_manage_guild(guild):
         return JsonResponse({"ok": False, "error": "You don't have permission to manage this guild."}, status=403)
 
     product = Product.objects.filter(pk=product_pk, guild_id=guild_pk).first()

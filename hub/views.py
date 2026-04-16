@@ -161,8 +161,13 @@ def member_directory(request: HttpRequest) -> HttpResponse:
     """
     ctx = _get_hub_context(request)
     current_member = _get_member(request)
+    # Admins see every member regardless of status or show_in_directory.
+    if request.capabilities.is_admin:
+        base_qs = Member.objects.all()
+    else:
+        base_qs = Member.objects.filter(status=Member.Status.ACTIVE, show_in_directory=True)
     members = (
-        Member.objects.filter(status=Member.Status.ACTIVE, show_in_directory=True)
+        base_qs
         .select_related("membership_plan", "user")
         .prefetch_related(
             Prefetch(
@@ -208,10 +213,9 @@ def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
     if member is not None:
         tab, _created = Tab.objects.get_or_create(member=member)
 
-    from hub.permissions import can_manage_guild
     from membership.models import Guild as _Guild
 
-    can_manage = can_manage_guild(request.user, guild)
+    can_manage = request.capabilities.can_manage_guild(guild)
     manage_context: dict[str, Any] = {}
     if can_manage:
         products_json = []
@@ -235,6 +239,37 @@ def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "products_json": json.dumps(products_json),
         }
 
+    # Members list for lead/officer pickers. Shown to anyone who can manage
+    # this guild (admins always, leads, and existing officers).
+    picker_members: list[dict[str, Any]] = []
+    if can_manage:
+        picker_members = list(
+            Member.objects.filter(status=Member.Status.ACTIVE)
+            .order_by("full_legal_name")
+            .values("pk", "full_legal_name")
+        )
+
+    # Leadership roster as a single list, lead first, then titled roles.
+    # Each row: {role_pk (None for the lead), member_pk, member_name, title}
+    leadership_rows: list[dict[str, Any]] = []
+    if guild.guild_lead_id:
+        leadership_rows.append({
+            "role_pk": None,
+            "member_pk": guild.guild_lead_id,
+            "member_name": guild.guild_lead.display_name,
+            "title": "Guild Lead",
+            "is_lead": True,
+        })
+    for r in guild.officer_roles.select_related("member").order_by("title", "member__full_legal_name"):
+        leadership_rows.append({
+            "role_pk": r.pk,
+            "member_pk": r.member_id,
+            "member_name": r.member.display_name,
+            "title": r.title,
+            "is_lead": False,
+        })
+    leadership_json = json.dumps(leadership_rows)
+
     return render(
         request,
         "hub/guild_detail.html",
@@ -244,6 +279,8 @@ def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "products": products,
             "tab": tab,
             "can_manage": can_manage,
+            "picker_members": picker_members,
+            "leadership_json": leadership_json,
             **manage_context,
         },
     )
@@ -252,11 +289,13 @@ def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
 @login_required
 @require_POST
 def guild_update(request: HttpRequest, pk: int) -> JsonResponse:
-    """Update a guild's name and/or about text. Admin/guild-lead only."""
-    from hub.permissions import can_manage_guild
+    """Update a guild's fields. Admin/guild-officer only.
 
+    Members/officers can edit name + about. Admins can additionally edit
+    is_active, notes, and guild_lead (admin-only metadata fields).
+    """
     guild = get_object_or_404(Guild, pk=pk)
-    if not can_manage_guild(request.user, guild):
+    if not request.capabilities.can_manage_guild(guild):
         return JsonResponse({"ok": False, "error": "You don't have permission to edit this guild."}, status=403)
 
     try:
@@ -275,9 +314,51 @@ def guild_update(request: HttpRequest, pk: int) -> JsonResponse:
 
     guild.name = name
     guild.about = about
-    guild.save(update_fields=["name", "about"])
+    update_fields = ["name", "about"]
 
-    return JsonResponse({"ok": True, "guild": {"pk": guild.pk, "name": guild.name, "about": guild.about}})
+    if request.capabilities.is_admin and "guild_lead_id" in payload:
+        lead_id = payload["guild_lead_id"]
+        guild.guild_lead_id = int(lead_id) if lead_id else None
+        update_fields.append("guild_lead")
+
+    guild.save(update_fields=update_fields)
+
+    # Officer roles — managers can replace the full roster.
+    # Payload: "officer_roles": [{"member_id": 42, "title": "Treasurer"}, ...]
+    if "officer_roles" in payload:
+        from membership.models import GuildOfficerRole
+        rows = payload["officer_roles"]
+        if not isinstance(rows, list):
+            return JsonResponse({"ok": False, "error": "officer_roles must be a list."}, status=400)
+        cleaned: list[tuple[int, str]] = []
+        for r in rows:
+            try:
+                mid = int(r["member_id"])
+                title = str(r["title"]).strip()
+            except (KeyError, TypeError, ValueError):
+                return JsonResponse({"ok": False, "error": "Each role needs member_id and title."}, status=400)
+            if not title:
+                return JsonResponse({"ok": False, "error": "Title cannot be empty."}, status=400)
+            cleaned.append((mid, title))
+        # Replace: delete all existing, recreate. Simplest for a small roster.
+        guild.officer_roles.all().delete()
+        for mid, title in cleaned:
+            GuildOfficerRole.objects.create(guild=guild, member_id=mid, title=title)
+
+    current_roles = [
+        {"role_pk": r.pk, "member_id": r.member_id, "title": r.title}
+        for r in guild.officer_roles.select_related("member").order_by("title")
+    ]
+    return JsonResponse({
+        "ok": True,
+        "guild": {
+            "pk": guild.pk,
+            "name": guild.name,
+            "about": guild.about,
+            "guild_lead_id": guild.guild_lead_id,
+            "officer_roles": current_roles,
+        },
+    })
 
 
 @login_required

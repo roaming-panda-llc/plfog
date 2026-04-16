@@ -12,8 +12,10 @@ from django.views.decorators.http import require_GET, require_POST
 
 from allauth.account.internal.stagekit import clear_login
 
+from plfog.capabilities import SESSION_HIDDEN_KEY, Capability, admin_capability_required
+
 from .forms import FindAccountForm
-from .models import PushSubscription
+from .models import PushSubscription, SiteConfiguration
 
 logger = logging.getLogger(__name__)
 
@@ -139,3 +141,61 @@ def unsubscribe(request):
     except Exception:
         logger.exception("Push unsubscription failed")
         return JsonResponse({"error": "Unsubscription failed. Please try again."}, status=500)
+
+
+@admin_capability_required
+def site_settings(request: HttpRequest) -> HttpResponse:
+    """Hub-native Site Settings page. Admin capability required."""
+    from django import forms
+
+    class SiteConfigurationForm(forms.ModelForm):
+        class Meta:
+            model = SiteConfiguration
+            fields = ["registration_mode"]
+
+    config = SiteConfiguration.load()
+    if request.method == "POST":
+        form = SiteConfigurationForm(request.POST, instance=config)
+        if form.is_valid():
+            form.save()
+            from django.contrib import messages
+            messages.success(request, "Site settings saved.")
+            return redirect("site_settings")
+    else:
+        form = SiteConfigurationForm(instance=config)
+    return render(request, "core/site_settings.html", {"form": form, "config": config})
+
+
+@require_POST
+@login_required
+def capabilities_toggle(request: HttpRequest) -> JsonResponse:
+    """Add or remove a capability from the session-hidden set.
+
+    Request body: ``{"capability": "admin", "hidden": true}``. When
+    ``hidden`` is true the capability is added to the hidden set (the
+    user unchecked its "Viewing as" checkbox); when false it's removed.
+    Unknown capabilities are rejected so junk never lands in the session.
+    Capabilities the user does not actually hold are also rejected — you
+    can only hide what you have.
+    """
+    try:
+        payload = json.loads(request.body or b"{}")
+        name = payload["capability"]
+        hidden = bool(payload["hidden"])
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return JsonResponse({"error": "Invalid request"}, status=400)
+
+    if name not in Capability.ALL:
+        return JsonResponse({"error": f"Unknown capability '{name}'"}, status=400)
+
+    if not request.capabilities.has_actual(name):
+        return JsonResponse({"error": "Cannot toggle a capability you don't have"}, status=403)
+
+    current = set(request.session.get(SESSION_HIDDEN_KEY, []))
+    if hidden:
+        current.add(name)
+    else:
+        current.discard(name)
+    request.session[SESSION_HIDDEN_KEY] = sorted(current)
+
+    return JsonResponse({"hidden": sorted(current)})

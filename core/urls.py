@@ -19,4 +19,8 @@ urlpatterns = [
     path("webpush/vapid-key/", views.vapid_key, name="webpush_vapid_key"),
     path("webpush/subscribe/", views.subscribe, name="webpush_subscribe"),
     path("webpush/unsubscribe/", views.unsubscribe, name="webpush_unsubscribe"),
+    # Capability session toggle (Viewing-as popover)
+    path("capabilities/toggle/", views.capabilities_toggle, name="capabilities_toggle"),
+    # Hub-native Site Settings (admin only)
+    path("settings/site/", views.site_settings, name="site_settings"),
 ]

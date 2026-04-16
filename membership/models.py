@@ -425,6 +425,13 @@ class Guild(models.Model):
         on_delete=models.SET_NULL,
         related_name="led_guilds",
     )
+    officers = models.ManyToManyField(
+        Member,
+        blank=True,
+        through="GuildOfficerRole",
+        related_name="officer_of_guilds",
+        help_text="Members holding a titled officer role in this guild (besides the lead).",
+    )
     notes = models.TextField(blank=True)
     about = models.TextField(
         blank=True,
@@ -464,6 +471,44 @@ class Guild(models.Model):
             ),
         )["total"]
         return total
+
+
+class GuildOfficerRole(models.Model):
+    """A titled officer role for a member in a specific guild.
+
+    Titles are free-text (Treasurer, Secretary, Instructor, Orientor, etc.)
+    so the community can invent new roles without schema changes. The
+    ``guild_lead`` FK on ``Guild`` stays as the authoritative Lead slot;
+    this model is for everyone else on the leadership roster.
+    """
+
+    guild = models.ForeignKey(
+        Guild,
+        on_delete=models.CASCADE,
+        related_name="officer_roles",
+    )
+    member = models.ForeignKey(
+        Member,
+        on_delete=models.CASCADE,
+        related_name="officer_roles",
+    )
+    title = models.CharField(
+        max_length=80,
+        help_text="Free-text role title, e.g. Treasurer, Secretary, Instructor.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["title", "member__full_legal_name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["guild", "member", "title"],
+                name="uq_guild_officer_role",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.member.display_name} — {self.title} ({self.guild.name})"
 
 
 class VotePreference(models.Model):

@@ -2,8 +2,31 @@
 {% block title %}Member Directory{% endblock %}
 
 {% block content %}
-<h1 class="hub-page-title">Member Directory</h1>
-<p class="hub-text-muted" style="margin-bottom: 1.5rem;">{{ members|length }} active member{{ members|length|pluralize }}.</p>
+<style>
+    .directory-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; gap: 1rem; flex-wrap: wrap; }
+    .directory-header__actions { display: flex; gap: 0.5rem; }
+    .directory-card__admin-badges { display: flex; gap: 0.375rem; margin-top: 0.375rem; flex-wrap: wrap; }
+    .directory-card__badge { display: inline-block; padding: 0.125rem 0.5rem; border-radius: 4px; font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+    .directory-card__badge--admin { background: rgba(238, 180, 75, 0.18); color: #EEB44B; }
+    .directory-card__badge--officer { background: rgba(100, 180, 238, 0.18); color: #64b4ee; }
+    .directory-card__badge--hidden { background: rgba(248, 113, 113, 0.12); color: #f87171; }
+    .directory-card__badge--status { background: rgba(156, 163, 175, 0.18); color: #96ACBB; }
+    .pl-btn--primary { display: inline-flex; align-items: center; padding: 0.5rem 1rem; background: #EEB44B; color: #092E4C; border-radius: 6px; font-weight: 600; text-decoration: none; font-size: 0.875rem; border: none; cursor: pointer; }
+    .pl-btn--primary:hover { background: #d4a043; color: #092E4C; }
+</style>
+<div class="directory-header">
+    <div>
+        <h1 class="hub-page-title" style="margin: 0;">Member Directory</h1>
+        <p class="hub-text-muted" style="margin: 0.25rem 0 0;">
+            {{ members|length }} {% if request.capabilities.is_admin %}member{{ members|length|pluralize }} (all statuses){% else %}active member{{ members|length|pluralize }}{% endif %}.
+        </p>
+    </div>
+    {% if request.capabilities.is_admin %}
+    <div class="directory-header__actions">
+        <a href="{% url 'admin_invite_member' %}" class="pl-btn--primary" hx-boost="false">+ Invite Member</a>
+    </div>
+    {% endif %}
+</div>
 
 <div class="directory-grid">
     {% for member in members %}
@@ -24,6 +47,14 @@
                     <span class="directory-card__joined">Joined {{ member.join_date|date:"N Y" }}</span>
                     {% endif %}
                 </div>
+                {% if request.capabilities.is_admin %}
+                <div class="directory-card__admin-badges">
+                    {% if member.fog_role == 'admin' %}<span class="directory-card__badge directory-card__badge--admin">Admin</span>{% endif %}
+                    {% if member.fog_role == 'guild_officer' %}<span class="directory-card__badge directory-card__badge--officer">Guild Officer</span>{% endif %}
+                    {% if not member.show_in_directory %}<span class="directory-card__badge directory-card__badge--hidden">Hidden</span>{% endif %}
+                    {% if member.status != 'active' %}<span class="directory-card__badge directory-card__badge--status">{{ member.get_status_display }}</span>{% endif %}
+                </div>
+                {% endif %}
             </div>
         </div>
         {% if member.about_me %}

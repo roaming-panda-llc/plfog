@@ -76,6 +76,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
     "plfog.service_worker_middleware.ServiceWorkerAllowedMiddleware",
+    "plfog.capability_middleware.CapabilityMiddleware",
 ]
 
 if DEBUG and os.environ.get("DEV_AUTO_LOGIN_EMAIL"):

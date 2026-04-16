@@ -55,84 +55,75 @@
         {% endif %}
         {% endif %}
     </div>
-    {% if guild.guild_lead %}
-    <div class="hub-detail-section">
-        <h3 class="hub-detail-label">Guild Lead</h3>
-        <div class="hub-member-row" style="cursor:pointer;" @click="$dispatch('open-modal', 'guild-lead-profile')">
-            <div class="hub-member-avatar">
-                {{ guild.guild_lead.display_name|make_list|first|upper }}
+
+    <div class="hub-detail-section"
+         x-data="guildLeadership({
+            updateUrl: '{% url 'hub_guild_update' guild.pk %}',
+            csrfToken: document.querySelector('[name=csrfmiddlewaretoken]')?.value || '',
+            initialLeadId: {{ guild.guild_lead_id|default:'null' }},
+            initialRoster: {{ leadership_json }},
+            canEditLead: {{ request.capabilities.is_admin|yesno:'true,false' }},
+            canEditOfficers: {{ can_manage|yesno:'true,false' }},
+         })">
+        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">
+            <h3 class="hub-detail-label" style="margin:0;">Leadership</h3>
+            {% if can_manage %}
+            <button type="button" class="gi-edit-btn" @click="startEdit()" x-show="!editing" title="Edit leadership">✎</button>
+            {% endif %}
+        </div>
+
+        {# View mode: unified list, lead first, then officers grouped under each title #}
+        <div x-show="!editing">
+            <template x-if="roster.length === 0">
+                <p class="hub-text-muted" style="margin:0;font-size:0.875rem;">No leadership assigned.</p>
+            </template>
+            <template x-for="row in roster" :key="row.role_pk || 'lead'">
+                <div class="hub-member-row">
+                    <div class="hub-member-avatar" x-text="row.member_name.charAt(0).toUpperCase()"></div>
+                    <div class="hub-member-info">
+                        <span class="hub-member-name" x-text="row.member_name"></span>
+                        <span class="hub-badge" x-text="row.title"></span>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        {# Edit mode: split into lead (admin-only) and officer rows #}
+        <div x-show="editing" x-cloak style="display:flex;flex-direction:column;gap:0.75rem;">
+            {# Lead row — always shown, but only admins can change it #}
+            <div style="display:flex;flex-direction:column;gap:0.25rem;">
+                <div class="hub-text-muted" style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.04em;">Guild Lead <template x-if="!canEditLead"><span>(admin only)</span></template></div>
+                <select x-model="draftLeadId" :disabled="!canEditLead" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:#F4EFDD;padding:0.5rem;border-radius:4px;">
+                    <option :value="null">— None —</option>
+                    {% for m in picker_members %}
+                    <option value="{{ m.pk }}">{{ m.full_legal_name }}</option>
+                    {% endfor %}
+                </select>
             </div>
-            <div class="hub-member-info">
-                <span class="hub-member-name">{{ guild.guild_lead.display_name }}</span>
-                <span class="hub-badge">Lead</span>
+
+            {# Officer rows — dynamic list of {member_id, title} pairs #}
+            <div class="hub-text-muted" style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.04em;">Officers</div>
+            <template x-for="(row, idx) in draftRoles" :key="idx">
+                <div style="display:flex;gap:0.5rem;align-items:center;">
+                    <select x-model="row.member_id" style="flex:2;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:#F4EFDD;padding:0.4rem;border-radius:4px;">
+                        <option :value="null">— Member —</option>
+                        {% for m in picker_members %}
+                        <option value="{{ m.pk }}">{{ m.full_legal_name }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" x-model="row.title" placeholder="Title (e.g. Treasurer)" style="flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.12);color:#F4EFDD;padding:0.4rem;border-radius:4px;font-family:inherit;">
+                    <button type="button" class="gi-btn gi-btn--ghost" @click="removeRole(idx)" title="Remove">×</button>
+                </div>
+            </template>
+            <button type="button" class="gi-btn gi-btn--ghost" style="align-self:flex-start;" @click="addRole()">+ Add officer</button>
+
+            <div style="display:flex;gap:0.5rem;">
+                <button type="button" class="gi-btn gi-btn--primary" @click="saveAll()" :disabled="saving">Save</button>
+                <button type="button" class="gi-btn gi-btn--ghost" @click="cancelEdit()">Cancel</button>
             </div>
         </div>
     </div>
 
-    {# Guild lead profile modal #}
-    <div x-data="{ open: false }"
-         x-show="open"
-         x-transition:enter="modal-enter"
-         x-transition:leave="modal-leave"
-         @open-modal.window="if ($event.detail === 'guild-lead-profile') open = true"
-         @close-modal.window="if ($event.detail === 'guild-lead-profile') open = false"
-         @keydown.escape.window="open = false"
-         class="pl-modal-backdrop"
-         style="display: none;"
-         role="dialog"
-         aria-modal="true">
-        <div class="pl-modal pl-modal--sm" @click.outside="open = false">
-            <div class="pl-modal__header">
-                <h2 class="pl-modal__title">{{ guild.guild_lead.display_name }}</h2>
-                <button type="button" @click="open = false" class="pl-modal__close" aria-label="Close">&times;</button>
-            </div>
-            <div class="pl-modal__body">
-                {% if guild.guild_lead.show_in_directory %}
-                <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.25rem;">
-                    <div class="hub-member-avatar" style="width:48px;height:48px;font-size:1.25rem;">
-                        {{ guild.guild_lead.display_name|make_list|first|upper }}
-                    </div>
-                    <div>
-                        <div style="font-weight:600;color:var(--hub-text, #F4EFDD);">{{ guild.guild_lead.display_name }}</div>
-                        {% if guild.guild_lead.pronouns and guild.guild_lead.pronouns != "prefer not to share" %}
-                        <div style="font-size:0.8125rem;color:var(--hub-text-muted, #96ACBB);">{{ guild.guild_lead.pronouns }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-                {% if guild.guild_lead.about_me %}
-                <p style="font-size:0.875rem;color:var(--hub-text, #F4EFDD);margin:0 0 1rem;">{{ guild.guild_lead.about_me }}</p>
-                {% endif %}
-                {% if guild.guild_lead.primary_email or guild.guild_lead.phone or guild.guild_lead.discord_handle %}
-                <div style="display:flex;flex-direction:column;gap:0.5rem;">
-                    {% if guild.guild_lead.primary_email %}
-                    <div style="display:flex;gap:0.5rem;font-size:0.875rem;">
-                        <span style="color:var(--hub-text-muted, #96ACBB);min-width:60px;">Email</span>
-                        <a href="mailto:{{ guild.guild_lead.primary_email }}" style="color:var(--color-tuscan-yellow, #EEB44B);">{{ guild.guild_lead.primary_email }}</a>
-                    </div>
-                    {% endif %}
-                    {% if guild.guild_lead.phone %}
-                    <div style="display:flex;gap:0.5rem;font-size:0.875rem;">
-                        <span style="color:var(--hub-text-muted, #96ACBB);min-width:60px;">Phone</span>
-                        <span style="color:var(--hub-text, #F4EFDD);">{{ guild.guild_lead.phone }}</span>
-                    </div>
-                    {% endif %}
-                    {% if guild.guild_lead.discord_handle %}
-                    <div style="display:flex;gap:0.5rem;font-size:0.875rem;">
-                        <span style="color:var(--hub-text-muted, #96ACBB);min-width:60px;">Discord</span>
-                        <span style="color:var(--hub-text, #F4EFDD);">{{ guild.guild_lead.discord_handle }}</span>
-                    </div>
-                    {% endif %}
-                </div>
-                {% endif %}
-                {% else %}
-                <p style="font-size:0.875rem;color:var(--hub-text-muted, #96ACBB);margin:0;">
-                    This member has chosen to keep their profile private. Their information is not listed in the member directory.
-                </p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-    {% endif %}
 </div>
 
 {# Products card #}
@@ -378,6 +369,92 @@ function guildCart(guildPk) {
                 }));
             });
         }
+    };
+}
+
+function guildLeadership(cfg) {
+    return {
+        ...cfg,
+        roster: cfg.initialRoster || [],
+        leadId: cfg.initialLeadId,
+        editing: false,
+        saving: false,
+        draftLeadId: cfg.initialLeadId,
+        draftRoles: [],   // [{member_id, title}, ...]
+
+        startEdit() {
+            this.draftLeadId = this.leadId;
+            this.draftRoles = this.roster
+                .filter(r => !r.is_lead)
+                .map(r => ({ member_id: String(r.member_pk), title: r.title }));
+            this.editing = true;
+        },
+
+        cancelEdit() {
+            this.editing = false;
+        },
+
+        addRole() {
+            this.draftRoles.push({ member_id: null, title: '' });
+        },
+
+        removeRole(idx) {
+            this.draftRoles.splice(idx, 1);
+        },
+
+        async saveAll() {
+            this.saving = true;
+            const body = {
+                name: document.title,
+                officer_roles: this.draftRoles
+                    .filter(r => r.member_id && r.title.trim())
+                    .map(r => ({ member_id: parseInt(r.member_id, 10), title: r.title.trim() })),
+            };
+            if (this.canEditLead) body.guild_lead_id = this.draftLeadId;
+            try {
+                const r = await fetch(this.updateUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': this.csrfToken },
+                    body: JSON.stringify(body),
+                });
+                const res = await r.json();
+                if (!res.ok) {
+                    alert(res.error || 'Save failed.');
+                    return;
+                }
+                // Rebuild roster from response + current picker option labels
+                const lookupName = (pk) => {
+                    const opt = document.querySelector(`option[value="${pk}"]`);
+                    return opt ? opt.textContent : `#${pk}`;
+                };
+                const newRoster = [];
+                if (res.guild.guild_lead_id) {
+                    newRoster.push({
+                        role_pk: null,
+                        member_pk: res.guild.guild_lead_id,
+                        member_name: lookupName(res.guild.guild_lead_id),
+                        title: 'Guild Lead',
+                        is_lead: true,
+                    });
+                }
+                for (const r2 of (res.guild.officer_roles || [])) {
+                    newRoster.push({
+                        role_pk: r2.role_pk,
+                        member_pk: r2.member_id,
+                        member_name: lookupName(r2.member_id),
+                        title: r2.title,
+                        is_lead: false,
+                    });
+                }
+                this.roster = newRoster;
+                this.leadId = res.guild.guild_lead_id;
+                this.editing = false;
+            } catch (e) {
+                alert('Network error: ' + e.message);
+            } finally {
+                this.saving = false;
+            }
+        },
     };
 }
 </script>

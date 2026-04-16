@@ -1460,3 +1460,82 @@ a:hover { color: var(--color-yellow-hover); }
     font-size: 0.8rem;
     color: var(--hub-text-muted);
 }
+
+
+/* Capability popover (topbar 'Viewing as') */
+.pl-capability-popover { position: relative; display: inline-block; }
+.pl-capability-popover__menu {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    min-width: 220px;
+    background: var(--hub-bg-elevated, #1a1a1a);
+    border: 1px solid var(--hub-border, rgba(255,255,255,0.1));
+    border-radius: 8px;
+    padding: 0.75rem;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    z-index: 100;
+}
+.pl-capability-popover__header {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--hub-text-muted);
+    margin-bottom: 0.5rem;
+}
+.pl-capability-popover__row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.25rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    border-radius: 4px;
+}
+.pl-capability-popover__row:hover { background: rgba(255,255,255,0.05); }
+.pl-capability-popover__row input { margin: 0; }
+.pl-capability-popover__hint {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--hub-border, rgba(255,255,255,0.08));
+    font-size: 0.75rem;
+    color: var(--hub-text-muted);
+    line-height: 1.4;
+}
+
+
+/* Plain (non-collapsible) sidebar section label */
+.hub-sidebar__section-label {
+    padding: 1rem 1rem 0.375rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--hub-text-muted);
+}
+
+
+/* Guilds dropdown: toggle button styled as a regular sidebar link */
+.hub-sidebar__link--toggle {
+    width: 100%;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+}
+.hub-sidebar__link--toggle span {
+    flex: 1;
+}
+.hub-sidebar__link--toggle[aria-expanded="true"] .hub-sidebar__chevron {
+    transform: rotate(180deg);
+}
+.hub-sidebar__link--nested {
+    margin-left: 1.5rem;
+    font-size: 0.8125rem;
+    color: rgba(244, 239, 221, 0.55);
+}
+.hub-sidebar__link--nested svg {
+    color: rgba(244, 239, 221, 0.35);
+}
