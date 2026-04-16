@@ -200,7 +200,7 @@ class Member(models.Model):
         content_type_field="content_type",
         object_id_field="object_id",
     )
-    guild_leaderships = models.ManyToManyField(
+    guild_leaderships: models.ManyToManyField["Guild", Any] = models.ManyToManyField(
         "Guild",
         blank=True,
         related_name="guild_leads",
