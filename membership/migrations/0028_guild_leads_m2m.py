@@ -9,7 +9,11 @@ def _copy_fk_to_m2m(apps, schema_editor):
 
 
 def _restore_fk_from_m2m(apps, schema_editor):
-    """Restore Guild.guild_lead from the first entry in guild_leaderships (for reversal)."""
+    """Restore Guild.guild_lead from the first entry in guild_leaderships (for reversal).
+
+    NOTE: If a guild had multiple leads, only the first (arbitrary ordering) is preserved.
+    This data loss is inherent to the M2M→FK direction and is expected on reversal.
+    """
     Guild = apps.get_model("membership", "Guild")
     for guild in Guild.objects.all():
         first_lead = guild.guild_leaderships.first()

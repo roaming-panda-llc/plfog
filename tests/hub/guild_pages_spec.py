@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from django.test import Client
 
 from tests.billing.factories import BillingSettingsFactory, ProductFactory, TabFactory
-from tests.membership.factories import GuildFactory, MembershipPlanFactory
+from tests.membership.factories import GuildFactory, MemberFactory, MembershipPlanFactory
 
 
 def _linked_user(client: Client, *, username: str = "u1", guild=None) -> tuple:
@@ -109,7 +109,6 @@ def describe_guild_lead_section():
         assert "Guild Lead" not in _guild_card_content(response)
 
     def it_shows_guild_lead_singular_for_one_lead(client: Client):
-        from tests.membership.factories import MemberFactory
         User.objects.create_user(username="lead_one_viewer", password="pass")
         lead = MemberFactory(preferred_name="LeadPerson")
         guild = GuildFactory()
@@ -123,7 +122,6 @@ def describe_guild_lead_section():
         assert "LeadPerson" in card
 
     def it_shows_guild_leads_plural_for_multiple_leads(client: Client):
-        from tests.membership.factories import MemberFactory
         User.objects.create_user(username="lead_many_viewer", password="pass")
         lead1 = MemberFactory(preferred_name="Lead Alpha")
         lead2 = MemberFactory(preferred_name="Lead Beta")
