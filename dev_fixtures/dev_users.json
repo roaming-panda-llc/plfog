@@ -1,0 +1,129 @@
+[
+  {
+    "model": "membership.membershipplan",
+    "pk": 900001,
+    "fields": {
+      "name": "Local Dev Plan",
+      "monthly_price": "0.00",
+      "deposit_required": null,
+      "notes": "Fixture plan for local development.",
+      "created_at": "2026-04-15T00:00:00Z"
+    }
+  },
+  {
+    "model": "auth.user",
+    "pk": 900001,
+    "fields": {
+      "password": "pbkdf2_sha256$1200000$plfog-local-dev$hOOoJ1dugzdheCEGYcJJZSC3Zz+SkRErrNDHyd2QK0Q=",
+      "last_login": null,
+      "is_superuser": true,
+      "username": "super@example.com",
+      "first_name": "Super",
+      "last_name": "User",
+      "email": "super@example.com",
+      "is_staff": true,
+      "is_active": true,
+      "date_joined": "2026-04-15T00:00:00Z",
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "auth.user",
+    "pk": 900002,
+    "fields": {
+      "password": "pbkdf2_sha256$1200000$plfog-local-dev$hOOoJ1dugzdheCEGYcJJZSC3Zz+SkRErrNDHyd2QK0Q=",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "normal@example.com",
+      "first_name": "Normal",
+      "last_name": "User",
+      "email": "normal@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2026-04-15T00:00:00Z",
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "account.emailaddress",
+    "pk": 900001,
+    "fields": {
+      "user": 900001,
+      "email": "super@example.com",
+      "verified": true,
+      "primary": true
+    }
+  },
+  {
+    "model": "account.emailaddress",
+    "pk": 900002,
+    "fields": {
+      "user": 900002,
+      "email": "normal@example.com",
+      "verified": true,
+      "primary": true
+    }
+  },
+  {
+    "model": "membership.member",
+    "pk": 900001,
+    "fields": {
+      "airtable_record_id": null,
+      "user": 900001,
+      "full_legal_name": "Super User",
+      "preferred_name": "",
+      "_pre_signup_email": "super@example.com",
+      "phone": "",
+      "discord_handle": "",
+      "other_contact_info": "",
+      "pronouns": "",
+      "about_me": "",
+      "billing_name": "",
+      "emergency_contact_name": "",
+      "emergency_contact_phone": "",
+      "emergency_contact_relationship": "",
+      "membership_plan": 900001,
+      "status": "active",
+      "member_type": "standard",
+      "fog_role": "admin",
+      "join_date": null,
+      "cancellation_date": null,
+      "committed_until": null,
+      "show_in_directory": false,
+      "notes": "Fixture admin user for local development.",
+      "created_at": "2026-04-15T00:00:00Z"
+    }
+  },
+  {
+    "model": "membership.member",
+    "pk": 900002,
+    "fields": {
+      "airtable_record_id": null,
+      "user": 900002,
+      "full_legal_name": "Normal User",
+      "preferred_name": "",
+      "_pre_signup_email": "normal@example.com",
+      "phone": "",
+      "discord_handle": "",
+      "other_contact_info": "",
+      "pronouns": "",
+      "about_me": "",
+      "billing_name": "",
+      "emergency_contact_name": "",
+      "emergency_contact_phone": "",
+      "emergency_contact_relationship": "",
+      "membership_plan": 900001,
+      "status": "active",
+      "member_type": "standard",
+      "fog_role": "member",
+      "join_date": null,
+      "cancellation_date": null,
+      "committed_until": null,
+      "show_in_directory": false,
+      "notes": "Fixture normal user for local development.",
+      "created_at": "2026-04-15T00:00:00Z"
+    }
+  }
+]

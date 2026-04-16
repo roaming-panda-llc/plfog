@@ -6,7 +6,7 @@ ifneq (,$(wildcard .env))
     export
 endif
 
-.PHONY: help setup install db-up db-down db-pull-prod migrate server test lint format
+.PHONY: help setup install db-up db-down db-pull-prod localfix migrate server test lint format
 
 help: ## Show available commands
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' Makefile | sort | \
@@ -37,6 +37,9 @@ db-down: ## Stop PostgreSQL
 
 db-pull-prod: ## Download production database into local Postgres
 	.venv/bin/python manage.py pull_prod_db
+
+localfix: ## Load local development fixture data
+	.venv/bin/python manage.py loaddata dev_fixtures/dev_users.json
 
 migrate: ## Run Django migrations
 	.venv/bin/python manage.py migrate
