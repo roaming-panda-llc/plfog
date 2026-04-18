@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from django.contrib.auth.models import AnonymousUser, User
+from django.test import RequestFactory
 
-from hub.view_as import ROLE_ADMIN, ROLE_GUILD_OFFICER, ROLE_MEMBER, ViewAs, compute_actual_roles
+from hub.view_as import (
+    ROLE_ADMIN,
+    ROLE_GUILD_OFFICER,
+    ROLE_MEMBER,
+    ViewAs,
+    ViewAsMiddleware,
+    compute_actual_roles,
+)
 from membership.models import Member
-from tests.membership.factories import MemberFactory
 
 
 def _make_user_member(fog_role: str, *, username: str = "u") -> tuple[User, Member]:
@@ -109,11 +118,6 @@ def describe_ViewAs():
             assert names == [ROLE_MEMBER, ROLE_GUILD_OFFICER]
 
 
-from django.test import RequestFactory
-
-from hub.view_as import ViewAsMiddleware
-
-
 @pytest.fixture
 def rf() -> RequestFactory:
     return RequestFactory()
@@ -154,9 +158,6 @@ def describe_ViewAsMiddleware():
 
         assert captured["view_as"].is_admin is False
         assert captured["view_as"].is_guild_officer is True
-
-
-import json
 
 
 @pytest.mark.django_db

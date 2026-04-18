@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
-VERSION = "1.6.2"
+VERSION = "1.6.3"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.6.3",
+        "date": "2026-04-17",
+        "title": "Admin role preview in the hub",
+        "changes": [
+            'Admins and guild officers now have a new "Viewing as" button in the topbar — use it to preview the hub the way a plain member or guild officer would see it, without logging out. Unchecking a role hides that role\'s UI for the current session only.',
+        ],
+    },
     {
         "version": "1.6.2",
         "date": "2026-04-15",
