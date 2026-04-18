@@ -154,3 +154,80 @@ def describe_ViewAsMiddleware():
 
         assert captured["view_as"].is_admin is False
         assert captured["view_as"].is_guild_officer is True
+
+
+import json
+
+
+@pytest.mark.django_db
+def describe_view_as_toggle_endpoint():
+    def it_adds_role_to_hidden_set(client):
+        user, _ = _make_user_member(Member.FogRole.ADMIN, username="toggle_admin")
+        client.login(username=user.username, password="p")
+
+        response = client.post(
+            "/view-as/toggle/",
+            data=json.dumps({"role": "admin", "hidden": True}),
+            content_type="application/json",
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {"hidden": ["admin"]}
+        assert client.session["view_as_hidden_roles"] == ["admin"]
+
+    def it_removes_role_when_hidden_is_false(client):
+        user, _ = _make_user_member(Member.FogRole.ADMIN, username="toggle_unhide")
+        client.login(username=user.username, password="p")
+        session = client.session
+        session["view_as_hidden_roles"] = ["admin", "guild_officer"]
+        session.save()
+
+        response = client.post(
+            "/view-as/toggle/",
+            data=json.dumps({"role": "admin", "hidden": False}),
+            content_type="application/json",
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {"hidden": ["guild_officer"]}
+
+    def it_rejects_unknown_role_names(client):
+        user, _ = _make_user_member(Member.FogRole.ADMIN, username="toggle_wizard")
+        client.login(username=user.username, password="p")
+
+        response = client.post(
+            "/view-as/toggle/",
+            data=json.dumps({"role": "wizard", "hidden": True}),
+            content_type="application/json",
+        )
+
+        assert response.status_code == 400
+
+    def it_rejects_toggling_a_role_the_user_does_not_hold(client):
+        user, _ = _make_user_member(Member.FogRole.MEMBER, username="toggle_plain")
+        client.login(username=user.username, password="p")
+
+        response = client.post(
+            "/view-as/toggle/",
+            data=json.dumps({"role": "admin", "hidden": True}),
+            content_type="application/json",
+        )
+
+        assert response.status_code == 403
+
+    def it_rejects_malformed_json(client):
+        user, _ = _make_user_member(Member.FogRole.ADMIN, username="toggle_malformed")
+        client.login(username=user.username, password="p")
+
+        response = client.post("/view-as/toggle/", data=b"not json", content_type="application/json")
+
+        assert response.status_code == 400
+
+    def it_requires_login(client):
+        response = client.post(
+            "/view-as/toggle/",
+            data=json.dumps({"role": "admin", "hidden": True}),
+            content_type="application/json",
+        )
+
+        assert response.status_code in (302, 401, 403)

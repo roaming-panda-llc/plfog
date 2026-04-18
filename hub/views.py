@@ -21,6 +21,7 @@ from billing.exceptions import NoPaymentMethodError, TabLimitExceededError, TabL
 from billing.models import BillingSettings, Tab, TabCharge
 from hub.calendar_service import refresh_stale_sources
 from hub.forms import BetaFeedbackForm, EmailPreferencesForm, GuildEditForm, ProfileSettingsForm, VotePreferenceForm
+from hub.view_as import ALL_ROLES, SESSION_HIDDEN_KEY
 from membership.cycle import get_cycle_context
 from membership.models import FundingSnapshot, Guild, Member, VotePreference
 
@@ -927,3 +928,35 @@ def calendar_export_ics(request: HttpRequest) -> HttpResponse:
     response = HttpResponse(ical_content, content_type="text/calendar; charset=utf-8")
     response["Content-Disposition"] = 'attachment; filename="past-lives-calendar.ics"'
     return response
+
+
+@require_POST
+@login_required
+def view_as_toggle(request: HttpRequest) -> JsonResponse:
+    """Add or remove a role from the session-hidden set.
+
+    Body: ``{"role": "admin", "hidden": true}``. Unknown role names and
+    roles the user does not actually hold are rejected so the session
+    can never carry junk or grant privileges.
+    """
+    try:
+        payload = json.loads(request.body or b"{}")
+        role = payload["role"]
+        hidden = bool(payload["hidden"])
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return JsonResponse({"error": "Invalid request"}, status=400)
+
+    if role not in ALL_ROLES:
+        return JsonResponse({"error": f"Unknown role '{role}'"}, status=400)
+
+    if not request.view_as.has_actual(role):
+        return JsonResponse({"error": "Cannot toggle a role you don't have"}, status=403)
+
+    current = set(request.session.get(SESSION_HIDDEN_KEY, []))
+    if hidden:
+        current.add(role)
+    else:
+        current.discard(role)
+    request.session[SESSION_HIDDEN_KEY] = sorted(current)
+
+    return JsonResponse({"hidden": sorted(current)})
