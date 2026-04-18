@@ -44,7 +44,7 @@ def compute_actual_roles(user: "AbstractBaseUser | AnonymousUser | None") -> fro
     from membership.models import Member as MemberModel
 
     try:
-        member = user.member
+        member = user.member  # type: ignore[union-attr]
     except MemberModel.DoesNotExist:
         member = None
 
@@ -124,5 +124,5 @@ class ViewAsMiddleware:
         self.get_response = get_response
 
     def __call__(self, request: "HttpRequest"):
-        request.view_as = ViewAs.for_request(request)
+        request.view_as = ViewAs.for_request(request)  # type: ignore[attr-defined]
         return self.get_response(request)

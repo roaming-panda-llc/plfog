@@ -949,7 +949,7 @@ def view_as_toggle(request: HttpRequest) -> JsonResponse:
     if role not in ALL_ROLES:
         return JsonResponse({"error": f"Unknown role '{role}'"}, status=400)
 
-    if not request.view_as.has_actual(role):
+    if not request.view_as.has_actual(role):  # type: ignore[attr-defined]
         return JsonResponse({"error": "Cannot toggle a role you don't have"}, status=403)
 
     current = set(request.session.get(SESSION_HIDDEN_KEY, []))
