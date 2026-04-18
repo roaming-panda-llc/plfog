@@ -19,6 +19,11 @@ from hub.view_as import (
 from membership.models import Member
 
 
+@pytest.fixture
+def rf() -> RequestFactory:
+    return RequestFactory()
+
+
 def _make_user_member(fog_role: str, *, username: str = "u") -> tuple[User, Member]:
     """Create a User + Member pair with the given fog_role.
 
@@ -41,7 +46,7 @@ def describe_compute_actual_roles():
     def it_returns_empty_frozenset_when_user_has_no_member():
         user = User.objects.create_user(username="u", password="p")
         Member.objects.filter(user=user).delete()
-        user = User.objects.get(pk=user.pk)  # refetch to drop stale .member descriptor cache
+        user = User.objects.get(pk=user.pk)
         assert compute_actual_roles(user) == frozenset()
 
     def it_returns_admin_guild_officer_and_member_for_fog_admin():
@@ -64,63 +69,78 @@ def describe_compute_actual_roles():
 
 
 def describe_ViewAs():
-    def it_marks_has_true_only_for_effective_roles():
-        v = ViewAs(actual=frozenset({ROLE_ADMIN, ROLE_MEMBER}), hidden=frozenset({ROLE_ADMIN}))
-        assert v.has(ROLE_ADMIN) is False
-        assert v.has(ROLE_MEMBER) is True
+    def describe_default_view_as_role():
+        def it_picks_the_highest_actual_role_when_nothing_is_picked():
+            v = ViewAs(actual=frozenset({ROLE_ADMIN, ROLE_GUILD_OFFICER, ROLE_MEMBER}), picked=None)
+            assert v.view_as_role == ROLE_ADMIN
+            assert v.effective == frozenset({ROLE_ADMIN, ROLE_GUILD_OFFICER, ROLE_MEMBER})
 
-    def it_has_actual_ignores_hidden():
-        v = ViewAs(actual=frozenset({ROLE_ADMIN}), hidden=frozenset({ROLE_ADMIN}))
-        assert v.has_actual(ROLE_ADMIN) is True
-        assert v.has(ROLE_ADMIN) is False
+        def it_leaves_view_as_role_none_for_unauthenticated():
+            v = ViewAs(actual=frozenset(), picked=None)
+            assert v.view_as_role is None
+            assert v.effective == frozenset()
 
-    def it_exposes_convenience_properties():
-        v = ViewAs(
-            actual=frozenset({ROLE_ADMIN, ROLE_GUILD_OFFICER, ROLE_MEMBER}),
-            hidden=frozenset({ROLE_ADMIN}),
-        )
-        assert v.is_admin is False
-        assert v.is_guild_officer is True
-        assert v.is_member is True
+    def describe_effective_roles():
+        def it_caps_effective_to_roles_at_or_below_picked():
+            v = ViewAs(actual=frozenset({ROLE_ADMIN, ROLE_GUILD_OFFICER, ROLE_MEMBER}), picked=ROLE_GUILD_OFFICER)
+            assert v.effective == frozenset({ROLE_GUILD_OFFICER, ROLE_MEMBER})
+            assert v.is_admin is False
+            assert v.is_guild_officer is True
+            assert v.is_member is True
 
-    def describe_show_popover():
+        def it_picking_member_reduces_effective_to_just_member():
+            v = ViewAs(actual=frozenset({ROLE_ADMIN, ROLE_GUILD_OFFICER, ROLE_MEMBER}), picked=ROLE_MEMBER)
+            assert v.effective == frozenset({ROLE_MEMBER})
+
+    def describe_has_actual():
+        def it_reports_true_for_roles_the_user_holds_regardless_of_pick():
+            v = ViewAs(actual=frozenset({ROLE_ADMIN, ROLE_MEMBER}), picked=ROLE_MEMBER)
+            assert v.has_actual(ROLE_ADMIN) is True
+            assert v.has(ROLE_ADMIN) is False
+
+    def describe_show_dropdown():
         def it_is_true_for_admins():
-            v = ViewAs(actual=frozenset({ROLE_ADMIN, ROLE_GUILD_OFFICER, ROLE_MEMBER}), hidden=frozenset())
-            assert v.show_popover is True
+            v = ViewAs(actual=frozenset({ROLE_ADMIN, ROLE_GUILD_OFFICER, ROLE_MEMBER}), picked=None)
+            assert v.show_dropdown is True
 
         def it_is_true_for_guild_officers():
-            v = ViewAs(actual=frozenset({ROLE_GUILD_OFFICER, ROLE_MEMBER}), hidden=frozenset())
-            assert v.show_popover is True
+            v = ViewAs(actual=frozenset({ROLE_GUILD_OFFICER, ROLE_MEMBER}), picked=None)
+            assert v.show_dropdown is True
 
         def it_is_false_for_plain_members():
-            v = ViewAs(actual=frozenset({ROLE_MEMBER}), hidden=frozenset())
-            assert v.show_popover is False
+            v = ViewAs(actual=frozenset({ROLE_MEMBER}), picked=None)
+            assert v.show_dropdown is False
 
         def it_is_false_for_unauthenticated():
-            v = ViewAs(actual=frozenset(), hidden=frozenset())
-            assert v.show_popover is False
+            v = ViewAs(actual=frozenset(), picked=None)
+            assert v.show_dropdown is False
 
-    def describe_popover_rows():
-        def it_lists_rows_in_display_order_with_active_flags():
-            v = ViewAs(
-                actual=frozenset({ROLE_ADMIN, ROLE_GUILD_OFFICER, ROLE_MEMBER}),
-                hidden=frozenset({ROLE_ADMIN}),
-            )
-            assert v.popover_rows == [
-                {"name": ROLE_MEMBER, "label": "Member", "active": True},
-                {"name": ROLE_GUILD_OFFICER, "label": "Guild Officer", "active": True},
-                {"name": ROLE_ADMIN, "label": "Admin", "active": False},
+    def describe_current_label():
+        def it_is_admin_by_default_for_an_admin():
+            v = ViewAs(actual=frozenset({ROLE_ADMIN, ROLE_GUILD_OFFICER, ROLE_MEMBER}), picked=None)
+            assert v.current_label == "Admin"
+
+        def it_reflects_the_picked_role():
+            v = ViewAs(actual=frozenset({ROLE_ADMIN, ROLE_GUILD_OFFICER, ROLE_MEMBER}), picked=ROLE_GUILD_OFFICER)
+            assert v.current_label == "Guild Officer"
+
+        def it_is_empty_when_no_role_is_resolved():
+            v = ViewAs(actual=frozenset(), picked=None)
+            assert v.current_label == ""
+
+    def describe_dropdown_options():
+        def it_lists_roles_highest_first_with_selected_flag():
+            v = ViewAs(actual=frozenset({ROLE_ADMIN, ROLE_GUILD_OFFICER, ROLE_MEMBER}), picked=ROLE_GUILD_OFFICER)
+            assert v.dropdown_options == [
+                {"name": ROLE_ADMIN, "label": "Admin", "selected": False},
+                {"name": ROLE_GUILD_OFFICER, "label": "Guild Officer", "selected": True},
+                {"name": ROLE_MEMBER, "label": "Member", "selected": False},
             ]
 
         def it_skips_roles_not_actually_held():
-            v = ViewAs(actual=frozenset({ROLE_GUILD_OFFICER, ROLE_MEMBER}), hidden=frozenset())
-            names = [row["name"] for row in v.popover_rows]
-            assert names == [ROLE_MEMBER, ROLE_GUILD_OFFICER]
-
-
-@pytest.fixture
-def rf() -> RequestFactory:
-    return RequestFactory()
+            v = ViewAs(actual=frozenset({ROLE_GUILD_OFFICER, ROLE_MEMBER}), picked=None)
+            names = [row["name"] for row in v.dropdown_options]
+            assert names == [ROLE_GUILD_OFFICER, ROLE_MEMBER]
 
 
 @pytest.mark.django_db
@@ -139,14 +159,14 @@ def describe_ViewAsMiddleware():
 
         ViewAsMiddleware(get_response)(request)
 
-        assert captured["view_as"].is_admin is True
+        assert captured["view_as"].view_as_role == ROLE_ADMIN
         assert captured["view_as"].actual == frozenset({ROLE_ADMIN, ROLE_GUILD_OFFICER, ROLE_MEMBER})
 
-    def it_respects_hidden_roles_in_session(rf: RequestFactory):
-        user, _ = _make_user_member(Member.FogRole.ADMIN, username="mw_hidden")
+    def it_respects_picked_role_in_session(rf: RequestFactory):
+        user, _ = _make_user_member(Member.FogRole.ADMIN, username="mw_picked")
         request = rf.get("/")
         request.user = user
-        request.session = {"view_as_hidden_roles": ["admin"]}
+        request.session = {"view_as_role": "guild_officer"}
 
         captured: dict[str, object] = {}
 
@@ -156,78 +176,97 @@ def describe_ViewAsMiddleware():
 
         ViewAsMiddleware(get_response)(request)
 
+        assert captured["view_as"].view_as_role == ROLE_GUILD_OFFICER
         assert captured["view_as"].is_admin is False
         assert captured["view_as"].is_guild_officer is True
 
+    def it_ignores_picked_role_the_user_does_not_hold(rf: RequestFactory):
+        user, _ = _make_user_member(Member.FogRole.MEMBER, username="mw_rogue")
+        request = rf.get("/")
+        request.user = user
+        request.session = {"view_as_role": "admin"}
+
+        captured: dict[str, object] = {}
+
+        def get_response(req):
+            captured["view_as"] = req.view_as
+            return "ok"
+
+        ViewAsMiddleware(get_response)(request)
+
+        assert captured["view_as"].view_as_role == ROLE_MEMBER
+        assert captured["view_as"].is_admin is False
+
 
 @pytest.mark.django_db
-def describe_view_as_toggle_endpoint():
-    def it_adds_role_to_hidden_set(client):
-        user, _ = _make_user_member(Member.FogRole.ADMIN, username="toggle_admin")
+def describe_view_as_set_endpoint():
+    def it_sets_picked_role_in_session(client):
+        user, _ = _make_user_member(Member.FogRole.ADMIN, username="set_admin")
         client.login(username=user.username, password="p")
 
         response = client.post(
-            "/view-as/toggle/",
-            data=json.dumps({"role": "admin", "hidden": True}),
+            "/view-as/set/",
+            data=json.dumps({"role": "guild_officer"}),
             content_type="application/json",
         )
 
         assert response.status_code == 200
-        assert response.json() == {"hidden": ["admin"]}
-        assert client.session["view_as_hidden_roles"] == ["admin"]
+        assert response.json() == {"role": "guild_officer"}
+        assert client.session["view_as_role"] == "guild_officer"
 
-    def it_removes_role_when_hidden_is_false(client):
-        user, _ = _make_user_member(Member.FogRole.ADMIN, username="toggle_unhide")
+    def it_overwrites_previous_selection(client):
+        user, _ = _make_user_member(Member.FogRole.ADMIN, username="set_overwrite")
         client.login(username=user.username, password="p")
         session = client.session
-        session["view_as_hidden_roles"] = ["admin", "guild_officer"]
+        session["view_as_role"] = "guild_officer"
         session.save()
 
         response = client.post(
-            "/view-as/toggle/",
-            data=json.dumps({"role": "admin", "hidden": False}),
+            "/view-as/set/",
+            data=json.dumps({"role": "admin"}),
             content_type="application/json",
         )
 
         assert response.status_code == 200
-        assert response.json() == {"hidden": ["guild_officer"]}
+        assert response.json() == {"role": "admin"}
+        assert client.session["view_as_role"] == "admin"
 
     def it_rejects_unknown_role_names(client):
-        user, _ = _make_user_member(Member.FogRole.ADMIN, username="toggle_wizard")
+        user, _ = _make_user_member(Member.FogRole.ADMIN, username="set_wizard")
         client.login(username=user.username, password="p")
 
         response = client.post(
-            "/view-as/toggle/",
-            data=json.dumps({"role": "wizard", "hidden": True}),
+            "/view-as/set/",
+            data=json.dumps({"role": "wizard"}),
             content_type="application/json",
         )
 
         assert response.status_code == 400
 
-    def it_rejects_toggling_a_role_the_user_does_not_hold(client):
-        user, _ = _make_user_member(Member.FogRole.MEMBER, username="toggle_plain")
+    def it_rejects_viewing_as_a_role_the_user_does_not_hold(client):
+        user, _ = _make_user_member(Member.FogRole.MEMBER, username="set_plain")
         client.login(username=user.username, password="p")
 
         response = client.post(
-            "/view-as/toggle/",
-            data=json.dumps({"role": "admin", "hidden": True}),
+            "/view-as/set/",
+            data=json.dumps({"role": "admin"}),
             content_type="application/json",
         )
 
         assert response.status_code == 403
 
     def it_rejects_malformed_json(client):
-        user, _ = _make_user_member(Member.FogRole.ADMIN, username="toggle_malformed")
+        user, _ = _make_user_member(Member.FogRole.ADMIN, username="set_malformed")
         client.login(username=user.username, password="p")
 
-        response = client.post("/view-as/toggle/", data=b"not json", content_type="application/json")
+        response = client.post("/view-as/set/", data=b"not json", content_type="application/json")
 
         assert response.status_code == 400
 
     def it_requires_login(client):
         response = client.post(
-            "/view-as/toggle/",
-            data=json.dumps({"role": "admin", "hidden": True}),
+            "/view-as/set/",
+            data=json.dumps({"role": "admin"}),
             content_type="application/json",
         )
 
@@ -235,8 +274,8 @@ def describe_view_as_toggle_endpoint():
 
 
 @pytest.mark.django_db
-def describe_popover_in_hub_template():
-    def it_renders_popover_for_admins(client):
+def describe_dropdown_in_hub_template():
+    def it_renders_dropdown_for_admins(client):
         user, _ = _make_user_member(Member.FogRole.ADMIN, username="tmpl_admin")
         client.login(username=user.username, password="p")
 
@@ -244,9 +283,9 @@ def describe_popover_in_hub_template():
 
         assert response.status_code == 200
         assert b"pl-view-as-popover" in response.content
-        assert b"Viewing as" in response.content
+        assert b"Viewing as: Admin" in response.content
 
-    def it_hides_popover_for_plain_members(client):
+    def it_hides_dropdown_for_plain_members(client):
         user, _ = _make_user_member(Member.FogRole.MEMBER, username="tmpl_plain")
         client.login(username=user.username, password="p")
 
@@ -255,13 +294,26 @@ def describe_popover_in_hub_template():
         assert response.status_code == 200
         assert b"pl-view-as-popover" not in response.content
 
-    def it_hides_admin_view_button_when_admin_role_is_hidden(client):
-        user, _ = _make_user_member(Member.FogRole.ADMIN, username="tmpl_hidden_admin")
+    def it_hides_admin_view_button_when_viewing_as_guild_officer(client):
+        user, _ = _make_user_member(Member.FogRole.ADMIN, username="tmpl_as_officer")
         client.login(username=user.username, password="p")
         session = client.session
-        session["view_as_hidden_roles"] = ["admin"]
+        session["view_as_role"] = "guild_officer"
         session.save()
 
         response = client.get("/guilds/voting/")
 
         assert b"Admin View" not in response.content
+        assert b"Viewing as: Guild Officer" in response.content
+
+    def it_hides_admin_view_button_when_viewing_as_member(client):
+        user, _ = _make_user_member(Member.FogRole.ADMIN, username="tmpl_as_member")
+        client.login(username=user.username, password="p")
+        session = client.session
+        session["view_as_role"] = "member"
+        session.save()
+
+        response = client.get("/guilds/voting/")
+
+        assert b"Admin View" not in response.content
+        assert b"Viewing as: Member" in response.content

@@ -1870,17 +1870,34 @@ a:hover { color: var(--color-yellow-hover); }
 }
 
 .pl-view-as-popover__row {
+    width: 100%;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 8px;
-    padding: 6px 8px;
+    padding: 7px 10px;
+    border: none;
+    background: none;
+    color: inherit;
+    text-align: left;
     border-radius: 6px;
     cursor: pointer;
     font-size: 14px;
+    font-family: inherit;
 }
 
 .pl-view-as-popover__row:hover {
     background: rgba(255, 255, 255, 0.05);
+}
+
+.pl-view-as-popover__row--selected {
+    background: rgba(255, 255, 255, 0.04);
+    font-weight: 600;
+}
+
+.pl-view-as-popover__check {
+    opacity: 0.7;
+    font-size: 12px;
 }
 
 .pl-view-as-popover__hint {
