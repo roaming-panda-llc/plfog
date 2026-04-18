@@ -543,3 +543,72 @@ def describe_calendar_export_ics_view():
         assert "DTEND;VALUE=DATE:" in content
         # Should NOT export as datetime format for all-day events
         assert "DTSTART:20" not in content or "DTSTART;VALUE=DATE:" in content
+
+    def it_includes_location_in_ics_output(client: Client):
+        from datetime import timedelta as td
+
+        _logged_in_user(client, username="caluser_loc")
+        guild = GuildFactory(name="Metal Shop", calendar_url="https://example.com/metal.ics")
+        now = timezone.now()
+        CalendarEvent.objects.create(
+            guild=guild,
+            uid="location-001",
+            title="Metal Shop Open Night",
+            location="1234 Main St, Portland OR",
+            start_dt=now + td(days=4),
+            end_dt=now + td(days=4, hours=2),
+            fetched_at=now,
+        )
+        response = client.get("/calendar/export.ics")
+        content = response.content.decode()
+        assert "LOCATION:1234 Main St, Portland OR" in content
+
+
+def describe_community_calendar_default_filters():
+    def it_includes_general_in_default_filters_when_general_calendar_configured(client: Client):
+        from core.models import SiteConfiguration
+
+        _logged_in_user(client, username="caluser_gen")
+        config = SiteConfiguration.load()
+        config.general_calendar_url = "https://example.com/general.ics"
+        config.save()
+        response = client.get("/calendar/")
+        assert response.status_code == 200
+        # default_filters_json should contain "general"
+        assert "general" in response.context["default_filters_json"]
+
+
+def describe_calendar_events_partial_invalid_params():
+    def it_defaults_to_zero_offsets_when_params_are_non_integer(client: Client):
+        _logged_in_user(client, username="caluser_bad")
+        with patch("hub.views.refresh_stale_sources"):
+            response = client.get("/calendar/events/?week_offset=abc&month_offset=xyz&page=bad")
+        assert response.status_code == 200
+        assert response.context["week_offset"] == 0
+        assert response.context["month_offset"] == 0
+        assert response.context["event_page"] == 1
+
+
+def describe_calendar_week_label_cross_month():
+    def it_uses_full_month_names_when_week_spans_two_months(client: Client):
+        """Week label format when start and end months differ (e.g. Apr 28 – May 4)."""
+        _logged_in_user(client, username="caluser_xmonth")
+        # week_offset chosen so that the navigated week crosses a month boundary;
+        # we rely on the label being rendered in the context, not asserting a fixed date.
+        # Drive week_offset until start.month != end.month — but simpler: just call
+        # the helper directly with a known cross-month date.
+        from unittest.mock import patch
+
+        from django.utils import timezone as dj_tz
+
+        # Freeze "today" to Monday April 28 2026 — week is Apr 28–May 4 (cross month)
+        fake_now = dj_tz.now().replace(year=2026, month=4, day=28, hour=12, minute=0, second=0, microsecond=0)
+        with patch("hub.views.dj_timezone") as mock_tz:
+            mock_tz.now.return_value = fake_now
+            with patch("hub.views.refresh_stale_sources"):
+                response = client.get("/calendar/events/?week_offset=0")
+        assert response.status_code == 200
+        week_label = response.context["week_label"]
+        # Cross-month format: "Apr 28 – May 4, 2026"
+        assert "Apr" in week_label
+        assert "May" in week_label
