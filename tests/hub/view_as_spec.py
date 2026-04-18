@@ -231,3 +231,36 @@ def describe_view_as_toggle_endpoint():
         )
 
         assert response.status_code in (302, 401, 403)
+
+
+@pytest.mark.django_db
+def describe_popover_in_hub_template():
+    def it_renders_popover_for_admins(client):
+        user, _ = _make_user_member(Member.FogRole.ADMIN, username="tmpl_admin")
+        client.login(username=user.username, password="p")
+
+        response = client.get("/guilds/voting/")
+
+        assert response.status_code == 200
+        assert b"pl-view-as-popover" in response.content
+        assert b"Viewing as" in response.content
+
+    def it_hides_popover_for_plain_members(client):
+        user, _ = _make_user_member(Member.FogRole.MEMBER, username="tmpl_plain")
+        client.login(username=user.username, password="p")
+
+        response = client.get("/guilds/voting/")
+
+        assert response.status_code == 200
+        assert b"pl-view-as-popover" not in response.content
+
+    def it_hides_admin_view_button_when_admin_role_is_hidden(client):
+        user, _ = _make_user_member(Member.FogRole.ADMIN, username="tmpl_hidden_admin")
+        client.login(username=user.username, password="p")
+        session = client.session
+        session["view_as_hidden_roles"] = ["admin"]
+        session.save()
+
+        response = client.get("/guilds/voting/")
+
+        assert b"Admin View" not in response.content
