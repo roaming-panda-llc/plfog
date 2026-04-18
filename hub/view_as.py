@@ -111,3 +111,18 @@ class ViewAs:
         actual = compute_actual_roles(request.user)
         hidden = _read_hidden(getattr(request, "session", None))
         return cls(actual=actual, hidden=hidden)
+
+
+class ViewAsMiddleware:
+    """Attach ``request.view_as`` to every request.
+
+    Must run after ``AuthenticationMiddleware`` (needs ``request.user``)
+    and ``SessionMiddleware`` (needs ``request.session``).
+    """
+
+    def __init__(self, get_response) -> None:  # noqa: ANN001
+        self.get_response = get_response
+
+    def __call__(self, request: "HttpRequest"):
+        request.view_as = ViewAs.for_request(request)
+        return self.get_response(request)

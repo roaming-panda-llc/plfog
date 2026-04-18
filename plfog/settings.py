@@ -75,6 +75,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
+    "hub.view_as.ViewAsMiddleware",
     "plfog.service_worker_middleware.ServiceWorkerAllowedMiddleware",
 ]
 

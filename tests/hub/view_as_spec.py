@@ -107,3 +107,50 @@ def describe_ViewAs():
             v = ViewAs(actual=frozenset({ROLE_GUILD_OFFICER, ROLE_MEMBER}), hidden=frozenset())
             names = [row["name"] for row in v.popover_rows]
             assert names == [ROLE_MEMBER, ROLE_GUILD_OFFICER]
+
+
+from django.test import RequestFactory
+
+from hub.view_as import ViewAsMiddleware
+
+
+@pytest.fixture
+def rf() -> RequestFactory:
+    return RequestFactory()
+
+
+@pytest.mark.django_db
+def describe_ViewAsMiddleware():
+    def it_attaches_view_as_to_request(rf: RequestFactory):
+        user, _ = _make_user_member(Member.FogRole.ADMIN, username="mw_admin")
+        request = rf.get("/")
+        request.user = user
+        request.session = {}
+
+        captured: dict[str, object] = {}
+
+        def get_response(req):
+            captured["view_as"] = req.view_as
+            return "ok"
+
+        ViewAsMiddleware(get_response)(request)
+
+        assert captured["view_as"].is_admin is True
+        assert captured["view_as"].actual == frozenset({ROLE_ADMIN, ROLE_GUILD_OFFICER, ROLE_MEMBER})
+
+    def it_respects_hidden_roles_in_session(rf: RequestFactory):
+        user, _ = _make_user_member(Member.FogRole.ADMIN, username="mw_hidden")
+        request = rf.get("/")
+        request.user = user
+        request.session = {"view_as_hidden_roles": ["admin"]}
+
+        captured: dict[str, object] = {}
+
+        def get_response(req):
+            captured["view_as"] = req.view_as
+            return "ok"
+
+        ViewAsMiddleware(get_response)(request)
+
+        assert captured["view_as"].is_admin is False
+        assert captured["view_as"].is_guild_officer is True
