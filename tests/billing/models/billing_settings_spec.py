@@ -134,6 +134,30 @@ def describe_BillingSettings():
             assert result is not None
             assert (result.date() - fake_now.date()).days == 7
 
+        def it_returns_candidate_when_candidate_is_future_in_current_month():
+            from datetime import time as _time
+            from unittest.mock import patch
+
+            from django.utils import timezone as _tz
+
+            # Freeze "now" to day 5 at 09:00; charge_day_of_month=28 makes candidate=day 28 > now
+            now = _tz.localtime()
+            fake_now = now.replace(day=5, hour=9, minute=0, second=0, microsecond=0)
+
+            settings = BillingSettingsFactory(
+                charge_frequency=BillingSettings.ChargeFrequency.MONTHLY,
+                charge_day_of_month=28,
+                charge_day_of_week=None,
+                charge_time="09:00",
+            )
+            settings.charge_time = _time(9, 0)
+
+            with patch("billing.models.timezone.localtime", return_value=fake_now):
+                result = settings.next_charge_at()
+            assert result is not None
+            assert result.day == 28
+            assert result.month == fake_now.month  # still in the same month
+
         def it_wraps_to_january_when_monthly_candidate_is_december():
             from datetime import time as _time
             from unittest.mock import patch

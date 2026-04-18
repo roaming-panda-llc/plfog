@@ -163,12 +163,41 @@
             </button>
             <span class="pl-topbar__divider"></span>
             <button class="pl-badge--beta" onclick="document.getElementById('changelog-modal').style.display='flex'">BETA v{{ app_version }}</button>
-            {% if user.is_staff %}
+            {% if request.view_as.is_admin %}
             <span class="pl-topbar__divider"></span>
             <a href="{% url 'admin:index' %}" class="pl-view-switcher" hx-boost="false" title="Switch to Admin View">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
                 Admin View
             </a>
+            {% endif %}
+            {% if request.view_as.show_dropdown %}
+            <span class="pl-topbar__divider"></span>
+            <div class="pl-view-as-popover"
+                 x-data="viewAsDropdown()"
+                 @keydown.escape.window="if (open) { open = false; $el.querySelector('button').focus() }">
+                <button type="button" class="pl-view-switcher" @click="open = !open" :aria-expanded="open" title="Viewing as">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                    Viewing as: {{ request.view_as.current_label }}
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:4px;"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+                <div class="pl-view-as-popover__menu" x-show="open" x-transition @click.away="open = false" role="menu">
+                    <div class="pl-view-as-popover__header">View as</div>
+                    {% for row in request.view_as.dropdown_options %}
+                    <button type="button"
+                            role="menuitemradio"
+                            aria-checked="{% if row.selected %}true{% else %}false{% endif %}"
+                            class="pl-view-as-popover__row{% if row.selected %} pl-view-as-popover__row--selected{% endif %}"
+                            @click="pick('{{ row.name }}')">
+                        <span>{{ row.label }}</span>
+                        {% if row.selected %}<span class="pl-view-as-popover__check" aria-hidden="true">✓</span>{% endif %}
+                    </button>
+                    {% endfor %}
+                    <div class="pl-view-as-popover__hint">Preview the hub as a lower role. Session-only.</div>
+                </div>
+            </div>
             {% endif %}
             <div class="pl-topbar__spacer"></div>
             {% if tab_balance is not None %}
@@ -244,6 +273,28 @@
     </script>
     {# HTMX auto-fires HX-Trigger JSON keys as events (and a kebab-case alias — see htmx Dt()) #}
     {# — so the `showToast` key in trigger_toast dispatches `show-toast` directly. No manual parse. #}
+    <script>
+        function viewAsDropdown() {
+            return {
+                open: false,
+                async pick(role) {
+                    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+                        || document.cookie.split('; ').find(c => c.startsWith('csrftoken='))?.split('=')[1];
+                    const response = await fetch("{% url 'hub_view_as_set' %}", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-CSRFToken": csrfToken || "",
+                        },
+                        body: JSON.stringify({ role }),
+                    });
+                    if (response.ok) {
+                        window.location.reload();
+                    }
+                },
+            };
+        }
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

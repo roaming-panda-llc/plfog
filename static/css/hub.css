@@ -1842,3 +1842,68 @@ a:hover { color: var(--color-yellow-hover); }
 .guild-product-card__edit-btn:hover {
     background: rgba(238, 180, 75, 0.3);
 }
+
+/* Viewing-as popover */
+.pl-view-as-popover {
+    position: relative;
+}
+
+.pl-view-as-popover__menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 200px;
+    background: var(--hub-dropdown-bg);
+    border: 1px solid var(--hub-dropdown-border);
+    border-radius: 8px;
+    padding: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    z-index: 50;
+}
+
+.pl-view-as-popover__header {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.6;
+    padding: 4px 8px 8px;
+}
+
+.pl-view-as-popover__row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 7px 10px;
+    border: none;
+    background: none;
+    color: inherit;
+    text-align: left;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-family: inherit;
+}
+
+.pl-view-as-popover__row:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.pl-view-as-popover__row--selected {
+    background: rgba(255, 255, 255, 0.04);
+    font-weight: 600;
+}
+
+.pl-view-as-popover__check {
+    opacity: 0.7;
+    font-size: 12px;
+}
+
+.pl-view-as-popover__hint {
+    font-size: 11px;
+    opacity: 0.55;
+    padding: 8px;
+    border-top: 1px solid var(--hub-dropdown-border);
+    margin-top: 4px;
+}

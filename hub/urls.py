@@ -46,4 +46,5 @@ urlpatterns = [
     path("calendar/", views.community_calendar, name="hub_community_calendar"),
     path("calendar/events/", views.calendar_events_partial, name="hub_community_calendar_events"),
     path("calendar/export.ics", views.calendar_export_ics, name="hub_calendar_export_ics"),
+    path("view-as/set/", views.view_as_set, name="hub_view_as_set"),
 ]
