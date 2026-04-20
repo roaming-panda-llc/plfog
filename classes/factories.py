@@ -36,3 +36,18 @@ class InstructorFactory(DjangoModelFactory):
     slug = factory.LazyAttribute(lambda o: o.display_name.lower().replace(" ", "-"))
     bio = "A great teacher."
     is_active = True
+
+
+class ClassOfferingFactory(DjangoModelFactory):
+    class Meta:
+        model = models.ClassOffering
+
+    title = factory.Sequence(lambda n: f"Class {n}")
+    slug = factory.LazyAttribute(lambda o: o.title.lower().replace(" ", "-"))
+    category = factory.SubFactory(CategoryFactory)
+    instructor = factory.SubFactory(InstructorFactory)
+    description = "A hands-on class."
+    price_cents = 5000
+    member_discount_pct = 10
+    capacity = 6
+    status = models.ClassOffering.Status.DRAFT

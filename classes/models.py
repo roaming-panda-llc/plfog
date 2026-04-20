@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
+
+from classes.managers import ClassOfferingQuerySet
 
 DEFAULT_LIABILITY_TEXT = """ASSUMPTION OF RISK AND WAIVER OF LIABILITY
 
@@ -64,6 +67,81 @@ class Instructor(models.Model):
 
     def __str__(self) -> str:
         return self.display_name
+
+
+class ClassOffering(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        PENDING = "pending", "Pending Review"
+        PUBLISHED = "published", "Published"
+        ARCHIVED = "archived", "Archived"
+
+    class SchedulingModel(models.TextChoices):
+        FIXED = "fixed", "Fixed sessions"
+        FLEXIBLE = "flexible", "Flexible (arrange with instructor)"
+
+    title = models.CharField(max_length=255, help_text="Public class title.")
+    slug = models.SlugField(max_length=255, unique=True, help_text="URL slug.")
+    category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="classes", help_text="Category grouping.")
+    instructor = models.ForeignKey(Instructor, on_delete=models.PROTECT, related_name="classes", help_text="Assigned instructor.")
+    description = models.TextField(blank=True, help_text="Class description — markdown-safe.")
+    prerequisites = models.TextField(blank=True, help_text="What a student should know/own.")
+    materials_included = models.TextField(blank=True, help_text="Included materials.")
+    materials_to_bring = models.TextField(blank=True, help_text="What students must bring.")
+    safety_requirements = models.TextField(blank=True, help_text="PPE or other safety requirements.")
+    age_minimum = models.PositiveIntegerField(null=True, blank=True, help_text="Minimum age.")
+    age_guardian_note = models.TextField(blank=True, help_text="Notes about minors / guardians.")
+    price_cents = models.PositiveIntegerField(help_text="Full price in cents.")
+    member_discount_pct = models.PositiveIntegerField(default=10, help_text="Auto-applied for verified members.")
+    capacity = models.PositiveIntegerField(default=6, help_text="Maximum confirmed registrants.")
+    scheduling_model = models.CharField(
+        max_length=10, choices=SchedulingModel.choices, default=SchedulingModel.FIXED,
+        help_text="Fixed scheduled sessions or flexible per-student scheduling.",
+    )
+    flexible_note = models.TextField(blank=True, help_text="Notes when scheduling_model=flexible.")
+    is_private = models.BooleanField(default=False, help_text="Hidden from public portal; private registration only.")
+    private_for_name = models.CharField(max_length=255, blank=True, help_text="Name shown when private.")
+    recurring_pattern = models.CharField(max_length=255, blank=True, help_text="Free-text recurrence description.")
+    image = models.ImageField(upload_to="classes/images/", blank=True, help_text="Hero image.")
+    requires_model_release = models.BooleanField(default=False, help_text="When on, registrants also sign model release.")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT, help_text="Lifecycle status.")
+    created_by = models.ForeignKey(
+        Instructor, on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+        help_text="Instructor who authored the class.",
+    )
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+        help_text="Admin user who approved publication.",
+    )
+    published_at = models.DateTimeField(null=True, blank=True, help_text="Stamp on first publish.")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = ClassOfferingQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return self.title
+
+    def submit_for_review(self) -> None:
+        if self.status != self.Status.DRAFT:
+            raise ValueError(f"Only draft classes can be submitted; got {self.status}.")
+        self.status = self.Status.PENDING
+        self.save(update_fields=["status", "updated_at"])
+
+    def approve(self, admin_user) -> None:
+        if self.status != self.Status.PENDING:
+            raise ValueError(f"Only pending classes can be approved; got {self.status}.")
+        self.status = self.Status.PUBLISHED
+        self.approved_by = admin_user
+        self.published_at = timezone.now()
+        self.save(update_fields=["status", "approved_by", "published_at", "updated_at"])
+
+    def archive(self) -> None:
+        self.status = self.Status.ARCHIVED
+        self.save(update_fields=["status", "updated_at"])
 
 
 class ClassSettings(models.Model):
