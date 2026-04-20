@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 import factory
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from factory.django import DjangoModelFactory
 
 from classes import models
@@ -51,3 +54,12 @@ class ClassOfferingFactory(DjangoModelFactory):
     member_discount_pct = 10
     capacity = 6
     status = models.ClassOffering.Status.DRAFT
+
+
+class ClassSessionFactory(DjangoModelFactory):
+    class Meta:
+        model = models.ClassSession
+
+    class_offering = factory.SubFactory(ClassOfferingFactory)
+    starts_at = factory.LazyFunction(timezone.now)
+    ends_at = factory.LazyAttribute(lambda o: o.starts_at + timedelta(hours=2))

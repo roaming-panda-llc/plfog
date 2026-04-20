@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.db import models
+from django.db.models import CheckConstraint, F, Q
 from django.utils import timezone
 
 from classes.managers import ClassOfferingQuerySet
@@ -142,6 +143,23 @@ class ClassOffering(models.Model):
     def archive(self) -> None:
         self.status = self.Status.ARCHIVED
         self.save(update_fields=["status", "updated_at"])
+
+
+class ClassSession(models.Model):
+    class_offering = models.ForeignKey(
+        ClassOffering, on_delete=models.CASCADE, related_name="sessions",
+        help_text="Parent class offering.",
+    )
+    starts_at = models.DateTimeField(help_text="Start (timezone-aware).")
+    ends_at = models.DateTimeField(help_text="End (timezone-aware).")
+    sort_order = models.PositiveIntegerField(default=0, help_text="Display order within a class.")
+
+    class Meta:
+        ordering = ["starts_at"]
+        constraints = [CheckConstraint(condition=Q(ends_at__gt=F("starts_at")), name="session_ends_after_starts")]
+
+    def __str__(self) -> str:
+        return f"{self.class_offering.title} — {self.starts_at:%Y-%m-%d}"
 
 
 class ClassSettings(models.Model):
