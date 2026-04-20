@@ -12,10 +12,8 @@ def admin_user(db):
 
     User = get_user_model()
     user = User.objects.create_user(username="admin@example.com", email="admin@example.com", password="x")
-    user.is_staff = True
-    user.is_superuser = True
-    user.save()
-    Member.objects.create(user=user, full_legal_name="Admin User", fog_role=Member.FogRole.ADMIN)
+    member = Member.objects.create(user=user, full_legal_name="Admin User", fog_role=Member.FogRole.ADMIN)
+    member.sync_user_permissions()
     return user
 
 
