@@ -212,6 +212,31 @@ class DiscountCode(models.Model):
         return True
 
 
+class Waiver(models.Model):
+    class Kind(models.TextChoices):
+        LIABILITY = "liability", "Liability"
+        MODEL_RELEASE = "model_release", "Model Release"
+
+    registration = models.ForeignKey(
+        "Registration", on_delete=models.CASCADE, related_name="waivers",
+        help_text="The registration this waiver belongs to.",
+    )
+    kind = models.CharField(max_length=20, choices=Kind.choices, help_text="Which waiver was signed.")
+    waiver_text = models.TextField(help_text="Full text as shown at time of signing (audit record).")
+    signature_text = models.CharField(max_length=255, help_text="Name typed as signature.")
+    ip_address = models.GenericIPAddressField(null=True, blank=True, help_text="Client IP at time of signing.")
+    signed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-signed_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["registration", "kind"], name="uq_waiver_registration_kind"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.get_kind_display()} for registration {self.registration_id}"
+
+
 class ClassSettings(models.Model):
     enabled_publicly = models.BooleanField(
         default=False,
