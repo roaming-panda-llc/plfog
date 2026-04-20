@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     # Project apps
     "core",
     "hub",
+    "classes",
     "membership",
     "billing",
     "airtable_sync",

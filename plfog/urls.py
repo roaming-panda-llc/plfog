@@ -74,6 +74,7 @@ urlpatterns = admin_custom_urls + [
     path("accounts/email/", HubEmailView.as_view(), name="account_email"),
     path("accounts/", include("allauth.urls")),
     path("billing/", include("billing.urls")),
+    path("classes/", include("classes.urls")),
     # Member hub
     path("", include("hub.urls")),
     path("", include("core.urls")),
