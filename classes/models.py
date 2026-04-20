@@ -384,6 +384,9 @@ class ClassSettings(models.Model):
 
     def save(self, *args, **kwargs) -> None:
         self.pk = 1
+        if ClassSettings.objects.filter(pk=1).exists():
+            kwargs.pop("force_insert", None)
+            kwargs["force_update"] = True
         super().save(*args, **kwargs)
 
     @classmethod
