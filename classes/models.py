@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from django.conf import settings
 from django.db import models
 
 DEFAULT_LIABILITY_TEXT = """ASSUMPTION OF RISK AND WAIVER OF LIABILITY
@@ -39,6 +40,30 @@ class Category(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+
+class Instructor(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="instructor",
+        help_text="Auth identity — required.",
+    )
+    display_name = models.CharField(max_length=255, help_text="Public name shown on class pages.")
+    slug = models.SlugField(max_length=255, unique=True, help_text="URL slug for public profile.")
+    bio = models.TextField(blank=True, help_text="Markdown-safe bio shown on profile.")
+    photo = models.ImageField(upload_to="classes/instructors/", blank=True, help_text="Profile photo.")
+    website = models.URLField(blank=True, help_text="Personal site.")
+    social_handle = models.CharField(max_length=255, blank=True, help_text="e.g. @handle on primary social.")
+    is_active = models.BooleanField(default=True, help_text="Inactive instructors hidden from public browse.")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["display_name"]
+
+    def __str__(self) -> str:
+        return self.display_name
 
 
 class ClassSettings(models.Model):
