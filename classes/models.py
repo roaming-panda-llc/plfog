@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 from datetime import date as date_type
 
 from django.conf import settings
@@ -256,6 +257,91 @@ class RegistrationReminder(models.Model):
 
     def __str__(self) -> str:
         return f"Reminder for registration {self.registration_id} → session {self.session_id}"
+
+
+class Registration(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending payment"
+        CONFIRMED = "confirmed", "Confirmed"
+        WAITLISTED = "waitlisted", "Waitlisted"
+        CANCELLED = "cancelled", "Cancelled"
+        REFUNDED = "refunded", "Refunded"
+
+    class_offering = models.ForeignKey(
+        ClassOffering, on_delete=models.PROTECT, related_name="registrations",
+        help_text="The class this registration is for.",
+    )
+    member = models.ForeignKey(
+        "membership.Member", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="class_registrations",
+        help_text="Auto-linked when email matches a verified Member email.",
+    )
+    first_name = models.CharField(max_length=100, help_text="Registrant first name.")
+    last_name = models.CharField(max_length=100, help_text="Registrant last name.")
+    pronouns = models.CharField(max_length=50, blank=True, help_text="Optional pronouns.")
+    email = models.EmailField(help_text="Registrant email — drives member linking + self-serve link.")
+    phone = models.CharField(max_length=20, blank=True, help_text="Optional phone.")
+    address_line1 = models.CharField(max_length=255, blank=True)
+    address_city = models.CharField(max_length=100, blank=True)
+    address_state = models.CharField(max_length=50, blank=True)
+    address_zip = models.CharField(max_length=20, blank=True)
+    prior_experience = models.TextField(blank=True, help_text="Free-text prior-experience question.")
+    looking_for = models.TextField(blank=True, help_text="Free-text 'what are you hoping to get out of this?' question.")
+    discount_code = models.ForeignKey(
+        DiscountCode, null=True, blank=True, on_delete=models.SET_NULL,
+        help_text="Discount code used at registration, if any.",
+    )
+    amount_paid_cents = models.PositiveIntegerField(default=0, help_text="Amount actually paid (after discount).")
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.PENDING,
+        help_text="Lifecycle status.",
+    )
+    stripe_session_id = models.CharField(max_length=255, blank=True, help_text="Stripe Checkout Session ID.")
+    stripe_payment_id = models.CharField(max_length=255, blank=True, help_text="Stripe PaymentIntent ID on confirm.")
+    self_serve_token = models.CharField(
+        max_length=128, unique=True, db_index=True,
+        help_text="Random token used in /classes/my/<token>/ self-serve URL.",
+    )
+    subscribed_to_mailchimp = models.BooleanField(default=False, help_text="Whether MailChimp subscribe succeeded.")
+    registered_at = models.DateTimeField(auto_now_add=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-registered_at"]
+        indexes = [
+            models.Index(fields=["email"]),
+            models.Index(fields=["class_offering", "status"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.email} → {self.class_offering.title}"
+
+    def save(self, *args, **kwargs) -> None:
+        creating = self._state.adding
+        if creating and not self.self_serve_token:
+            self.self_serve_token = secrets.token_urlsafe(48)
+        super().save(*args, **kwargs)
+        if creating and self.member_id is None:
+            self.link_member_by_email()
+
+    def link_member_by_email(self) -> None:
+        from membership.models import Member
+
+        match = (
+            Member.objects.filter(
+                user__emailaddress__email__iexact=self.email,
+                user__emailaddress__verified=True,
+            ).distinct().first()
+        )
+        if match is not None:
+            self.member = match
+            super().save(update_fields=["member"])
+
+    def cancel(self, reason: str = "") -> None:
+        self.status = self.Status.CANCELLED
+        self.cancelled_at = timezone.now()
+        self.save(update_fields=["status", "cancelled_at"])
 
 
 class ClassSettings(models.Model):

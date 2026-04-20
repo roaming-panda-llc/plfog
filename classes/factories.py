@@ -72,3 +72,22 @@ class DiscountCodeFactory(DjangoModelFactory):
     code = factory.Sequence(lambda n: f"CODE{n}")
     discount_pct = 20
     is_active = True
+
+
+class RegistrationFactory(DjangoModelFactory):
+    class Meta:
+        model = models.Registration
+
+    class_offering = factory.SubFactory(ClassOfferingFactory)
+    first_name = "Test"
+    last_name = "User"
+    email = factory.Sequence(lambda n: f"test{n}@example.com")
+    amount_paid_cents = 0
+
+
+class RegistrationReminderFactory(DjangoModelFactory):
+    class Meta:
+        model = models.RegistrationReminder
+
+    registration = factory.SubFactory(RegistrationFactory)
+    session = factory.SubFactory(ClassSessionFactory)
