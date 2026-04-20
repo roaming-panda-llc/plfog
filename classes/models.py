@@ -26,6 +26,21 @@ I waive any right to inspect or approve the finished images or the use to which 
 I understand that I may revoke this consent at any time by notifying PLM in writing at info@pastlives.space."""
 
 
+class Category(models.Model):
+    name = models.CharField(max_length=100, unique=True, help_text="Display name (e.g. Woodworking).")
+    slug = models.SlugField(max_length=100, unique=True, help_text="URL slug.")
+    sort_order = models.PositiveIntegerField(default=0, help_text="Ascending sort; lower shows first.")
+    hero_image = models.ImageField(upload_to="classes/categories/", blank=True, help_text="Optional header image.")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["sort_order", "name"]
+        verbose_name_plural = "Categories"
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class ClassSettings(models.Model):
     enabled_publicly = models.BooleanField(
         default=False,
