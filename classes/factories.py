@@ -63,3 +63,12 @@ class ClassSessionFactory(DjangoModelFactory):
     class_offering = factory.SubFactory(ClassOfferingFactory)
     starts_at = factory.LazyFunction(timezone.now)
     ends_at = factory.LazyAttribute(lambda o: o.starts_at + timedelta(hours=2))
+
+
+class DiscountCodeFactory(DjangoModelFactory):
+    class Meta:
+        model = models.DiscountCode
+
+    code = factory.Sequence(lambda n: f"CODE{n}")
+    discount_pct = 20
+    is_active = True

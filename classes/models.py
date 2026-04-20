@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date as date_type
+
 from django.conf import settings
 from django.db import models
 from django.db.models import CheckConstraint, F, Q
@@ -160,6 +162,54 @@ class ClassSession(models.Model):
 
     def __str__(self) -> str:
         return f"{self.class_offering.title} — {self.starts_at:%Y-%m-%d}"
+
+
+class DiscountCode(models.Model):
+    code = models.CharField(max_length=40, unique=True, help_text="Uppercase code — normalized on save.")
+    description = models.CharField(max_length=255, blank=True, help_text="Admin-only description.")
+    discount_pct = models.PositiveIntegerField(null=True, blank=True, help_text="Percent off (0-100).")
+    discount_fixed_cents = models.PositiveIntegerField(null=True, blank=True, help_text="Flat cents off.")
+    valid_from = models.DateField(null=True, blank=True, help_text="First date the code is valid.")
+    valid_until = models.DateField(null=True, blank=True, help_text="Last date the code is valid.")
+    max_uses = models.PositiveIntegerField(null=True, blank=True, help_text="Cap total uses. Null = unlimited.")
+    use_count = models.PositiveIntegerField(default=0, help_text="Incremented on each successful registration.")
+    is_active = models.BooleanField(default=True, help_text="Admin toggle to disable without deleting.")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["code"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(Q(discount_pct__isnull=False) | Q(discount_fixed_cents__isnull=False)),
+                name="discount_has_value",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.code
+
+    def save(self, *args, **kwargs) -> None:
+        self.code = self.code.strip().upper()
+        super().save(*args, **kwargs)
+
+    def apply_to(self, price_cents: int) -> int:
+        if self.discount_pct is not None:
+            return int(price_cents * (100 - self.discount_pct) / 100)
+        if self.discount_fixed_cents is not None:
+            return max(0, price_cents - self.discount_fixed_cents)
+        return price_cents
+
+    def is_currently_valid(self) -> bool:
+        if not self.is_active:
+            return False
+        today = date_type.today()
+        if self.valid_from and today < self.valid_from:
+            return False
+        if self.valid_until and today > self.valid_until:
+            return False
+        if self.max_uses is not None and self.use_count >= self.max_uses:
+            return False
+        return True
 
 
 class ClassSettings(models.Model):
