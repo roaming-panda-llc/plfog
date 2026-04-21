@@ -20,4 +20,20 @@
         <a href="{% url 'classes:admin_classes' %}" class="hub-btn">Cancel</a>
     </div>
 </form>
+<script>
+(function() {
+    const source = document.querySelector('[name="title"]');
+    const slug = document.querySelector('[name="slug"]');
+    if (!source || !slug) return;
+    let touched = slug.value.trim() !== '';
+    slug.addEventListener('input', () => { touched = true; });
+    source.addEventListener('input', () => {
+        if (touched) return;
+        slug.value = source.value.toLowerCase().trim()
+            .replace(/[^\w\s-]/g, '')
+            .replace(/[\s_-]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+    });
+})();
+</script>
 {% endblock %}
