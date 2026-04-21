@@ -29,7 +29,7 @@
             <td style="padding:0.5rem 0.75rem;">{{ c.instructor.display_name }}</td>
             <td style="padding:0.5rem 0.75rem;">{{ c.category.name }}</td>
             <td style="padding:0.5rem 0.75rem;">{{ c.get_status_display }}</td>
-            <td style="padding:0.5rem 0.75rem;">{{ c.registrations.count }}/{{ c.capacity }}</td>
+            <td style="padding:0.5rem 0.75rem;">{{ c.registration_count }}/{{ c.capacity }}</td>
         </tr>
     {% empty %}
         <tr>

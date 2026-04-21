@@ -165,6 +165,23 @@ class ClassOffering(models.Model):
         self.status = self.Status.ARCHIVED
         self.save(update_fields=["status", "updated_at"])
 
+    def duplicate(self) -> "ClassOffering":
+        """Clone this offering as a fresh draft with a unique slug and title."""
+        base_slug = f"{self.slug}-copy"
+        slug = base_slug
+        n = 1
+        while ClassOffering.objects.filter(slug=slug).exists():
+            n += 1
+            slug = f"{base_slug}-{n}"
+        self.pk = None
+        self.slug = slug
+        self.title = f"{self.title} (copy)"
+        self.status = self.Status.DRAFT
+        self.published_at = None
+        self.approved_by = None
+        self.save()
+        return self
+
 
 class ClassSession(models.Model):
     class_offering = models.ForeignKey(
@@ -312,10 +329,10 @@ class Registration(models.Model):
     pronouns = models.CharField(max_length=50, blank=True, help_text="Optional pronouns.")
     email = models.EmailField(help_text="Registrant email — drives member linking + self-serve link.")
     phone = models.CharField(max_length=20, blank=True, help_text="Optional phone.")
-    address_line1 = models.CharField(max_length=255, blank=True)
-    address_city = models.CharField(max_length=100, blank=True)
-    address_state = models.CharField(max_length=50, blank=True)
-    address_zip = models.CharField(max_length=20, blank=True)
+    address_line1 = models.CharField(max_length=255, blank=True, help_text="Street address (optional).")
+    address_city = models.CharField(max_length=100, blank=True, help_text="City (optional).")
+    address_state = models.CharField(max_length=50, blank=True, help_text="State or region (optional).")
+    address_zip = models.CharField(max_length=20, blank=True, help_text="Postal / ZIP code (optional).")
     prior_experience = models.TextField(blank=True, help_text="Free-text prior-experience question.")
     looking_for = models.TextField(
         blank=True, help_text="Free-text 'what are you hoping to get out of this?' question."
@@ -343,9 +360,10 @@ class Registration(models.Model):
         help_text="Random token used in /classes/my/<token>/ self-serve URL.",
     )
     subscribed_to_mailchimp = models.BooleanField(default=False, help_text="Whether MailChimp subscribe succeeded.")
-    registered_at = models.DateTimeField(auto_now_add=True)
-    confirmed_at = models.DateTimeField(null=True, blank=True)
-    cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancellation_reason = models.TextField(blank=True, help_text="Internal reason recorded when an admin cancels.")
+    registered_at = models.DateTimeField(auto_now_add=True, help_text="When this registration was created.")
+    confirmed_at = models.DateTimeField(null=True, blank=True, help_text="When payment confirmed, if any.")
+    cancelled_at = models.DateTimeField(null=True, blank=True, help_text="When this registration was cancelled.")
 
     class Meta:
         ordering = ["-registered_at"]
@@ -383,7 +401,8 @@ class Registration(models.Model):
     def cancel(self, reason: str = "") -> None:
         self.status = self.Status.CANCELLED
         self.cancelled_at = timezone.now()
-        self.save(update_fields=["status", "cancelled_at"])
+        self.cancellation_reason = reason
+        self.save(update_fields=["status", "cancelled_at", "cancellation_reason"])
 
 
 class ClassSettings(models.Model):

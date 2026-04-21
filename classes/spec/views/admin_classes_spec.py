@@ -125,6 +125,17 @@ def describe_approve_class():
         offering.refresh_from_db()
         assert offering.status == ClassOffering.Status.PUBLISHED
 
+    def it_ignores_get_on_approve_and_redirects(admin_user, client, db):
+        from classes.factories import ClassOfferingFactory
+        from classes.models import ClassOffering
+
+        client.force_login(admin_user)
+        offering = ClassOfferingFactory(status=ClassOffering.Status.PENDING)
+        response = client.get(reverse("classes:admin_class_approve", kwargs={"pk": offering.pk}))
+        assert response.status_code == 302
+        offering.refresh_from_db()
+        assert offering.status == ClassOffering.Status.PENDING
+
 
 def describe_archive_class():
     def it_archives_class(admin_user, client, db):
@@ -137,6 +148,17 @@ def describe_archive_class():
         assert response.status_code == 302
         offering.refresh_from_db()
         assert offering.status == ClassOffering.Status.ARCHIVED
+
+    def it_ignores_get_on_archive_and_redirects(admin_user, client, db):
+        from classes.factories import ClassOfferingFactory
+        from classes.models import ClassOffering
+
+        client.force_login(admin_user)
+        offering = ClassOfferingFactory(status=ClassOffering.Status.PUBLISHED)
+        response = client.get(reverse("classes:admin_class_archive", kwargs={"pk": offering.pk}))
+        assert response.status_code == 302
+        offering.refresh_from_db()
+        assert offering.status == ClassOffering.Status.PUBLISHED
 
 
 def describe_duplicate_class():
@@ -152,3 +174,26 @@ def describe_duplicate_class():
         copy = ClassOffering.objects.exclude(pk=src.pk).first()
         assert copy.status == ClassOffering.Status.DRAFT
         assert "copy" in copy.title.lower()
+
+    def it_ignores_get_on_duplicate_and_redirects(admin_user, client, db):
+        from classes.factories import ClassOfferingFactory
+        from classes.models import ClassOffering
+
+        client.force_login(admin_user)
+        src = ClassOfferingFactory(status=ClassOffering.Status.PUBLISHED)
+        response = client.get(reverse("classes:admin_class_duplicate", kwargs={"pk": src.pk}))
+        assert response.status_code == 302
+        assert ClassOffering.objects.count() == 1
+
+    def it_gives_second_copy_a_unique_slug(admin_user, client, db):
+        from classes.factories import ClassOfferingFactory
+        from classes.models import ClassOffering
+
+        client.force_login(admin_user)
+        src = ClassOfferingFactory(slug="pottery", status=ClassOffering.Status.PUBLISHED)
+        client.post(reverse("classes:admin_class_duplicate", kwargs={"pk": src.pk}))
+        client.post(reverse("classes:admin_class_duplicate", kwargs={"pk": src.pk}))
+        slugs = set(ClassOffering.objects.values_list("slug", flat=True))
+        assert "pottery" in slugs
+        assert "pottery-copy" in slugs
+        assert "pottery-copy-2" in slugs

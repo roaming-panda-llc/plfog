@@ -3,18 +3,16 @@
 from __future__ import annotations
 
 from functools import wraps
-from typing import TYPE_CHECKING, Any, Callable
+from typing import Any, Callable
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Count
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 
 from classes.forms import CategoryForm, ClassOfferingForm, ClassSettingsForm, DiscountCodeForm, InstructorInviteForm
 from classes.models import Category, ClassOffering, ClassSettings, DiscountCode, Instructor, Registration
-
-if TYPE_CHECKING:
-    pass
 
 _ViewFunc = Callable[..., HttpResponse]
 
@@ -40,7 +38,11 @@ def admin_root(request: HttpRequest) -> HttpResponse:
 
 @admin_required
 def admin_classes(request: HttpRequest) -> HttpResponse:
-    classes = ClassOffering.objects.select_related("instructor", "category").order_by("-created_at")
+    classes = (
+        ClassOffering.objects.select_related("instructor", "category")
+        .annotate(registration_count=Count("registrations"))
+        .order_by("-created_at")
+    )
     return render(
         request,
         "classes/admin/classes_list.html",
@@ -94,31 +96,30 @@ def admin_class_detail(request: HttpRequest, pk: int) -> HttpResponse:
 @admin_required
 def admin_class_approve(request: HttpRequest, pk: int) -> HttpResponse:
     offering = get_object_or_404(ClassOffering, pk=pk)
-    offering.approve(request.user)
-    messages.success(request, f"{offering.title} is published.")
+    if request.method == "POST":
+        offering.approve(request.user)
+        messages.success(request, f"{offering.title} is published.")
     return redirect("classes:admin_class_detail", pk=offering.pk)
 
 
 @admin_required
 def admin_class_archive(request: HttpRequest, pk: int) -> HttpResponse:
     offering = get_object_or_404(ClassOffering, pk=pk)
-    offering.archive()
-    messages.success(request, f"{offering.title} archived.")
-    return redirect("classes:admin_classes")
+    if request.method == "POST":
+        offering.archive()
+        messages.success(request, f"{offering.title} archived.")
+        return redirect("classes:admin_classes")
+    return redirect("classes:admin_class_detail", pk=offering.pk)
 
 
 @admin_required
 def admin_class_duplicate(request: HttpRequest, pk: int) -> HttpResponse:
-    src = get_object_or_404(ClassOffering, pk=pk)
-    src.pk = None
-    src.slug = f"{src.slug}-copy"
-    src.status = ClassOffering.Status.DRAFT
-    src.published_at = None
-    src.approved_by = None
-    src.title = f"{src.title} (copy)"
-    src.save()
-    messages.success(request, "Class duplicated.")
-    return redirect("classes:admin_class_edit", pk=src.pk)
+    offering = get_object_or_404(ClassOffering, pk=pk)
+    if request.method == "POST":
+        copy = offering.duplicate()
+        messages.success(request, "Class duplicated.")
+        return redirect("classes:admin_class_edit", pk=copy.pk)
+    return redirect("classes:admin_class_detail", pk=offering.pk)
 
 
 @admin_required
@@ -171,7 +172,7 @@ def admin_category_delete(request: HttpRequest, pk: int) -> HttpResponse:
 
 @admin_required
 def admin_instructors(request: HttpRequest) -> HttpResponse:
-    instructors = Instructor.objects.select_related("user").all()
+    instructors = Instructor.objects.select_related("user").annotate(class_count=Count("classes"))
     return render(
         request,
         "classes/admin/instructors.html",

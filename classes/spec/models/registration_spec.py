@@ -72,6 +72,7 @@ def describe_Registration():
             reg.refresh_from_db()
             assert reg.status == Registration.Status.CANCELLED
             assert reg.cancelled_at is not None
+            assert reg.cancellation_reason == "changed mind"
 
     def describe_stringify():
         def it_includes_email_and_class(db):
