@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from django import forms
+from django.contrib.auth import get_user_model
+from django.utils.text import slugify
 
 from classes.models import Category, ClassOffering
 
@@ -39,3 +41,48 @@ class CategoryForm(forms.ModelForm):
     class Meta:
         model = Category
         fields = ["name", "slug", "sort_order", "hero_image"]
+
+
+class InstructorInviteForm(forms.Form):
+    display_name = forms.CharField(max_length=255)
+    email = forms.EmailField()
+    bio = forms.CharField(widget=forms.Textarea, required=False)
+
+    def clean_email(self) -> str:
+        email = self.cleaned_data["email"].lower().strip()
+        User = get_user_model()
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError(
+                "A user with this email already exists. Link them manually in Django admin."
+            )
+        return email
+
+    def save(self) -> "Instructor":  # type: ignore[name-defined]
+        from allauth.account.models import EmailAddress
+
+        from classes.models import Instructor
+
+        User = get_user_model()
+        email = self.cleaned_data["email"]
+        user = User.objects.create_user(username=email, email=email)
+        user.set_unusable_password()
+        user.save()
+        EmailAddress.objects.update_or_create(
+            user=user,
+            email=email,
+            defaults={"verified": True, "primary": True},
+        )
+
+        base_slug = slugify(self.cleaned_data["display_name"]) or "instructor"
+        slug = base_slug
+        n = 1
+        while Instructor.objects.filter(slug=slug).exists():
+            n += 1
+            slug = f"{base_slug}-{n}"
+
+        return Instructor.objects.create(
+            user=user,
+            display_name=self.cleaned_data["display_name"],
+            slug=slug,
+            bio=self.cleaned_data.get("bio", ""),
+        )

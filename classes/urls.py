@@ -18,6 +18,7 @@ urlpatterns = [
     path("admin/categories/<int:pk>/edit/", views.admin_category_edit, name="admin_category_edit"),
     path("admin/categories/<int:pk>/delete/", views.admin_category_delete, name="admin_category_delete"),
     path("admin/instructors/", views.admin_instructors, name="admin_instructors"),
+    path("admin/instructors/new/", views.admin_instructor_invite, name="admin_instructor_invite"),
     path("admin/registrations/", views.admin_registrations, name="admin_registrations"),
     path("admin/discount-codes/", views.admin_discount_codes, name="admin_discount_codes"),
     path("admin/settings/", views.admin_settings, name="admin_settings"),

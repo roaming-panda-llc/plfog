@@ -10,8 +10,8 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 
-from classes.forms import CategoryForm, ClassOfferingForm
-from classes.models import Category, ClassOffering
+from classes.forms import CategoryForm, ClassOfferingForm, InstructorInviteForm
+from classes.models import Category, ClassOffering, Instructor
 
 if TYPE_CHECKING:
     pass
@@ -171,7 +171,26 @@ def admin_category_delete(request: HttpRequest, pk: int) -> HttpResponse:
 
 @admin_required
 def admin_instructors(request: HttpRequest) -> HttpResponse:
-    return render(request, "classes/admin/instructors.html", {"active_tab": "instructors"})
+    instructors = Instructor.objects.select_related("user").all()
+    return render(
+        request,
+        "classes/admin/instructors.html",
+        {"active_tab": "instructors", "instructors": instructors},
+    )
+
+
+@admin_required
+def admin_instructor_invite(request: HttpRequest) -> HttpResponse:
+    form = InstructorInviteForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        instructor = form.save()
+        messages.success(request, f"Invited {instructor.display_name}.")
+        return redirect("classes:admin_instructors")
+    return render(
+        request,
+        "classes/admin/instructor_form.html",
+        {"active_tab": "instructors", "form": form},
+    )
 
 
 @admin_required
