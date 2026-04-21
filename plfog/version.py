@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
-VERSION = "1.7.0.1"
+VERSION = "1.7.0.2"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.7.0.2",
+        "date": "2026-04-21",
+        "title": "Hotfix: deploy failing on Render",
+        "changes": [
+            "Fixed a deploy failure that was blocking new releases from going live on Render — the build step that packages up static files was being rejected because it couldn't see the production database settings. It now uses a harmless placeholder just for that build step, so deploys go through again",
+        ],
+    },
     {
         "version": "1.7.0.1",
         "date": "2026-04-21",
