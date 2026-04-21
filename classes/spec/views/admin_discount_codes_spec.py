@@ -1,0 +1,89 @@
+"""BDD specs for the admin Discount Codes tab."""
+
+from __future__ import annotations
+
+from django.urls import reverse
+
+
+def describe_admin_discount_codes():
+    def it_lists_codes(admin_user, client, db):
+        from classes.factories import DiscountCodeFactory
+
+        client.force_login(admin_user)
+        DiscountCodeFactory(code="HOLIDAY20")
+        response = client.get(reverse("classes:admin_discount_codes"))
+        assert response.status_code == 200
+        assert b"HOLIDAY20" in response.content
+
+    def it_creates_percent_code(admin_user, client, db):
+        client.force_login(admin_user)
+        response = client.post(
+            reverse("classes:admin_discount_code_create"),
+            {
+                "code": "SAVE20",
+                "discount_pct": 20,
+                "is_active": "on",
+            },
+        )
+        assert response.status_code == 302
+        from classes.models import DiscountCode
+
+        assert DiscountCode.objects.filter(code="SAVE20").exists()
+
+    def it_rejects_code_with_no_discount_value(admin_user, client, db):
+        client.force_login(admin_user)
+        response = client.post(
+            reverse("classes:admin_discount_code_create"),
+            {
+                "code": "EMPTY",
+                "is_active": "on",
+            },
+        )
+        assert response.status_code == 200
+        assert b"Set either a percent" in response.content
+
+    def it_renders_the_edit_form_on_get(admin_user, client, db):
+        from classes.factories import DiscountCodeFactory
+
+        client.force_login(admin_user)
+        code = DiscountCodeFactory(discount_pct=10)
+        response = client.get(reverse("classes:admin_discount_code_edit", kwargs={"pk": code.pk}))
+        assert response.status_code == 200
+
+    def it_edits_a_code(admin_user, client, db):
+        from classes.factories import DiscountCodeFactory
+
+        client.force_login(admin_user)
+        code = DiscountCodeFactory(discount_pct=10)
+        response = client.post(
+            reverse("classes:admin_discount_code_edit", kwargs={"pk": code.pk}),
+            {"code": code.code, "discount_pct": 25, "is_active": "on"},
+        )
+        assert response.status_code == 302
+        code.refresh_from_db()
+        assert code.discount_pct == 25
+
+    def it_deletes_a_code(admin_user, client, db):
+        from classes.factories import DiscountCodeFactory
+        from classes.models import DiscountCode
+
+        client.force_login(admin_user)
+        code = DiscountCodeFactory()
+        response = client.post(reverse("classes:admin_discount_code_delete", kwargs={"pk": code.pk}))
+        assert response.status_code == 302
+        assert not DiscountCode.objects.filter(pk=code.pk).exists()
+
+    def it_ignores_get_on_delete_and_redirects(admin_user, client, db):
+        from classes.factories import DiscountCodeFactory
+        from classes.models import DiscountCode
+
+        client.force_login(admin_user)
+        code = DiscountCodeFactory()
+        response = client.get(reverse("classes:admin_discount_code_delete", kwargs={"pk": code.pk}))
+        assert response.status_code == 302
+        assert DiscountCode.objects.filter(pk=code.pk).exists()
+
+    def it_gates_behind_admin_role(member_user, client, db):
+        client.force_login(member_user)
+        response = client.get(reverse("classes:admin_discount_codes"))
+        assert response.status_code == 403

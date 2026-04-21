@@ -44,3 +44,4 @@ django.log
 .superpowers/
 .ruff_cache/
 .claude/
+db.sqlite3.bak*

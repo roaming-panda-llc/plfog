@@ -1,0 +1,32 @@
+{% extends "classes/admin/base.html" %}
+{% block tab_content %}
+<h2>Registration #{{ registration.pk }}</h2>
+<dl>
+    <dt>Class</dt><dd>{{ registration.class_offering.title }}</dd>
+    <dt>Registrant</dt><dd>{{ registration.first_name }} {{ registration.last_name }} — {{ registration.email }}</dd>
+    <dt>Member</dt><dd>{% if registration.member %}{{ registration.member.full_legal_name }}{% else %}—{% endif %}</dd>
+    <dt>Status</dt><dd>{{ registration.get_status_display }}</dd>
+    <dt>Paid</dt><dd>${{ registration.amount_paid_cents|floatformat:2 }}</dd>
+    <dt>Registered at</dt><dd>{{ registration.registered_at }}</dd>
+</dl>
+
+<h3>Waivers</h3>
+{% for waiver in registration.waivers.all %}
+    <details>
+        <summary>{{ waiver.get_kind_display }} — signed {{ waiver.signed_at }} by "{{ waiver.signature_text }}"</summary>
+        <pre style="white-space:pre-wrap;">{{ waiver.waiver_text }}</pre>
+    </details>
+{% empty %}
+    <p style="color:var(--hub-text-muted);">No waivers on file (likely an admin-created registration).</p>
+{% endfor %}
+
+<h3>Actions</h3>
+{% if registration.status != 'cancelled' %}
+    <form method="post" action="{% url 'classes:admin_registration_cancel' pk=registration.pk %}" style="display:flex; gap:0.5rem; align-items:center;">
+        {% csrf_token %}
+        <input name="reason" placeholder="Reason (internal)" style="padding:0.5rem; flex:1;">
+        <button class="hub-btn">Cancel Registration</button>
+    </form>
+{% endif %}
+<p style="color:var(--hub-text-muted); margin-top:1rem;"><small>Refunds land in Plan 2 (Stripe integration). Void Tab entries in billing if needed.</small></p>
+{% endblock %}

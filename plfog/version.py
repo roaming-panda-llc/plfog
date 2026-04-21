@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
-VERSION = "1.6.3"
+VERSION = "1.7.0.1"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.7.0.1",
+        "date": "2026-04-21",
+        "title": "Classes: admin tabs foundation",
+        "changes": [
+            "New Classes admin area (admins only) with six tabs — Classes, Categories, Instructors, Registrations, Discount Codes, and Settings — so we can build out the makerspace's class catalog natively inside Past Lives without needing the old booking site",
+            "Admins can create categories, invite instructors (who get their own login), build classes with a full set of fields (prerequisites, materials, capacity, member discount, scheduling), and manage discount codes — the public registration flow + Stripe payments come in a follow-up release",
+            'Instructors now exist as a first-class role: someone can be a member, an instructor, or both. The "Viewing as" dropdown recognizes the new role so admins can preview what teachers see',
+            "Class titles and category names auto-fill the URL slug as you type — saves a step every time you make a new one",
+        ],
+    },
     {
         "version": "1.6.3",
         "date": "2026-04-17",

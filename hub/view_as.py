@@ -24,13 +24,15 @@ if TYPE_CHECKING:
 ROLE_MEMBER = "member"
 ROLE_GUILD_OFFICER = "guild_officer"
 ROLE_ADMIN = "admin"
+ROLE_INSTRUCTOR = "instructor"
 
-ALL_ROLES: frozenset[str] = frozenset({ROLE_MEMBER, ROLE_GUILD_OFFICER, ROLE_ADMIN})
+ALL_ROLES: frozenset[str] = frozenset({ROLE_MEMBER, ROLE_INSTRUCTOR, ROLE_GUILD_OFFICER, ROLE_ADMIN})
 
 ROLE_HIERARCHY: tuple[str, ...] = (ROLE_MEMBER, ROLE_GUILD_OFFICER, ROLE_ADMIN)
 
 ROLE_LABELS: tuple[tuple[str, str], ...] = (
     (ROLE_ADMIN, "Admin"),
+    (ROLE_INSTRUCTOR, "Instructor"),
     (ROLE_GUILD_OFFICER, "Guild Officer"),
     (ROLE_MEMBER, "Member"),
 )
@@ -42,7 +44,9 @@ def compute_actual_roles(user: "AbstractBaseUser | AnonymousUser | None") -> fro
     """Derive the set of roles a user actually holds.
 
     Superusers without a linked Member still get the full set so emergency
-    access is never dependent on Member data being correct.
+    access is never dependent on Member data being correct. The ``instructor``
+    role is parallel to the member hierarchy — derived from the existence
+    of an ``Instructor`` record linked to the user.
     """
     if user is None or not getattr(user, "is_authenticated", False):
         return frozenset()
@@ -54,16 +58,24 @@ def compute_actual_roles(user: "AbstractBaseUser | AnonymousUser | None") -> fro
     except MemberModel.DoesNotExist:
         member = None
 
-    if member is None:
-        if getattr(user, "is_superuser", False):
-            return ALL_ROLES
-        return frozenset()
+    # Lazy import — avoids circulars during Django app loading.
+    from classes.models import Instructor
 
-    if member.fog_role == MemberModel.FogRole.ADMIN:
-        return frozenset({ROLE_ADMIN, ROLE_GUILD_OFFICER, ROLE_MEMBER})
-    if member.fog_role == MemberModel.FogRole.GUILD_OFFICER:
-        return frozenset({ROLE_GUILD_OFFICER, ROLE_MEMBER})
-    return frozenset({ROLE_MEMBER})
+    has_instructor = Instructor.objects.filter(user=user).exists()  # type: ignore[misc]
+
+    roles: set[str] = set()
+    if member is not None:
+        if member.fog_role == MemberModel.FogRole.ADMIN:
+            roles.update({ROLE_ADMIN, ROLE_GUILD_OFFICER, ROLE_MEMBER})
+        elif member.fog_role == MemberModel.FogRole.GUILD_OFFICER:
+            roles.update({ROLE_GUILD_OFFICER, ROLE_MEMBER})
+        else:
+            roles.add(ROLE_MEMBER)
+    if has_instructor:
+        roles.add(ROLE_INSTRUCTOR)
+    if getattr(user, "is_superuser", False) and not roles:
+        roles.update({ROLE_ADMIN, ROLE_GUILD_OFFICER, ROLE_MEMBER})
+    return frozenset(roles)
 
 
 def _highest_role(actual: frozenset[str]) -> str | None:
@@ -115,9 +127,17 @@ class ViewAs:
         return self.has(ROLE_MEMBER)
 
     @property
+    def is_instructor(self) -> bool:
+        return ROLE_INSTRUCTOR in self.actual
+
+    @property
     def show_dropdown(self) -> bool:
-        """Only users with more than the base ``member`` role see the dropdown."""
-        return len(self.actual - {ROLE_MEMBER}) > 0
+        """Only users with more than the base ``member`` hierarchy role see the dropdown.
+
+        The ``instructor`` role is parallel — it never triggers the dropdown on its own.
+        """
+        hierarchy_roles = self.actual & frozenset(ROLE_HIERARCHY)
+        return len(hierarchy_roles - {ROLE_MEMBER}) > 0
 
     @property
     def current_label(self) -> str:
@@ -129,11 +149,15 @@ class ViewAs:
 
     @property
     def dropdown_options(self) -> list[dict[str, object]]:
-        """Ordered ``{name, label, selected}`` dicts for the dropdown menu — highest role first."""
+        """Ordered ``{name, label, selected}`` dicts for the dropdown menu — highest role first.
+
+        Only hierarchy roles (admin, guild_officer, member) appear in the dropdown.
+        The ``instructor`` role is parallel and is excluded.
+        """
         return [
             {"name": name, "label": label, "selected": name == self.view_as_role}
             for name, label in ROLE_LABELS
-            if name in self.actual
+            if name in self.actual and name in ROLE_HIERARCHY
         ]
 
     @classmethod
