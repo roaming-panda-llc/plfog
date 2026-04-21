@@ -10,8 +10,6 @@ from django.db import models
 from django.db.models import CheckConstraint, F, Q
 from django.utils import timezone
 
-from classes.managers import ClassOfferingQuerySet
-
 DEFAULT_LIABILITY_TEXT = """ASSUMPTION OF RISK AND WAIVER OF LIABILITY
 
 I understand that participation in classes, workshops, and activities at Past Lives Makerspace ("PLM") involves inherent risks, including but not limited to: exposure to tools, machinery, and equipment; risk of cuts, burns, eye injury, hearing damage, and other physical harm; and exposure to dust, fumes, chemicals, and other materials.
@@ -71,6 +69,17 @@ class Instructor(models.Model):
 
     def __str__(self) -> str:
         return self.display_name
+
+
+class ClassOfferingQuerySet(models.QuerySet["ClassOffering"]):
+    def public(self) -> "ClassOfferingQuerySet":
+        return self.filter(status="published")
+
+    def pending_review(self) -> "ClassOfferingQuerySet":
+        return self.filter(status="pending")
+
+    def for_instructor(self, instructor: "Instructor") -> "ClassOfferingQuerySet":
+        return self.filter(instructor=instructor)
 
 
 class ClassOffering(models.Model):
