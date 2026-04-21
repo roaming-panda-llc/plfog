@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from classes.factories import InstructorFactory
 from classes.models import Instructor
 
@@ -13,11 +15,8 @@ def describe_Instructor():
 
     def it_requires_unique_slug(db):
         InstructorFactory(slug="jane-doe")
-        try:
+        with pytest.raises(Exception):
             InstructorFactory(slug="jane-doe")
-        except Exception:
-            return
-        raise AssertionError("duplicate slug should have raised")
 
     def it_orders_by_display_name(db):
         InstructorFactory(display_name="Zach")

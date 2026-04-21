@@ -58,3 +58,22 @@ def describe_instructor_invite():
         client.force_login(member_user)
         response = client.get(reverse("classes:admin_instructor_invite"))
         assert response.status_code == 403
+
+    def it_generates_unique_slug_when_display_name_collides(admin_user, client, db):
+        from classes.factories import InstructorFactory
+        from classes.models import Instructor
+
+        client.force_login(admin_user)
+        InstructorFactory(display_name="Alice Teacher", slug="alice-teacher")
+        response = client.post(
+            reverse("classes:admin_instructor_invite"),
+            {
+                "display_name": "Alice Teacher",
+                "email": "alice2@example.com",
+                "bio": "",
+            },
+        )
+        assert response.status_code == 302
+        slugs = set(Instructor.objects.values_list("slug", flat=True))
+        assert "alice-teacher" in slugs
+        assert "alice-teacher-2" in slugs

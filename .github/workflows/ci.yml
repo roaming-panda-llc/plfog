@@ -9,6 +9,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      DJANGO_SECRET_KEY: test-secret-key-for-ci
+      DATABASE_URL: sqlite:///db.sqlite3
     steps:
       - uses: actions/checkout@v4
 
@@ -25,27 +28,23 @@ jobs:
 
       - name: Run Django checks
         run: python manage.py check
-        env:
-          DJANGO_SECRET_KEY: test-secret-key-for-ci
 
       - name: Run migrations
         run: python manage.py migrate --run-syncdb
-        env:
-          DJANGO_SECRET_KEY: test-secret-key-for-ci
 
       - name: Run tests
         run: pytest --tb=short
-        env:
-          DJANGO_SECRET_KEY: test-secret-key-for-ci
 
       - name: Run mutation tests
         continue-on-error: true
         run: pytest --leela --target core --target hub --target membership --target plfog
-        env:
-          DJANGO_SECRET_KEY: test-secret-key-for-ci
 
   lint:
     runs-on: ubuntu-latest
+    env:
+      CI: true
+      DJANGO_SECRET_KEY: test-secret-key-for-ci
+      DATABASE_URL: sqlite:///db.sqlite3
     steps:
       - uses: actions/checkout@v4
 
@@ -68,6 +67,3 @@ jobs:
 
       - name: Mypy
         run: mypy plfog/ core/ membership/ hub/
-        env:
-          CI: true
-          DJANGO_SECRET_KEY: test-secret-key-for-ci

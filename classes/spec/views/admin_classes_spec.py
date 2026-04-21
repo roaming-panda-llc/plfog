@@ -25,6 +25,11 @@ def describe_admin_classes_routing():
 
 
 def describe_create_class():
+    def it_renders_the_create_form_on_get(admin_user, client, db):
+        client.force_login(admin_user)
+        response = client.get(reverse("classes:admin_class_create"))
+        assert response.status_code == 200
+
     def it_creates_a_class(admin_user, client, db):
         from classes.factories import CategoryFactory, InstructorFactory
 
@@ -54,6 +59,58 @@ def describe_create_class():
             },
         )
         assert response.status_code == 302
+
+
+def describe_edit_class():
+    def it_renders_the_edit_form_on_get(admin_user, client, db):
+        from classes.factories import ClassOfferingFactory
+
+        client.force_login(admin_user)
+        offering = ClassOfferingFactory()
+        response = client.get(reverse("classes:admin_class_edit", kwargs={"pk": offering.pk}))
+        assert response.status_code == 200
+
+    def it_saves_the_edit_on_post(admin_user, client, db):
+        from classes.factories import CategoryFactory, ClassOfferingFactory, InstructorFactory
+
+        client.force_login(admin_user)
+        offering = ClassOfferingFactory(title="Old Title")
+        response = client.post(
+            reverse("classes:admin_class_edit", kwargs={"pk": offering.pk}),
+            {
+                "title": "New Title",
+                "slug": offering.slug,
+                "category": CategoryFactory().pk,
+                "instructor": InstructorFactory().pk,
+                "price_cents": offering.price_cents,
+                "member_discount_pct": offering.member_discount_pct,
+                "capacity": offering.capacity,
+                "scheduling_model": offering.scheduling_model,
+                "description": offering.description,
+                "prerequisites": "",
+                "materials_included": "",
+                "materials_to_bring": "",
+                "safety_requirements": "",
+                "age_guardian_note": "",
+                "flexible_note": "",
+                "private_for_name": "",
+                "recurring_pattern": "",
+            },
+        )
+        assert response.status_code == 302
+        offering.refresh_from_db()
+        assert offering.title == "New Title"
+
+
+def describe_class_detail():
+    def it_shows_the_detail_page(admin_user, client, db):
+        from classes.factories import ClassOfferingFactory
+
+        client.force_login(admin_user)
+        offering = ClassOfferingFactory(title="Detailed Class")
+        response = client.get(reverse("classes:admin_class_detail", kwargs={"pk": offering.pk}))
+        assert response.status_code == 200
+        assert b"Detailed Class" in response.content
 
 
 def describe_approve_class():

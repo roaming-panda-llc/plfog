@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from classes.factories import CategoryFactory
 from classes.models import Category
 
@@ -20,8 +22,5 @@ def describe_Category():
 
     def it_enforces_name_uniqueness(db):
         CategoryFactory(name="Pottery")
-        try:
+        with pytest.raises(Exception):
             CategoryFactory(name="Pottery")
-        except Exception:
-            return
-        raise AssertionError("duplicate name should have raised")

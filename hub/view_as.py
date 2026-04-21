@@ -59,12 +59,9 @@ def compute_actual_roles(user: "AbstractBaseUser | AnonymousUser | None") -> fro
         member = None
 
     # Lazy import — avoids circulars during Django app loading.
-    try:
-        from classes.models import Instructor
+    from classes.models import Instructor
 
-        has_instructor = Instructor.objects.filter(user=user).exists()
-    except Exception:
-        has_instructor = False
+    has_instructor = Instructor.objects.filter(user=user).exists()  # type: ignore[misc]
 
     roles: set[str] = set()
     if member is not None:

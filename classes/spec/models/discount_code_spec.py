@@ -29,6 +29,10 @@ def describe_DiscountCode():
             code = DiscountCodeFactory(discount_pct=None, discount_fixed_cents=20_000)
             assert code.apply_to(10_000) == 0
 
+        def it_returns_price_unchanged_when_no_discount_set():
+            code = DiscountCode(code="NOOP", discount_pct=None, discount_fixed_cents=None)
+            assert code.apply_to(10_000) == 10_000
+
     def describe_is_currently_valid():
         def it_is_valid_when_no_window_and_active_and_under_limit(db):
             code = DiscountCodeFactory(is_active=True, valid_from=None, valid_until=None, max_uses=None)

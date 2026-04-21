@@ -38,6 +38,17 @@ def describe_admin_registrations():
         reg.refresh_from_db()
         assert reg.status == Registration.Status.CANCELLED
 
+    def it_ignores_get_on_cancel_and_redirects(admin_user, client, db):
+        from classes.factories import RegistrationFactory
+        from classes.models import Registration
+
+        client.force_login(admin_user)
+        reg = RegistrationFactory(status=Registration.Status.CONFIRMED)
+        response = client.get(reverse("classes:admin_registration_cancel", kwargs={"pk": reg.pk}))
+        assert response.status_code == 302
+        reg.refresh_from_db()
+        assert reg.status == Registration.Status.CONFIRMED
+
     def it_gates_behind_admin_role(member_user, client, db):
         client.force_login(member_user)
         response = client.get(reverse("classes:admin_registrations"))

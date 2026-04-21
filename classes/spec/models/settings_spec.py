@@ -33,3 +33,12 @@ def describe_ClassSettings():
             ClassSettings.objects.create(pk=99, liability_waiver_text="x", model_release_waiver_text="y")
             assert ClassSettings.objects.count() == 1
             assert ClassSettings.objects.first().pk == 1
+
+        def it_creates_row_when_none_exists(db):
+            ClassSettings.objects.all().delete()
+            ClassSettings.objects.create(liability_waiver_text="fresh", model_release_waiver_text="fresh")
+            assert ClassSettings.objects.count() == 1
+            assert ClassSettings.objects.first().pk == 1
+
+    def it_stringifies_as_class_settings(db):
+        assert str(ClassSettings.load()) == "Class Settings"
