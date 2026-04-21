@@ -15,10 +15,16 @@ def admin_user(db):
     user, _ = User.objects.get_or_create(
         username="admin@example.com", defaults={"email": "admin@example.com"}
     )
+    # The ensure_user_has_member signal auto-creates a Member with fog_role=MEMBER
+    # when the User is created, so get_or_create always finds the existing record.
+    # Explicitly update to ADMIN and sync permissions regardless.
     member, _ = Member.objects.get_or_create(
         user=user,
         defaults={"full_legal_name": "Admin User", "fog_role": Member.FogRole.ADMIN, "membership_plan": plan},
     )
+    if member.fog_role != Member.FogRole.ADMIN:
+        member.fog_role = Member.FogRole.ADMIN
+        member.save(update_fields=["fog_role"])
     member.sync_user_permissions()
     return user
 
