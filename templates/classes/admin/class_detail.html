@@ -1,0 +1,44 @@
+{% extends "classes/admin/base.html" %}
+{% block tab_content %}
+<div style="display:flex; gap:1rem; align-items:center; margin-bottom:0.75rem; flex-wrap:wrap;">
+    <h2 style="margin:0;">{{ offering.title }}</h2>
+    <span style="font-size:0.85rem; color:var(--hub-text-muted);">{{ offering.get_status_display }}</span>
+</div>
+<p>
+    <strong>Instructor:</strong> {{ offering.instructor.display_name }}
+    &middot;
+    <strong>Category:</strong> {{ offering.category.name }}
+</p>
+<p>
+    <strong>Price:</strong> ${{ offering.price_cents|floatformat:2 }}
+    &middot;
+    <strong>Capacity:</strong> {{ offering.capacity }}
+</p>
+<div style="margin:1.25rem 0; display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+    <a class="hub-btn" href="{% url 'classes:admin_class_edit' pk=offering.pk %}">Edit</a>
+    {% if offering.status == 'pending' %}
+        <form method="post" action="{% url 'classes:admin_class_approve' pk=offering.pk %}" style="display:inline;">
+            {% csrf_token %}
+            <button class="hub-btn hub-btn--primary" type="submit">Approve</button>
+        </form>
+    {% endif %}
+    {% if offering.status != 'archived' %}
+        <form method="post" action="{% url 'classes:admin_class_archive' pk=offering.pk %}" style="display:inline;">
+            {% csrf_token %}
+            <button class="hub-btn" type="submit">Archive</button>
+        </form>
+    {% endif %}
+    <form method="post" action="{% url 'classes:admin_class_duplicate' pk=offering.pk %}" style="display:inline;">
+        {% csrf_token %}
+        <button class="hub-btn" type="submit">Duplicate</button>
+    </form>
+</div>
+<h3>Sessions</h3>
+<ul style="margin:0; padding-left:1.25rem;">
+    {% for session in offering.sessions.all %}
+        <li style="padding:0.25rem 0;">{{ session.starts_at }} &rarr; {{ session.ends_at }}</li>
+    {% empty %}
+        <li style="color:var(--hub-text-muted);">No sessions scheduled yet.</li>
+    {% endfor %}
+</ul>
+{% endblock %}

@@ -1,2 +1,41 @@
 {% extends "classes/admin/base.html" %}
-{% block tab_content %}<p>Coming soon.</p>{% endblock %}
+{% block tab_content %}
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+    <div>
+        {% if pending_count %}
+            <span style="display:inline-block; background:var(--color-tuscan-yellow,#EEB44B); color:#000; font-size:0.8rem; font-weight:600; padding:0.2rem 0.6rem; border-radius:9999px;">
+                Pending review: {{ pending_count }}
+            </span>
+        {% endif %}
+    </div>
+    <a class="hub-btn hub-btn--primary" href="{% url 'classes:admin_class_create' %}">+ New Class</a>
+</div>
+<table style="width:100%; border-collapse:collapse;">
+    <thead>
+        <tr style="border-bottom:2px solid var(--hub-border);">
+            <th style="text-align:left; padding:0.5rem 0.75rem; font-weight:600;">Title</th>
+            <th style="text-align:left; padding:0.5rem 0.75rem; font-weight:600;">Instructor</th>
+            <th style="text-align:left; padding:0.5rem 0.75rem; font-weight:600;">Category</th>
+            <th style="text-align:left; padding:0.5rem 0.75rem; font-weight:600;">Status</th>
+            <th style="text-align:left; padding:0.5rem 0.75rem; font-weight:600;">Capacity</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for c in classes %}
+        <tr style="border-bottom:1px solid var(--hub-border);">
+            <td style="padding:0.5rem 0.75rem;">
+                <a href="{% url 'classes:admin_class_detail' pk=c.pk %}">{{ c.title }}</a>
+            </td>
+            <td style="padding:0.5rem 0.75rem;">{{ c.instructor.display_name }}</td>
+            <td style="padding:0.5rem 0.75rem;">{{ c.category.name }}</td>
+            <td style="padding:0.5rem 0.75rem;">{{ c.get_status_display }}</td>
+            <td style="padding:0.5rem 0.75rem;">{{ c.registrations.count }}/{{ c.capacity }}</td>
+        </tr>
+    {% empty %}
+        <tr>
+            <td colspan="5" style="padding:1.5rem 0.75rem; color:var(--hub-text-muted);">No classes yet.</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
