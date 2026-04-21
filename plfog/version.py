@@ -2,20 +2,9 @@
 
 from __future__ import annotations
 
-VERSION = "1.7.0.2"
+VERSION = "1.7.0.1"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
-    {
-        "version": "1.7.0.2",
-        "date": "2026-04-21",
-        "title": "Classes admin: review fixes",
-        "changes": [
-            "Approving, archiving, and duplicating a class now only happens when you click the button — drive-by links can't trigger those actions by accident",
-            "Duplicating a class twice in a row now gives each copy its own unique URL slug instead of colliding",
-            "When you cancel a registration, the internal reason you type is now actually saved against that registration",
-            "Admin Classes and Instructors lists load in one trip to the database instead of one query per row",
-        ],
-    },
     {
         "version": "1.7.0.1",
         "date": "2026-04-21",
