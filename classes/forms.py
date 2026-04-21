@@ -6,7 +6,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.utils.text import slugify
 
-from classes.models import Category, ClassOffering, DiscountCode
+from classes.models import Category, ClassOffering, ClassSettings, DiscountCode
 
 
 class ClassOfferingForm(forms.ModelForm):
@@ -107,3 +107,25 @@ class DiscountCodeForm(forms.ModelForm):
         if not data.get("discount_pct") and not data.get("discount_fixed_cents"):
             raise forms.ValidationError("Set either a percent OR a fixed-cents discount.")
         return data
+
+
+class ClassSettingsForm(forms.ModelForm):
+    class Meta:
+        model = ClassSettings
+        fields = [
+            "enabled_publicly",
+            "liability_waiver_text",
+            "model_release_waiver_text",
+            "default_member_discount_pct",
+            "reminder_hours_before",
+            "instructor_approval_required",
+            "mailchimp_api_key",
+            "mailchimp_list_id",
+            "google_analytics_measurement_id",
+            "confirmation_email_footer",
+        ]
+        widgets = {
+            "liability_waiver_text": forms.Textarea(attrs={"rows": 10}),
+            "model_release_waiver_text": forms.Textarea(attrs={"rows": 10}),
+            "confirmation_email_footer": forms.Textarea(attrs={"rows": 3}),
+        }

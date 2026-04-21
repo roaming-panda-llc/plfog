@@ -10,8 +10,8 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 
-from classes.forms import CategoryForm, ClassOfferingForm, DiscountCodeForm, InstructorInviteForm
-from classes.models import Category, ClassOffering, DiscountCode, Instructor, Registration
+from classes.forms import CategoryForm, ClassOfferingForm, ClassSettingsForm, DiscountCodeForm, InstructorInviteForm
+from classes.models import Category, ClassOffering, ClassSettings, DiscountCode, Instructor, Registration
 
 if TYPE_CHECKING:
     pass
@@ -274,4 +274,14 @@ def admin_discount_code_delete(request: HttpRequest, pk: int) -> HttpResponse:
 
 @admin_required
 def admin_settings(request: HttpRequest) -> HttpResponse:
-    return render(request, "classes/admin/settings.html", {"active_tab": "settings"})
+    settings_obj = ClassSettings.load()
+    form = ClassSettingsForm(request.POST or None, instance=settings_obj)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Settings saved.")
+        return redirect("classes:admin_settings")
+    return render(
+        request,
+        "classes/admin/settings.html",
+        {"active_tab": "settings", "form": form},
+    )
