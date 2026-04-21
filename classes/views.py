@@ -10,8 +10,8 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 
-from classes.forms import CategoryForm, ClassOfferingForm, InstructorInviteForm
-from classes.models import Category, ClassOffering, Instructor, Registration
+from classes.forms import CategoryForm, ClassOfferingForm, DiscountCodeForm, InstructorInviteForm
+from classes.models import Category, ClassOffering, DiscountCode, Instructor, Registration
 
 if TYPE_CHECKING:
     pass
@@ -226,7 +226,50 @@ def admin_registration_cancel(request: HttpRequest, pk: int) -> HttpResponse:
 
 @admin_required
 def admin_discount_codes(request: HttpRequest) -> HttpResponse:
-    return render(request, "classes/admin/discount_codes.html", {"active_tab": "discount_codes"})
+    codes = DiscountCode.objects.all()
+    return render(
+        request,
+        "classes/admin/discount_codes.html",
+        {"active_tab": "discount_codes", "codes": codes},
+    )
+
+
+@admin_required
+def admin_discount_code_create(request: HttpRequest) -> HttpResponse:
+    form = DiscountCodeForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Discount code created.")
+        return redirect("classes:admin_discount_codes")
+    return render(
+        request,
+        "classes/admin/discount_code_form.html",
+        {"active_tab": "discount_codes", "form": form, "mode": "create"},
+    )
+
+
+@admin_required
+def admin_discount_code_edit(request: HttpRequest, pk: int) -> HttpResponse:
+    code = get_object_or_404(DiscountCode, pk=pk)
+    form = DiscountCodeForm(request.POST or None, instance=code)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Discount code updated.")
+        return redirect("classes:admin_discount_codes")
+    return render(
+        request,
+        "classes/admin/discount_code_form.html",
+        {"active_tab": "discount_codes", "form": form, "code": code, "mode": "edit"},
+    )
+
+
+@admin_required
+def admin_discount_code_delete(request: HttpRequest, pk: int) -> HttpResponse:
+    code = get_object_or_404(DiscountCode, pk=pk)
+    if request.method == "POST":
+        code.delete()
+        messages.success(request, "Discount code deleted.")
+    return redirect("classes:admin_discount_codes")
 
 
 @admin_required

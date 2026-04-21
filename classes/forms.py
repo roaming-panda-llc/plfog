@@ -6,7 +6,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.utils.text import slugify
 
-from classes.models import Category, ClassOffering
+from classes.models import Category, ClassOffering, DiscountCode
 
 
 class ClassOfferingForm(forms.ModelForm):
@@ -86,3 +86,24 @@ class InstructorInviteForm(forms.Form):
             slug=slug,
             bio=self.cleaned_data.get("bio", ""),
         )
+
+
+class DiscountCodeForm(forms.ModelForm):
+    class Meta:
+        model = DiscountCode
+        fields = [
+            "code",
+            "description",
+            "discount_pct",
+            "discount_fixed_cents",
+            "valid_from",
+            "valid_until",
+            "max_uses",
+            "is_active",
+        ]
+
+    def clean(self) -> dict:
+        data = super().clean()
+        if not data.get("discount_pct") and not data.get("discount_fixed_cents"):
+            raise forms.ValidationError("Set either a percent OR a fixed-cents discount.")
+        return data

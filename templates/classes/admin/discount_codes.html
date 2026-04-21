@@ -1,2 +1,40 @@
 {% extends "classes/admin/base.html" %}
-{% block tab_content %}<p>Coming soon.</p>{% endblock %}
+{% block tab_content %}
+<div style="display:flex; justify-content:flex-end; margin-bottom:1rem;">
+    <a class="hub-btn hub-btn--primary" href="{% url 'classes:admin_discount_code_create' %}">+ New Code</a>
+</div>
+<table style="width:100%; border-collapse:collapse;">
+    <thead style="border-bottom:2px solid var(--hub-border);">
+        <tr style="text-align:left;">
+            <th style="padding:0.5rem 0.75rem; font-weight:600;">Code</th>
+            <th style="padding:0.5rem 0.75rem; font-weight:600;">%</th>
+            <th style="padding:0.5rem 0.75rem; font-weight:600;">Fixed</th>
+            <th style="padding:0.5rem 0.75rem; font-weight:600;">Valid</th>
+            <th style="padding:0.5rem 0.75rem; font-weight:600;">Uses</th>
+            <th style="padding:0.5rem 0.75rem; font-weight:600;">Active</th>
+            <th style="padding:0.5rem 0.75rem; font-weight:600;"></th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for c in codes %}
+        <tr style="border-bottom:1px solid var(--hub-border);">
+            <td style="padding:0.5rem 0.75rem;">{{ c.code }}</td>
+            <td style="padding:0.5rem 0.75rem;">{{ c.discount_pct|default:"—" }}</td>
+            <td style="padding:0.5rem 0.75rem;">{% if c.discount_fixed_cents %}${{ c.discount_fixed_cents|floatformat:2 }}{% else %}—{% endif %}</td>
+            <td style="padding:0.5rem 0.75rem;">{{ c.valid_from|default:"—" }} → {{ c.valid_until|default:"—" }}</td>
+            <td style="padding:0.5rem 0.75rem;">{{ c.use_count }}/{{ c.max_uses|default:"∞" }}</td>
+            <td style="padding:0.5rem 0.75rem;">{{ c.is_active|yesno }}</td>
+            <td style="padding:0.5rem 0.75rem; display:flex; gap:0.5rem;">
+                <a class="hub-btn" href="{% url 'classes:admin_discount_code_edit' pk=c.pk %}">Edit</a>
+                <form method="post" action="{% url 'classes:admin_discount_code_delete' pk=c.pk %}" style="display:inline;">
+                    {% csrf_token %}
+                    <button class="hub-btn">Delete</button>
+                </form>
+            </td>
+        </tr>
+    {% empty %}
+        <tr><td colspan="7" style="padding:0.5rem 0.75rem; color:var(--hub-text-muted);">No discount codes yet.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
