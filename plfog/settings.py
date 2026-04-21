@@ -1,6 +1,7 @@
 """Django settings for plfog - Past Lives Makerspace."""
 
 import os
+import sys
 from pathlib import Path
 
 import dj_database_url
@@ -105,15 +106,27 @@ WSGI_APPLICATION = "plfog.wsgi.application"
 
 # Database
 DATABASE_URL = os.environ.get("DATABASE_URL")
+_IS_PYTEST = "pytest" in sys.argv[0] or "PYTEST_CURRENT_TEST" in os.environ
+
 if DATABASE_URL:
     DATABASES = {"default": dj_database_url.parse(DATABASE_URL)}
-else:
+elif _IS_PYTEST:
+    # Tests run without docker by default — use local sqlite file.
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": str(BASE_DIR / "db.sqlite3"),
         }
     }
+else:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "DATABASE_URL is not set. Start the dev server with `make server` "
+        "(loads .env automatically) or export DATABASE_URL yourself. "
+        "Refusing to fall back to on-disk sqlite — it causes schema drift "
+        "between local dev and prod."
+    )
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
