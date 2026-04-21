@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from django import forms
 
-from classes.models import ClassOffering
+from classes.models import Category, ClassOffering
 
 
 class ClassOfferingForm(forms.ModelForm):
@@ -33,3 +33,9 @@ class ClassOfferingForm(forms.ModelForm):
             "image",
             "requires_model_release",
         ]
+
+
+class CategoryForm(forms.ModelForm):
+    class Meta:
+        model = Category
+        fields = ["name", "slug", "sort_order", "hero_image"]

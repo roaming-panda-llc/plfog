@@ -1,2 +1,36 @@
 {% extends "classes/admin/base.html" %}
-{% block tab_content %}<p>Coming soon.</p>{% endblock %}
+{% block tab_content %}
+<div style="display:flex; justify-content:flex-end; margin-bottom:1rem;">
+    <a class="hub-btn hub-btn--primary" href="{% url 'classes:admin_category_create' %}">+ New Category</a>
+</div>
+<table style="width:100%; border-collapse:collapse;">
+    <thead>
+        <tr style="border-bottom:2px solid var(--hub-border);">
+            <th style="text-align:left; padding:0.5rem 0.75rem; font-weight:600;">Name</th>
+            <th style="text-align:left; padding:0.5rem 0.75rem; font-weight:600;">Slug</th>
+            <th style="text-align:left; padding:0.5rem 0.75rem; font-weight:600;">Sort</th>
+            <th style="padding:0.5rem 0.75rem;"></th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for c in categories %}
+        <tr style="border-bottom:1px solid var(--hub-border);">
+            <td style="padding:0.5rem 0.75rem;">{{ c.name }}</td>
+            <td style="padding:0.5rem 0.75rem;">{{ c.slug }}</td>
+            <td style="padding:0.5rem 0.75rem;">{{ c.sort_order }}</td>
+            <td style="padding:0.5rem 0.75rem; display:flex; gap:0.5rem;">
+                <a class="hub-btn" href="{% url 'classes:admin_category_edit' pk=c.pk %}">Edit</a>
+                <form method="post" action="{% url 'classes:admin_category_delete' pk=c.pk %}" style="display:inline;">
+                    {% csrf_token %}
+                    <button class="hub-btn">Delete</button>
+                </form>
+            </td>
+        </tr>
+    {% empty %}
+        <tr>
+            <td colspan="4" style="padding:1.5rem 0.75rem; color:var(--hub-text-muted);">No categories yet.</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

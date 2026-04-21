@@ -10,8 +10,8 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 
-from classes.forms import ClassOfferingForm
-from classes.models import ClassOffering
+from classes.forms import CategoryForm, ClassOfferingForm
+from classes.models import Category, ClassOffering
 
 if TYPE_CHECKING:
     pass
@@ -123,7 +123,50 @@ def admin_class_duplicate(request: HttpRequest, pk: int) -> HttpResponse:
 
 @admin_required
 def admin_categories(request: HttpRequest) -> HttpResponse:
-    return render(request, "classes/admin/categories.html", {"active_tab": "categories"})
+    categories = Category.objects.all()
+    return render(
+        request,
+        "classes/admin/categories.html",
+        {"active_tab": "categories", "categories": categories},
+    )
+
+
+@admin_required
+def admin_category_create(request: HttpRequest) -> HttpResponse:
+    form = CategoryForm(request.POST or None, request.FILES or None)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Category created.")
+        return redirect("classes:admin_categories")
+    return render(
+        request,
+        "classes/admin/category_form.html",
+        {"active_tab": "categories", "form": form, "mode": "create"},
+    )
+
+
+@admin_required
+def admin_category_edit(request: HttpRequest, pk: int) -> HttpResponse:
+    category = get_object_or_404(Category, pk=pk)
+    form = CategoryForm(request.POST or None, request.FILES or None, instance=category)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Category updated.")
+        return redirect("classes:admin_categories")
+    return render(
+        request,
+        "classes/admin/category_form.html",
+        {"active_tab": "categories", "form": form, "category": category, "mode": "edit"},
+    )
+
+
+@admin_required
+def admin_category_delete(request: HttpRequest, pk: int) -> HttpResponse:
+    category = get_object_or_404(Category, pk=pk)
+    if request.method == "POST":
+        category.delete()
+        messages.success(request, "Category deleted.")
+    return redirect("classes:admin_categories")
 
 
 @admin_required
