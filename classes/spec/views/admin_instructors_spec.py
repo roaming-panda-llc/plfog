@@ -11,7 +11,7 @@ def describe_admin_instructors():
         from classes.factories import InstructorFactory
 
         client.force_login(admin_user)
-        inst = InstructorFactory(display_name="Alice Teacher")
+        InstructorFactory(display_name="Alice Teacher")
         response = client.get(reverse("classes:admin_instructors"))
         assert response.status_code == 200
         assert b"Alice Teacher" in response.content

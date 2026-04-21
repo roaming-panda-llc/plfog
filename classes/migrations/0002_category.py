@@ -4,25 +4,27 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('classes', '0001_initial'),
+        ("classes", "0001_initial"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Category',
+            name="Category",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(help_text='Display name (e.g. Woodworking).', max_length=100, unique=True)),
-                ('slug', models.SlugField(help_text='URL slug.', max_length=100, unique=True)),
-                ('sort_order', models.PositiveIntegerField(default=0, help_text='Ascending sort; lower shows first.')),
-                ('hero_image', models.ImageField(blank=True, help_text='Optional header image.', upload_to='classes/categories/')),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("name", models.CharField(help_text="Display name (e.g. Woodworking).", max_length=100, unique=True)),
+                ("slug", models.SlugField(help_text="URL slug.", max_length=100, unique=True)),
+                ("sort_order", models.PositiveIntegerField(default=0, help_text="Ascending sort; lower shows first.")),
+                (
+                    "hero_image",
+                    models.ImageField(blank=True, help_text="Optional header image.", upload_to="classes/categories/"),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
             ],
             options={
-                'verbose_name_plural': 'Categories',
-                'ordering': ['sort_order', 'name'],
+                "verbose_name_plural": "Categories",
+                "ordering": ["sort_order", "name"],
             },
         ),
     ]

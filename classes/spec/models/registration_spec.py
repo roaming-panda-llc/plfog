@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 from django.contrib.auth import get_user_model
 
 from classes.factories import ClassOfferingFactory, RegistrationFactory

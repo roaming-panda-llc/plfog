@@ -28,7 +28,6 @@ def describe_admin_categories():
 
     def it_edits_a_category(admin_user, client, db):
         from classes.factories import CategoryFactory
-        from classes.models import Category
 
         client.force_login(admin_user)
         cat = CategoryFactory(name="Old")

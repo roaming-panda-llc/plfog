@@ -206,7 +206,8 @@ def admin_registrations(request: HttpRequest) -> HttpResponse:
 @admin_required
 def admin_registration_detail(request: HttpRequest, pk: int) -> HttpResponse:
     registration = get_object_or_404(
-        Registration.objects.select_related("class_offering", "member").prefetch_related("waivers"), pk=pk,
+        Registration.objects.select_related("class_offering", "member").prefetch_related("waivers"),
+        pk=pk,
     )
     return render(
         request,

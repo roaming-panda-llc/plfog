@@ -6,7 +6,7 @@ import pytest
 from django.db.utils import IntegrityError
 
 from classes.factories import ClassOfferingFactory, RegistrationFactory
-from classes.models import Registration, Waiver
+from classes.models import Waiver
 
 
 def describe_Waiver():
@@ -14,8 +14,10 @@ def describe_Waiver():
         offering = ClassOfferingFactory()
         reg = RegistrationFactory(class_offering=offering)
         waiver = Waiver.objects.create(
-            registration=reg, kind=Waiver.Kind.LIABILITY,
-            waiver_text="text", signature_text="A B",
+            registration=reg,
+            kind=Waiver.Kind.LIABILITY,
+            waiver_text="text",
+            signature_text="A B",
         )
         assert "liability" in str(waiver).lower()
 

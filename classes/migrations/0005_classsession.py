@@ -5,24 +5,35 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('classes', '0004_classoffering'),
+        ("classes", "0004_classoffering"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='ClassSession',
+            name="ClassSession",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('starts_at', models.DateTimeField(help_text='Start (timezone-aware).')),
-                ('ends_at', models.DateTimeField(help_text='End (timezone-aware).')),
-                ('sort_order', models.PositiveIntegerField(default=0, help_text='Display order within a class.')),
-                ('class_offering', models.ForeignKey(help_text='Parent class offering.', on_delete=django.db.models.deletion.CASCADE, related_name='sessions', to='classes.classoffering')),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("starts_at", models.DateTimeField(help_text="Start (timezone-aware).")),
+                ("ends_at", models.DateTimeField(help_text="End (timezone-aware).")),
+                ("sort_order", models.PositiveIntegerField(default=0, help_text="Display order within a class.")),
+                (
+                    "class_offering",
+                    models.ForeignKey(
+                        help_text="Parent class offering.",
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="sessions",
+                        to="classes.classoffering",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['starts_at'],
-                'constraints': [models.CheckConstraint(condition=models.Q(('ends_at__gt', models.F('starts_at'))), name='session_ends_after_starts')],
+                "ordering": ["starts_at"],
+                "constraints": [
+                    models.CheckConstraint(
+                        condition=models.Q(("ends_at__gt", models.F("starts_at"))), name="session_ends_after_starts"
+                    )
+                ],
             },
         ),
     ]

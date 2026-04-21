@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from django.utils import timezone
 
 from classes.factories import ClassOfferingFactory, InstructorFactory
 from classes.models import ClassOffering

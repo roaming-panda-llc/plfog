@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from django import forms
 from django.contrib.auth import get_user_model
 from django.utils.text import slugify
 
 from classes.models import Category, ClassOffering, ClassSettings, DiscountCode
+
+if TYPE_CHECKING:
+    from classes.models import Instructor
 
 
 class ClassOfferingForm(forms.ModelForm):
@@ -52,12 +57,10 @@ class InstructorInviteForm(forms.Form):
         email = self.cleaned_data["email"].lower().strip()
         User = get_user_model()
         if User.objects.filter(email__iexact=email).exists():
-            raise forms.ValidationError(
-                "A user with this email already exists. Link them manually in Django admin."
-            )
+            raise forms.ValidationError("A user with this email already exists. Link them manually in Django admin.")
         return email
 
-    def save(self) -> "Instructor":  # type: ignore[name-defined]
+    def save(self) -> Instructor:
         from allauth.account.models import EmailAddress
 
         from classes.models import Instructor

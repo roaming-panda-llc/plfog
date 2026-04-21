@@ -14,18 +14,22 @@ def describe_admin_settings():
 
     def it_saves_settings(admin_user, client, db):
         client.force_login(admin_user)
-        response = client.post(reverse("classes:admin_settings"), {
-            "liability_waiver_text": "NEW LIABILITY TEXT",
-            "model_release_waiver_text": "NEW MODEL RELEASE",
-            "default_member_discount_pct": 15,
-            "reminder_hours_before": 48,
-            "mailchimp_api_key": "",
-            "mailchimp_list_id": "",
-            "google_analytics_measurement_id": "G-ABC123",
-            "confirmation_email_footer": "",
-        })
+        response = client.post(
+            reverse("classes:admin_settings"),
+            {
+                "liability_waiver_text": "NEW LIABILITY TEXT",
+                "model_release_waiver_text": "NEW MODEL RELEASE",
+                "default_member_discount_pct": 15,
+                "reminder_hours_before": 48,
+                "mailchimp_api_key": "",
+                "mailchimp_list_id": "",
+                "google_analytics_measurement_id": "G-ABC123",
+                "confirmation_email_footer": "",
+            },
+        )
         assert response.status_code == 302
         from classes.models import ClassSettings
+
         settings_obj = ClassSettings.load()
         assert settings_obj.default_member_discount_pct == 15
         assert settings_obj.google_analytics_measurement_id == "G-ABC123"

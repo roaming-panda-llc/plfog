@@ -86,8 +86,12 @@ class ClassOffering(models.Model):
 
     title = models.CharField(max_length=255, help_text="Public class title.")
     slug = models.SlugField(max_length=255, unique=True, help_text="URL slug.")
-    category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="classes", help_text="Category grouping.")
-    instructor = models.ForeignKey(Instructor, on_delete=models.PROTECT, related_name="classes", help_text="Assigned instructor.")
+    category = models.ForeignKey(
+        Category, on_delete=models.PROTECT, related_name="classes", help_text="Category grouping."
+    )
+    instructor = models.ForeignKey(
+        Instructor, on_delete=models.PROTECT, related_name="classes", help_text="Assigned instructor."
+    )
     description = models.TextField(blank=True, help_text="Class description — markdown-safe.")
     prerequisites = models.TextField(blank=True, help_text="What a student should know/own.")
     materials_included = models.TextField(blank=True, help_text="Included materials.")
@@ -99,7 +103,9 @@ class ClassOffering(models.Model):
     member_discount_pct = models.PositiveIntegerField(default=10, help_text="Auto-applied for verified members.")
     capacity = models.PositiveIntegerField(default=6, help_text="Maximum confirmed registrants.")
     scheduling_model = models.CharField(
-        max_length=10, choices=SchedulingModel.choices, default=SchedulingModel.FIXED,
+        max_length=10,
+        choices=SchedulingModel.choices,
+        default=SchedulingModel.FIXED,
         help_text="Fixed scheduled sessions or flexible per-student scheduling.",
     )
     flexible_note = models.TextField(blank=True, help_text="Notes when scheduling_model=flexible.")
@@ -107,14 +113,26 @@ class ClassOffering(models.Model):
     private_for_name = models.CharField(max_length=255, blank=True, help_text="Name shown when private.")
     recurring_pattern = models.CharField(max_length=255, blank=True, help_text="Free-text recurrence description.")
     image = models.ImageField(upload_to="classes/images/", blank=True, help_text="Hero image.")
-    requires_model_release = models.BooleanField(default=False, help_text="When on, registrants also sign model release.")
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT, help_text="Lifecycle status.")
+    requires_model_release = models.BooleanField(
+        default=False, help_text="When on, registrants also sign model release."
+    )
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.DRAFT, help_text="Lifecycle status."
+    )
     created_by = models.ForeignKey(
-        Instructor, on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+        Instructor,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
         help_text="Instructor who authored the class.",
     )
     approved_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
         help_text="Admin user who approved publication.",
     )
     published_at = models.DateTimeField(null=True, blank=True, help_text="Stamp on first publish.")
@@ -150,7 +168,9 @@ class ClassOffering(models.Model):
 
 class ClassSession(models.Model):
     class_offering = models.ForeignKey(
-        ClassOffering, on_delete=models.CASCADE, related_name="sessions",
+        ClassOffering,
+        on_delete=models.CASCADE,
+        related_name="sessions",
         help_text="Parent class offering.",
     )
     starts_at = models.DateTimeField(help_text="Start (timezone-aware).")
@@ -219,7 +239,9 @@ class Waiver(models.Model):
         MODEL_RELEASE = "model_release", "Model Release"
 
     registration = models.ForeignKey(
-        "Registration", on_delete=models.CASCADE, related_name="waivers",
+        "Registration",
+        on_delete=models.CASCADE,
+        related_name="waivers",
         help_text="The registration this waiver belongs to.",
     )
     kind = models.CharField(max_length=20, choices=Kind.choices, help_text="Which waiver was signed.")
@@ -240,11 +262,15 @@ class Waiver(models.Model):
 
 class RegistrationReminder(models.Model):
     registration = models.ForeignKey(
-        "Registration", on_delete=models.CASCADE, related_name="reminders",
+        "Registration",
+        on_delete=models.CASCADE,
+        related_name="reminders",
         help_text="The registration the reminder was sent to.",
     )
     session = models.ForeignKey(
-        ClassSession, on_delete=models.CASCADE, related_name="reminders",
+        ClassSession,
+        on_delete=models.CASCADE,
+        related_name="reminders",
         help_text="The session the reminder referenced.",
     )
     sent_at = models.DateTimeField(auto_now_add=True)
@@ -268,11 +294,16 @@ class Registration(models.Model):
         REFUNDED = "refunded", "Refunded"
 
     class_offering = models.ForeignKey(
-        ClassOffering, on_delete=models.PROTECT, related_name="registrations",
+        ClassOffering,
+        on_delete=models.PROTECT,
+        related_name="registrations",
         help_text="The class this registration is for.",
     )
     member = models.ForeignKey(
-        "membership.Member", null=True, blank=True, on_delete=models.SET_NULL,
+        "membership.Member",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
         related_name="class_registrations",
         help_text="Auto-linked when email matches a verified Member email.",
     )
@@ -286,20 +317,29 @@ class Registration(models.Model):
     address_state = models.CharField(max_length=50, blank=True)
     address_zip = models.CharField(max_length=20, blank=True)
     prior_experience = models.TextField(blank=True, help_text="Free-text prior-experience question.")
-    looking_for = models.TextField(blank=True, help_text="Free-text 'what are you hoping to get out of this?' question.")
+    looking_for = models.TextField(
+        blank=True, help_text="Free-text 'what are you hoping to get out of this?' question."
+    )
     discount_code = models.ForeignKey(
-        DiscountCode, null=True, blank=True, on_delete=models.SET_NULL,
+        DiscountCode,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
         help_text="Discount code used at registration, if any.",
     )
     amount_paid_cents = models.PositiveIntegerField(default=0, help_text="Amount actually paid (after discount).")
     status = models.CharField(
-        max_length=20, choices=Status.choices, default=Status.PENDING,
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
         help_text="Lifecycle status.",
     )
     stripe_session_id = models.CharField(max_length=255, blank=True, help_text="Stripe Checkout Session ID.")
     stripe_payment_id = models.CharField(max_length=255, blank=True, help_text="Stripe PaymentIntent ID on confirm.")
     self_serve_token = models.CharField(
-        max_length=128, unique=True, db_index=True,
+        max_length=128,
+        unique=True,
+        db_index=True,
         help_text="Random token used in /classes/my/<token>/ self-serve URL.",
     )
     subscribed_to_mailchimp = models.BooleanField(default=False, help_text="Whether MailChimp subscribe succeeded.")
@@ -332,7 +372,9 @@ class Registration(models.Model):
             Member.objects.filter(
                 user__emailaddress__email__iexact=self.email,
                 user__emailaddress__verified=True,
-            ).distinct().first()
+            )
+            .distinct()
+            .first()
         )
         if match is not None:
             self.member = match
@@ -371,9 +413,7 @@ class ClassSettings(models.Model):
         blank=True,
         help_text="GA4 measurement ID (e.g. G-XXXXXXX). Leave blank to disable GA tag.",
     )
-    confirmation_email_footer = models.TextField(
-        blank=True, help_text="Custom footer appended to confirmation emails."
-    )
+    confirmation_email_footer = models.TextField(blank=True, help_text="Custom footer appended to confirmation emails.")
 
     class Meta:
         verbose_name = "Class Settings"
