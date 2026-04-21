@@ -20,6 +20,8 @@ urlpatterns = [
     path("admin/instructors/", views.admin_instructors, name="admin_instructors"),
     path("admin/instructors/new/", views.admin_instructor_invite, name="admin_instructor_invite"),
     path("admin/registrations/", views.admin_registrations, name="admin_registrations"),
+    path("admin/registrations/<int:pk>/", views.admin_registration_detail, name="admin_registration_detail"),
+    path("admin/registrations/<int:pk>/cancel/", views.admin_registration_cancel, name="admin_registration_cancel"),
     path("admin/discount-codes/", views.admin_discount_codes, name="admin_discount_codes"),
     path("admin/settings/", views.admin_settings, name="admin_settings"),
 ]

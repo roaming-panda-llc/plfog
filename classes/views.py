@@ -11,7 +11,7 @@ from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 
 from classes.forms import CategoryForm, ClassOfferingForm, InstructorInviteForm
-from classes.models import Category, ClassOffering, Instructor
+from classes.models import Category, ClassOffering, Instructor, Registration
 
 if TYPE_CHECKING:
     pass
@@ -195,7 +195,33 @@ def admin_instructor_invite(request: HttpRequest) -> HttpResponse:
 
 @admin_required
 def admin_registrations(request: HttpRequest) -> HttpResponse:
-    return render(request, "classes/admin/registrations.html", {"active_tab": "registrations"})
+    registrations = Registration.objects.select_related("class_offering", "member").order_by("-registered_at")
+    return render(
+        request,
+        "classes/admin/registrations.html",
+        {"active_tab": "registrations", "registrations": registrations},
+    )
+
+
+@admin_required
+def admin_registration_detail(request: HttpRequest, pk: int) -> HttpResponse:
+    registration = get_object_or_404(
+        Registration.objects.select_related("class_offering", "member").prefetch_related("waivers"), pk=pk,
+    )
+    return render(
+        request,
+        "classes/admin/registration_detail.html",
+        {"active_tab": "registrations", "registration": registration},
+    )
+
+
+@admin_required
+def admin_registration_cancel(request: HttpRequest, pk: int) -> HttpResponse:
+    registration = get_object_or_404(Registration, pk=pk)
+    if request.method == "POST":
+        registration.cancel(reason=request.POST.get("reason", ""))
+        messages.success(request, "Registration cancelled.")
+    return redirect("classes:admin_registration_detail", pk=pk)
 
 
 @admin_required
