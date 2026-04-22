@@ -1,16 +1,12 @@
-"""Custom managers / querysets for classes models."""
+"""Custom managers / querysets for classes models.
+
+The concrete ``ClassOfferingQuerySet`` lives in ``classes.models`` alongside the
+model so django-stubs can resolve the manager type. This module re-exports it
+for backwards compatibility with any callers still importing from here.
+"""
 
 from __future__ import annotations
 
-from django.db import models
+from classes.models import ClassOfferingQuerySet
 
-
-class ClassOfferingQuerySet(models.QuerySet):
-    def public(self) -> "ClassOfferingQuerySet":
-        return self.filter(status="published")
-
-    def pending_review(self) -> "ClassOfferingQuerySet":
-        return self.filter(status="pending")
-
-    def for_instructor(self, instructor) -> "ClassOfferingQuerySet":
-        return self.filter(instructor=instructor)
+__all__ = ["ClassOfferingQuerySet"]
