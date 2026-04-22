@@ -7,17 +7,14 @@
 
 <div class="directory-grid">
     {% for member in members %}
-    <div class="directory-card" style="text-align:center;">
+    <div class="directory-card"{% if member.profile_photo %} style="text-align:center;"{% endif %}>
+        {% if member.profile_photo %}
         <div class="directory-card__name" style="margin-bottom:0.75rem;">{{ member.display_name }}</div>
         <div style="display:flex;justify-content:center;margin-bottom:0.75rem;">
-            {% if member.profile_photo %}
             <img class="directory-card__avatar directory-card__avatar--photo"
                  src="{{ member.profile_photo.url }}"
                  alt="{{ member.display_name }}"
                  style="width:120px;height:120px;border-radius:50%;object-fit:cover;">
-            {% else %}
-            <div class="directory-card__avatar" style="width:120px;height:120px;border-radius:50%;display:flex;align-items:center;justify-content:center;">{{ member.initials }}</div>
-            {% endif %}
         </div>
         <div class="directory-card__identity">
             {% if member.preferred_name and member.preferred_name != member.full_legal_name %}
@@ -33,6 +30,26 @@
                 {% endif %}
             </div>
         </div>
+        {% else %}
+        <div class="directory-card__header">
+            <div class="directory-card__avatar">{{ member.initials }}</div>
+            <div class="directory-card__identity">
+                <div class="directory-card__name">{{ member.display_name }}</div>
+                {% if member.preferred_name and member.preferred_name != member.full_legal_name %}
+                <div class="directory-card__preferred">{{ member.preferred_name }}</div>
+                {% endif %}
+                <div class="directory-card__meta">
+                    <span class="directory-card__role">{{ member.get_member_type_display }}</span>
+                    {% if member.pronouns and member.pronouns != "prefer not to share" %}
+                    <span class="directory-card__pronouns">{{ member.pronouns }}</span>
+                    {% endif %}
+                    {% if member.join_date %}
+                    <span class="directory-card__joined">Joined {{ member.join_date|date:"N Y" }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
         {% if member.about_me %}
         <p class="directory-card__about">{{ member.about_me }}</p>
         {% endif %}
