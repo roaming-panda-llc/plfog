@@ -13,7 +13,7 @@
             <img class="directory-card__avatar directory-card__avatar--photo"
                  src="{{ member.profile_photo.url }}"
                  alt="{{ member.display_name }}"
-                 style="object-fit:cover;">
+                 style="width:96px;height:96px;border-radius:50%;object-fit:cover;flex-shrink:0;">
             {% else %}
             <div class="directory-card__avatar">{{ member.initials }}</div>
             {% endif %}
