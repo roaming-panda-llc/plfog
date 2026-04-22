@@ -10,6 +10,7 @@ urlpatterns = [
     path("members/", views.member_directory, name="hub_member_directory"),
     path("guilds/<int:pk>/", views.guild_detail, name="hub_guild_detail"),
     path("guilds/<int:pk>/edit/", views.guild_edit, name="hub_guild_edit"),
+    path("guilds/<int:pk>/banner/delete/", views.guild_banner_delete, name="hub_guild_banner_delete"),
     path("guilds/<int:pk>/cart/confirm/", views.guild_cart_confirm, name="hub_guild_cart_confirm"),
     path("guilds/<int:pk>/eyop-form/", views.guild_eyop_form, name="hub_guild_eyop_form"),
     path(

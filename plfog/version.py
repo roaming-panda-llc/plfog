@@ -11,11 +11,11 @@ CHANGELOG: list[dict[str, str | list[str]]] = [
         "title": "Photos for member profiles, guild banners, and classes",
         "changes": [
             "You can now upload a profile photo on your User Settings → Profile page — your photo replaces your initials in the member directory and in the top-right of the navbar",
-            "Guild leads can add a banner image to their guild's page — it appears at the top of the guild detail page above the name and About section",
+            "Guild leads can add a banner image to their guild's page — it appears at the top of the guild detail page above the name and About section, with a tooltip explaining the recommended dimensions",
             "Class images (categories, instructors, and individual classes) and other photos uploaded through the admin now stay around between deploys instead of disappearing",
             "Image uploads have a 5 MB limit so things stay snappy and don't blow up our storage bill",
             "Replacing or removing a photo now also deletes the old file from storage so we don't accumulate orphaned images over time",
-            "Friendlier 'Delete photo' button with a confirmation pop-up replaces the small Clear checkbox that used to sit under the file input",
+            "Friendlier image-upload UI everywhere — the small 'Currently / Clear checkbox' has been replaced with a thumbnail preview and a small red 'Remove' (or 'Delete photo') button that asks for confirmation before deleting",
         ],
     },
     {

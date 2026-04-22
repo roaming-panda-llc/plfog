@@ -638,6 +638,20 @@ def profile_photo_delete(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+@require_POST
+def guild_banner_delete(request: HttpRequest, pk: int) -> HttpResponse:
+    """Clear a guild's banner image and redirect back to the guild page."""
+    guild = get_object_or_404(Guild, pk=pk)
+    forbidden = _require_can_edit_guild(request, guild)
+    if forbidden is not None:
+        return forbidden
+    if guild.banner_image:
+        guild.banner_image.delete(save=True)
+        messages.success(request, "Banner removed.")
+    return redirect("hub_guild_detail", pk=guild.pk)
+
+
+@login_required
 def beta_feedback(request: HttpRequest) -> HttpResponse:
     """Beta feedback page — users can report bugs, request features, or leave general feedback."""
     ctx = _get_hub_context(request)

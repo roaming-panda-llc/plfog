@@ -1,0 +1,41 @@
+{% comment %}
+Project-wide override for Django's default ClearableFileInput template.
+Activated via FORM_RENDERER = "django.forms.renderers.TemplatesSetting" and
+"django.forms" in INSTALLED_APPS.
+
+Replaces the ugly "Currently: <link> [✓] Clear / Change:" UI with a
+thumbnail preview (for images) and a small red "Remove" button that toggles
+the hidden Django clear-checkbox via vanilla JS — no Alpine required, so it
+works inside the Django admin and any other form that doesn't load Alpine.
+
+Affects every ImageField / FileField in the project (admin and front-end).
+The hub Profile/Guild forms use templates/components/image_field.html which
+renders its own UI; this template is for everything else.
+{% endcomment %}
+{% with input_id=widget.attrs.id|default:widget.name %}
+<div class="pl-fileinput" data-fileinput>
+    {% if widget.is_initial %}
+    <div class="pl-fileinput__current" data-current>
+        {% with name=widget.value.name|default:"" %}
+        {% if ".jpg" in name or ".jpeg" in name or ".png" in name or ".gif" in name or ".webp" in name or ".svg" in name %}
+        <img src="{{ widget.value.url }}"
+             alt="Current {{ widget.name }}"
+             style="max-width:160px;max-height:120px;object-fit:cover;border-radius:6px;border:1px solid #ccc;display:block;margin-bottom:0.4rem;">
+        {% else %}
+        <a href="{{ widget.value.url }}" target="_blank" rel="noopener" style="display:inline-block;margin-right:0.5rem;">{{ widget.value }}</a>
+        {% endif %}
+        {% endwith %}
+        {% if not widget.required %}
+        <button type="button"
+                data-clear-toggle
+                onclick="(function(b){var cb=document.getElementById('{{ widget.checkbox_id }}');if(!cb.checked&&!confirm('Remove this file? It will be deleted from storage when you save the form.'))return;cb.checked=!cb.checked;var c=b.closest('[data-fileinput]');var cur=c.querySelector('[data-current]');if(cb.checked){cur.style.opacity='0.4';cur.style.textDecoration='line-through';b.textContent='Undo remove';b.style.borderColor='#888';b.style.color='#888';}else{cur.style.opacity='1';cur.style.textDecoration='none';b.textContent='Remove';b.style.borderColor='#d9534f';b.style.color='#d9534f';}})(this)"
+                style="background:transparent;border:1px solid #d9534f;color:#d9534f;font-size:0.75rem;padding:0.25rem 0.6rem;border-radius:4px;cursor:pointer;line-height:1;">
+            Remove
+        </button>
+        <input type="checkbox" name="{{ widget.checkbox_name }}" id="{{ widget.checkbox_id }}" style="display:none;">
+        {% endif %}
+    </div>
+    {% endif %}
+    <input type="{{ widget.type }}" name="{{ widget.name }}"{% include "django/forms/widgets/attrs.html" %}>
+</div>
+{% endwith %}

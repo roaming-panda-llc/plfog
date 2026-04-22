@@ -32,35 +32,10 @@
                     <input type="email" id="email" value="{{ user.email }}" disabled>
                     <span class="hub-field-hint">Manage your emails in the Emails tab.</span>
                 </div>
+                {% url 'hub_profile_photo_delete' as profile_photo_delete_url %}
                 {% for field in profile_form %}
                     {% if field.name == "profile_photo" %}
-                        <div class="pl-form-group">
-                            <label class="pl-form-label" for="{{ field.id_for_label }}">Profile photo</label>
-                            {% if member.profile_photo %}
-                            <div style="display:flex;align-items:center;gap:1rem;margin-bottom:0.75rem;">
-                                <img src="{{ member.profile_photo.url }}"
-                                     alt="Current profile photo"
-                                     style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:1px solid var(--hub-border);">
-                                <button type="button"
-                                        @click="$dispatch('open-confirm', 'delete-profile-photo')"
-                                        style="background:transparent;border:1px solid #d9534f;color:#d9534f;font-size:0.75rem;padding:0.25rem 0.6rem;border-radius:4px;cursor:pointer;line-height:1;">
-                                    Delete photo
-                                </button>
-                            </div>
-                            {% endif %}
-                            <input type="file"
-                                   name="{{ field.html_name }}"
-                                   id="{{ field.id_for_label }}"
-                                   accept="image/*">
-                            {% if field.errors %}
-                            <ul class="pl-field-errors">
-                                {% for error in field.errors %}<li class="pl-field-error">{{ error }}</li>{% endfor %}
-                            </ul>
-                            {% endif %}
-                            <p class="pl-field-hint">
-                                {% if member.profile_photo %}Pick a new file to replace the current photo. {% endif %}Max 5 MB.
-                            </p>
-                        </div>
+                        {% include "components/image_field.html" with field=field current_image=member.profile_photo delete_url=profile_photo_delete_url modal_id="delete-profile-photo" label="Profile photo" shape="circle" thumbnail_width="96px" delete_button_text="Delete photo" confirm_title="Delete profile photo?" confirm_message="Your profile photo will be removed from the member directory and from our storage. This can't be undone." hint_html="Optional. Shown next to your name in the member directory and in the navbar. Max 5 MB." %}
                     {% else %}
                         {% include "components/form_field.html" with field=field %}
                     {% endif %}
@@ -74,10 +49,6 @@
                     <button type="submit" class="hub-btn hub-btn--primary">Save Profile</button>
                 </div>
             </form>
-            {% url 'hub_profile_photo_delete' as photo_delete_url %}
-            {% if member.profile_photo %}
-            {% include "components/confirm_modal.html" with confirm_id="delete-profile-photo" confirm_title="Delete profile photo?" confirm_message="Your profile photo will be removed from the member directory and from our storage. This can't be undone." confirm_action_url=photo_delete_url confirm_button_text="Delete photo" %}
-            {% endif %}
             {% else %}
             <p class="hub-text-muted">Your account is not linked to a membership profile. Contact an admin for help.</p>
             {% endif %}

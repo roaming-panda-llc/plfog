@@ -1,0 +1,100 @@
+{% comment %}
+Reusable image-upload form field with a thumbnail preview, a small red
+"Delete" button that opens a confirmation modal, and an optional ? tooltip
+of recommended sizes. Replaces Django's default ClearableFileInput UI.
+
+Parameters (pass via {% include ... with %}):
+  field             — required, bound Django form field for the ImageField
+  current_image     — required, the model attribute currently storing the file
+                      (e.g. ``member.profile_photo`` or ``guild.banner_image``).
+                      May be falsy when no image is uploaded yet.
+  delete_url        — required when current_image is truthy — POST endpoint
+                      that deletes the file and redirects back.
+  modal_id          — required when current_image is truthy — unique DOM id
+                      for the confirm modal (e.g. ``delete-profile-photo``).
+  label             — optional, override field.label
+  shape             — optional, "circle" (default) or "rect"
+  thumbnail_width   — optional, CSS width (default: 96px circle / 240px rect)
+  thumbnail_height  — optional, CSS height (default: same as width for circle / 80px rect)
+  tooltip_html      — optional, HTML rendered inside a ? bubble next to the label
+  hint_html         — optional, HTML rendered as the hint text under the input
+  delete_button_text   — optional, default "Delete"
+  confirm_title     — optional, default "Delete image?"
+  confirm_message   — optional, default generic warning
+{% endcomment %}
+{% with shape=shape|default:"circle" %}
+{% if shape == "rect" %}
+    {% with tw=thumbnail_width|default:"240px" th=thumbnail_height|default:"80px" %}
+    <div class="pl-form-group" data-image-field>
+        <label class="pl-form-label" for="{{ field.id_for_label }}" style="display:inline-flex;align-items:center;gap:0.4rem;">
+            {{ label|default:field.label }}
+            {% if tooltip_html %}
+            <span class="pl-help" tabindex="0" aria-label="More info">
+                <span class="pl-help__icon" aria-hidden="true">?</span>
+                <span class="pl-help__bubble" role="tooltip">{{ tooltip_html|safe }}</span>
+            </span>
+            {% endif %}
+        </label>
+        {% if current_image %}
+        <div style="display:flex;align-items:center;gap:1rem;margin-bottom:0.75rem;">
+            <img src="{{ current_image.url }}"
+                 alt="Current {{ label|default:field.label|lower }}"
+                 style="width:{{ tw }};height:{{ th }};border-radius:6px;object-fit:cover;border:1px solid var(--hub-border);">
+            <button type="button"
+                    @click="$dispatch('open-confirm', '{{ modal_id }}')"
+                    style="background:transparent;border:1px solid #d9534f;color:#d9534f;font-size:0.75rem;padding:0.25rem 0.6rem;border-radius:4px;cursor:pointer;line-height:1;">
+                {{ delete_button_text|default:"Delete" }}
+            </button>
+        </div>
+        {% endif %}
+        <input type="file" name="{{ field.html_name }}" id="{{ field.id_for_label }}" accept="image/*">
+        {% if field.errors %}
+        <ul class="pl-field-errors">
+            {% for error in field.errors %}<li class="pl-field-error">{{ error }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+        {% if hint_html %}
+        <p class="pl-field-hint">{{ hint_html|safe }}</p>
+        {% endif %}
+    </div>
+    {% endwith %}
+{% else %}
+    {% with tw=thumbnail_width|default:"96px" th=thumbnail_height|default:thumbnail_width|default:"96px" %}
+    <div class="pl-form-group" data-image-field>
+        <label class="pl-form-label" for="{{ field.id_for_label }}" style="display:inline-flex;align-items:center;gap:0.4rem;">
+            {{ label|default:field.label }}
+            {% if tooltip_html %}
+            <span class="pl-help" tabindex="0" aria-label="More info">
+                <span class="pl-help__icon" aria-hidden="true">?</span>
+                <span class="pl-help__bubble" role="tooltip">{{ tooltip_html|safe }}</span>
+            </span>
+            {% endif %}
+        </label>
+        {% if current_image %}
+        <div style="display:flex;align-items:center;gap:1rem;margin-bottom:0.75rem;">
+            <img src="{{ current_image.url }}"
+                 alt="Current {{ label|default:field.label|lower }}"
+                 style="width:{{ tw }};height:{{ th }};border-radius:50%;object-fit:cover;border:1px solid var(--hub-border);">
+            <button type="button"
+                    @click="$dispatch('open-confirm', '{{ modal_id }}')"
+                    style="background:transparent;border:1px solid #d9534f;color:#d9534f;font-size:0.75rem;padding:0.25rem 0.6rem;border-radius:4px;cursor:pointer;line-height:1;">
+                {{ delete_button_text|default:"Delete" }}
+            </button>
+        </div>
+        {% endif %}
+        <input type="file" name="{{ field.html_name }}" id="{{ field.id_for_label }}" accept="image/*">
+        {% if field.errors %}
+        <ul class="pl-field-errors">
+            {% for error in field.errors %}<li class="pl-field-error">{{ error }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+        {% if hint_html %}
+        <p class="pl-field-hint">{{ hint_html|safe }}</p>
+        {% endif %}
+    </div>
+    {% endwith %}
+{% endif %}
+{% if current_image and delete_url and modal_id %}
+{% include "components/confirm_modal.html" with confirm_id=modal_id confirm_title=confirm_title|default:"Delete image?" confirm_message=confirm_message|default:"This image will be removed from our storage. This can't be undone." confirm_action_url=delete_url confirm_button_text=delete_button_text|default:"Delete" %}
+{% endif %}
+{% endwith %}

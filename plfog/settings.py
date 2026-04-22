@@ -53,6 +53,9 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.sites",
+    # Lets project templates override Django's built-in form widget templates
+    # (see FORM_RENDERER below and templates/django/forms/widgets/).
+    "django.forms",
     # Third-party
     "allauth",
     "allauth.account",
@@ -191,6 +194,12 @@ STORAGES = {
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Use the regular template engine for form widgets so we can override Django's
+# built-in widget templates from templates/django/forms/widgets/. See
+# templates/django/forms/widgets/clearable_file_input.html for the customized
+# image/file upload UI used by every ImageField/FileField (admin + hub).
+FORM_RENDERER = "django.forms.renderers.TemplatesSetting"
 
 # Django WebPush settings - MUST be configured via environment variables
 # In CI (CI=true), use placeholder values that will fail at push time, not at startup

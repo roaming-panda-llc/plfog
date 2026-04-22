@@ -22,25 +22,8 @@ the modal wrapper handles the chrome.
                   placeholder="Tell members what this guild is about...">{{ guild_edit_form.about.value|default_if_none:'' }}</textarea>
     </div>
 
-    <div class="pl-form-group">
-        <label class="pl-form-label" for="{{ guild_edit_form.banner_image.id_for_label }}" style="display:inline-flex;align-items:center;gap:0.4rem;">
-            Banner image
-            <span class="pl-help" tabindex="0" aria-label="Recommended banner sizes">
-                <span class="pl-help__icon" aria-hidden="true">?</span>
-                <span class="pl-help__bubble" role="tooltip">
-                    <strong>Recommended size:</strong> 1600&nbsp;&times;&nbsp;400&nbsp;px (4:1 aspect ratio).<br>
-                    Banners are cropped to fill the top of the guild page at up to 240&nbsp;px tall.<br>
-                    <strong>Format:</strong> JPG or PNG. <strong>Max file size:</strong> 5&nbsp;MB.
-                </span>
-            </span>
-        </label>
-        {{ guild_edit_form.banner_image }}
-        {% if guild_edit_form.banner_image.errors %}
-        <ul class="pl-field-errors">
-            {% for error in guild_edit_form.banner_image.errors %}<li class="pl-field-error">{{ error }}</li>{% endfor %}
-        </ul>
-        {% endif %}
-    </div>
+    {% url 'hub_guild_banner_delete' guild.pk as guild_banner_delete_url %}
+    {% include "components/image_field.html" with field=guild_edit_form.banner_image current_image=guild.banner_image delete_url=guild_banner_delete_url modal_id="delete-guild-banner" label="Banner image" shape="rect" thumbnail_width="240px" thumbnail_height="80px" delete_button_text="Delete banner" confirm_title="Delete banner image?" confirm_message="The banner will be removed from this guild's page and from our storage. This can't be undone." tooltip_html="<strong>Recommended size:</strong> 1600&nbsp;&times;&nbsp;400&nbsp;px (4:1 aspect ratio).<br>Banners are cropped to fill the top of the guild page at up to 240&nbsp;px tall.<br><strong>Format:</strong> JPG or PNG. <strong>Max file size:</strong> 5&nbsp;MB." hint_html="Optional. Shown across the top of the guild page." %}
 
     <p class="pl-modal-section-label">Calendar Integration</p>
 
