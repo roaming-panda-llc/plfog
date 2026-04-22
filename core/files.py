@@ -16,9 +16,10 @@ def delete_orphan_on_replace(instance: models.Model, field_name: str) -> None:
     """
     if not instance.pk:
         return
+    model = type(instance)
     try:
-        old_instance = type(instance).objects.only(field_name).get(pk=instance.pk)
-    except type(instance).DoesNotExist:
+        old_instance = model._default_manager.only(field_name).get(pk=instance.pk)
+    except model.DoesNotExist:  # type: ignore[attr-defined]
         return
     old_file = getattr(old_instance, field_name)
     new_file = getattr(instance, field_name)
