@@ -13,6 +13,7 @@ from django.db.models import DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from core.validators import validate_image_size
 from membership.managers import MemberEmailManager
 
 DEFAULT_PRICE_PER_SQFT = Decimal("3.75")
@@ -162,6 +163,12 @@ class Member(models.Model):
         help_text="Pronouns shown in the member directory.",
     )
     about_me = models.TextField(blank=True, help_text="Short bio shown in the member directory.")
+    profile_photo = models.ImageField(
+        upload_to="members/profile/",
+        blank=True,
+        validators=[validate_image_size],
+        help_text="Profile photo shown in the member directory.",
+    )
     billing_name = models.CharField(max_length=255, blank=True)
 
     # Emergency contact
@@ -434,6 +441,12 @@ class Guild(models.Model):
         blank=True,
         default="",
         help_text="Member-facing description or announcement shown on the guild page.",
+    )
+    banner_image = models.ImageField(
+        upload_to="guilds/banners/",
+        blank=True,
+        validators=[validate_image_size],
+        help_text="Banner image shown at the top of the guild page.",
     )
     calendar_url = models.URLField(
         blank=True,
@@ -763,7 +776,7 @@ class Space(models.Model):
         choices=Status.choices,
         default=Status.AVAILABLE,
     )
-    photo = models.ImageField(upload_to="spaces/", blank=True)
+    photo = models.ImageField(upload_to="spaces/", blank=True, validators=[validate_image_size])
     floorplan_ref = models.CharField(max_length=100, blank=True)
     sublet_guild = models.ForeignKey(
         "Guild",

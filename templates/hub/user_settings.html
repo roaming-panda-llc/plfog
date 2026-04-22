@@ -24,7 +24,7 @@
     <div x-show="tab === 'profile'" x-cloak>
         <div class="hub-card">
             {% if member %}
-            <form method="post" class="hub-form">
+            <form method="post" enctype="multipart/form-data" class="hub-form">
                 {% csrf_token %}
                 <input type="hidden" name="form_id" value="profile">
                 <div class="hub-form-group">

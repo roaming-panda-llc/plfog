@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
-VERSION = "1.7.0.2"
+VERSION = "1.7.1"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.7.1",
+        "date": "2026-04-21",
+        "title": "Photos for member profiles, guild banners, and classes",
+        "changes": [
+            "You can now upload a profile photo on your User Settings → Profile page — it shows up next to your name in the member directory in place of your initials",
+            "Guild leads can add a banner image to their guild's page — it appears at the top of the guild detail page above the name and About section",
+            "Class images (categories, instructors, and individual classes) and other photos uploaded through the admin now stay around between deploys instead of disappearing",
+            "Image uploads have a 5 MB limit so things stay snappy and don't blow up our storage bill",
+        ],
+    },
     {
         "version": "1.7.0.2",
         "date": "2026-04-21",

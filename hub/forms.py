@@ -19,7 +19,7 @@ class GuildEditForm(forms.ModelForm):
 
     class Meta:
         model = Guild
-        fields = ["name", "about", "calendar_url", "calendar_color"]
+        fields = ["name", "about", "banner_image", "calendar_url", "calendar_color"]
         widgets = {
             "name": forms.TextInput(attrs={"placeholder": "Guild name"}),
             "about": forms.Textarea(
@@ -32,10 +32,12 @@ class GuildEditForm(forms.ModelForm):
         }
         labels = {
             "about": "About",
+            "banner_image": "Banner image",
             "calendar_url": "Google Calendar iCal URL",
             "calendar_color": "Calendar Color",
         }
         help_texts = {
+            "banner_image": "Shown at the top of the guild page. Max 5 MB.",
             "calendar_url": (
                 "In Google Calendar → Settings → your calendar → 'Secret address in iCal format'. "
                 "Leave blank if you don't use Google Calendar."
@@ -56,6 +58,7 @@ class ProfileSettingsForm(forms.ModelForm):
             "discord_handle",
             "other_contact_info",
             "about_me",
+            "profile_photo",
             "show_in_directory",
         ]
         widgets = {
@@ -70,6 +73,10 @@ class ProfileSettingsForm(forms.ModelForm):
             "discord_handle": "Discord",
             "other_contact_info": "Other contact info",
             "about_me": "About me",
+            "profile_photo": "Profile photo",
+        }
+        help_texts = {
+            "profile_photo": "Optional. Shown next to your name in the member directory. Max 5 MB.",
         }
 
 

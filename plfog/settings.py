@@ -145,8 +145,48 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
+
+# Media (user uploads). Stored on Cloudflare R2 in any environment that has the
+# R2 env vars configured; otherwise falls back to local FileSystemStorage so
+# tests and unconfigured dev machines keep working without external dependencies.
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID", "")
+R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME", "")
+R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID", "")
+R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY", "")
+R2_PUBLIC_URL = os.environ.get("R2_PUBLIC_URL", "").rstrip("/")
+_R2_READY = all([R2_ACCOUNT_ID, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_PUBLIC_URL])
+
+# Maximum upload size for ImageField uploads (members, guilds, classes).
+MAX_UPLOAD_IMAGE_BYTES = int(os.environ.get("MAX_UPLOAD_IMAGE_BYTES", str(5 * 1024 * 1024)))  # 5 MB
+
+if _R2_READY:
+    _default_storage = {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "bucket_name": R2_BUCKET_NAME,
+            "access_key": R2_ACCESS_KEY_ID,
+            "secret_key": R2_SECRET_ACCESS_KEY,
+            "endpoint_url": f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com",
+            "region_name": "auto",
+            "signature_version": "s3v4",
+            "addressing_style": "virtual",
+            # R2 does not support per-object ACLs; the bucket's Public Development URL
+            # (or a custom domain) serves files publicly.
+            "default_acl": None,
+            "querystring_auth": False,
+            "custom_domain": R2_PUBLIC_URL.replace("https://", "").replace("http://", ""),
+            "url_protocol": "https:",
+            "file_overwrite": False,
+        },
+    }
+else:
+    _default_storage = {"BACKEND": "django.core.files.storage.FileSystemStorage"}
+
 STORAGES = {
-    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "default": _default_storage,
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 

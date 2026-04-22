@@ -333,7 +333,7 @@ def guild_edit(request: HttpRequest, pk: int) -> HttpResponse:
     if forbidden is not None:
         return forbidden
 
-    form = GuildEditForm(request.POST, instance=guild)
+    form = GuildEditForm(request.POST, request.FILES, instance=guild)
     if form.is_valid():
         form.save()
         messages.success(request, "Guild updated.")
@@ -570,7 +570,7 @@ def user_settings(request: HttpRequest) -> HttpResponse:
         if member is None:
             messages.error(request, "Your account is not linked to a membership.")
             return redirect("hub_user_settings")
-        profile_form = ProfileSettingsForm(request.POST, instance=member)
+        profile_form = ProfileSettingsForm(request.POST, request.FILES, instance=member)
         if profile_form.is_valid():
             profile_form.save()
             messages.success(request, "Profile updated.")

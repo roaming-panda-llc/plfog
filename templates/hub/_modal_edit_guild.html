@@ -4,7 +4,7 @@ once as the modal body (via {% include "components/modal.html" %} with
 modal_body=...), and once-nothing here — we render the form directly and
 the modal wrapper handles the chrome.
 {% endcomment %}
-<form method="post" action="{% url 'hub_guild_edit' guild.pk %}" class="pl-guild-edit-form">
+<form method="post" action="{% url 'hub_guild_edit' guild.pk %}" enctype="multipart/form-data" class="pl-guild-edit-form">
     {% csrf_token %}
     <div class="pl-form-group">
         <label class="pl-form-label" for="id_guild_name">Guild name</label>
@@ -21,6 +21,8 @@ the modal wrapper handles the chrome.
                   rows="5"
                   placeholder="Tell members what this guild is about...">{{ guild_edit_form.about.value|default_if_none:'' }}</textarea>
     </div>
+
+    {% include "components/form_field.html" with field=guild_edit_form.banner_image %}
 
     <p class="pl-modal-section-label">Calendar Integration</p>
 

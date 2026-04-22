@@ -9,7 +9,14 @@
     {% for member in members %}
     <div class="directory-card">
         <div class="directory-card__header">
+            {% if member.profile_photo %}
+            <img class="directory-card__avatar directory-card__avatar--photo"
+                 src="{{ member.profile_photo.url }}"
+                 alt="{{ member.display_name }}"
+                 style="object-fit:cover;">
+            {% else %}
             <div class="directory-card__avatar">{{ member.initials }}</div>
+            {% endif %}
             <div class="directory-card__identity">
                 <div class="directory-card__name">{{ member.display_name }}</div>
                 {% if member.preferred_name and member.preferred_name != member.full_legal_name %}
