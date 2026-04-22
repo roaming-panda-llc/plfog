@@ -47,6 +47,7 @@ def describe_profile_settings_form():
             "discord_handle",
             "other_contact_info",
             "about_me",
+            "profile_photo",
             "show_in_directory",
         ]
 

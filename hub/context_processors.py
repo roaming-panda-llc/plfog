@@ -18,13 +18,17 @@ def hub_sidebar(request: HttpRequest) -> dict[str, Any]:
     requests so login/public pages don't hit the DB.
     """
     if not getattr(request.user, "is_authenticated", False):
-        return {"guilds": Guild.objects.none(), "user_initials": ""}
+        return {"guilds": Guild.objects.none(), "user_initials": "", "user_profile_photo_url": ""}
 
     initials = ""
+    photo_url = ""
     member: Member | None = getattr(request.user, "member", None)
     if member is not None:
         initials = member.initials
+        if member.profile_photo:
+            photo_url = member.profile_photo.url
     return {
         "guilds": Guild.objects.order_by("name"),
         "user_initials": initials,
+        "user_profile_photo_url": photo_url,
     }

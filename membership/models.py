@@ -13,6 +13,8 @@ from django.db.models import DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from core.files import delete_orphan_on_replace
+from core.validators import validate_image_size
 from membership.managers import MemberEmailManager
 
 DEFAULT_PRICE_PER_SQFT = Decimal("3.75")
@@ -162,6 +164,12 @@ class Member(models.Model):
         help_text="Pronouns shown in the member directory.",
     )
     about_me = models.TextField(blank=True, help_text="Short bio shown in the member directory.")
+    profile_photo = models.ImageField(
+        upload_to="members/profile/",
+        blank=True,
+        validators=[validate_image_size],
+        help_text="Profile photo shown in the member directory.",
+    )
     billing_name = models.CharField(max_length=255, blank=True)
 
     # Emergency contact
@@ -364,8 +372,11 @@ class Member(models.Model):
         self.user.is_superuser = new_super
         self.user.save(update_fields=["is_staff", "is_superuser"])
 
-    # Member records are managed in Airtable and pulled into Django via airtable_pull.
-    # No save()/delete() sync overrides — this model is read-only from Airtable's perspective.
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        # Member records are otherwise managed in Airtable; this override only
+        # cleans up the orphaned profile_photo file when the user replaces it.
+        delete_orphan_on_replace(self, "profile_photo")
+        super().save(*args, **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -435,6 +446,12 @@ class Guild(models.Model):
         default="",
         help_text="Member-facing description or announcement shown on the guild page.",
     )
+    banner_image = models.ImageField(
+        upload_to="guilds/banners/",
+        blank=True,
+        validators=[validate_image_size],
+        help_text="Banner image shown at the top of the guild page.",
+    )
     calendar_url = models.URLField(
         blank=True,
         default="",
@@ -465,6 +482,10 @@ class Guild(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        delete_orphan_on_replace(self, "banner_image")
+        super().save(*args, **kwargs)
 
     @property
     def active_leases(self) -> models.QuerySet[Lease]:
@@ -763,7 +784,12 @@ class Space(models.Model):
         choices=Status.choices,
         default=Status.AVAILABLE,
     )
-    photo = models.ImageField(upload_to="spaces/", blank=True)
+    photo = models.ImageField(
+        upload_to="spaces/",
+        blank=True,
+        validators=[validate_image_size],
+        help_text="Optional photo of the space, shown on the space detail page.",
+    )
     floorplan_ref = models.CharField(max_length=100, blank=True)
     sublet_guild = models.ForeignKey(
         "Guild",
@@ -786,6 +812,10 @@ class Space(models.Model):
         if self.name:
             return f"{self.space_id} - {self.name}"
         return self.space_id
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        delete_orphan_on_replace(self, "photo")
+        super().save(*args, **kwargs)
 
     @property
     def full_price(self) -> Decimal | None:

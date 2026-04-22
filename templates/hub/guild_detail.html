@@ -7,6 +7,12 @@
 
 {# Guild info card #}
 <div class="hub-card">
+    {% if guild.banner_image %}
+    <img src="{{ guild.banner_image.url }}"
+         alt="{{ guild.name }} banner"
+         class="pl-guild-banner"
+         style="width:100%;max-height:240px;object-fit:cover;border-radius:6px;margin-bottom:1rem;">
+    {% endif %}
     <div class="pl-guild-header">
         <h1 class="hub-page-title">{{ guild.name }}</h1>
         {% if can_edit_this_guild %}

@@ -24,7 +24,7 @@
     <div x-show="tab === 'profile'" x-cloak>
         <div class="hub-card">
             {% if member %}
-            <form method="post" class="hub-form">
+            <form method="post" enctype="multipart/form-data" class="hub-form">
                 {% csrf_token %}
                 <input type="hidden" name="form_id" value="profile">
                 <div class="hub-form-group">
@@ -32,8 +32,13 @@
                     <input type="email" id="email" value="{{ user.email }}" disabled>
                     <span class="hub-field-hint">Manage your emails in the Emails tab.</span>
                 </div>
+                {% url 'hub_profile_photo_delete' as profile_photo_delete_url %}
                 {% for field in profile_form %}
-                    {% include "components/form_field.html" with field=field %}
+                    {% if field.name == "profile_photo" %}
+                        {% include "components/image_field.html" with field=field current_image=member.profile_photo delete_url=profile_photo_delete_url modal_id="delete-profile-photo" label="Profile photo" shape="circle" thumbnail_width="96px" delete_button_text="Delete photo" confirm_title="Delete profile photo?" confirm_message="Your profile photo will be removed from the member directory and from our storage. This can't be undone." hint_html="Optional. Shown next to your name in the member directory and in the navbar. Max 5 MB." %}
+                    {% else %}
+                        {% include "components/form_field.html" with field=field %}
+                    {% endif %}
                 {% endfor %}
                 {% if profile_form.non_field_errors %}
                 <ul class="hub-field-errors">

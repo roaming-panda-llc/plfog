@@ -10,6 +10,9 @@ from django.db import models
 from django.db.models import CheckConstraint, F, Q
 from django.utils import timezone
 
+from core.files import delete_orphan_on_replace
+from core.validators import validate_image_size
+
 DEFAULT_LIABILITY_TEXT = """ASSUMPTION OF RISK AND WAIVER OF LIABILITY
 
 I understand that participation in classes, workshops, and activities at Past Lives Makerspace ("PLM") involves inherent risks, including but not limited to: exposure to tools, machinery, and equipment; risk of cuts, burns, eye injury, hearing damage, and other physical harm; and exposure to dust, fumes, chemicals, and other materials.
@@ -36,7 +39,12 @@ class Category(models.Model):
     name = models.CharField(max_length=100, unique=True, help_text="Display name (e.g. Woodworking).")
     slug = models.SlugField(max_length=100, unique=True, help_text="URL slug.")
     sort_order = models.PositiveIntegerField(default=0, help_text="Ascending sort; lower shows first.")
-    hero_image = models.ImageField(upload_to="classes/categories/", blank=True, help_text="Optional header image.")
+    hero_image = models.ImageField(
+        upload_to="classes/categories/",
+        blank=True,
+        validators=[validate_image_size],
+        help_text="Optional header image.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -45,6 +53,10 @@ class Category(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    def save(self, *args, **kwargs) -> None:
+        delete_orphan_on_replace(self, "hero_image")
+        super().save(*args, **kwargs)
 
 
 class Instructor(models.Model):
@@ -57,7 +69,12 @@ class Instructor(models.Model):
     display_name = models.CharField(max_length=255, help_text="Public name shown on class pages.")
     slug = models.SlugField(max_length=255, unique=True, help_text="URL slug for public profile.")
     bio = models.TextField(blank=True, help_text="Markdown-safe bio shown on profile.")
-    photo = models.ImageField(upload_to="classes/instructors/", blank=True, help_text="Profile photo.")
+    photo = models.ImageField(
+        upload_to="classes/instructors/",
+        blank=True,
+        validators=[validate_image_size],
+        help_text="Profile photo.",
+    )
     website = models.URLField(blank=True, help_text="Personal site.")
     social_handle = models.CharField(max_length=255, blank=True, help_text="e.g. @handle on primary social.")
     is_active = models.BooleanField(default=True, help_text="Inactive instructors hidden from public browse.")
@@ -69,6 +86,10 @@ class Instructor(models.Model):
 
     def __str__(self) -> str:
         return self.display_name
+
+    def save(self, *args, **kwargs) -> None:
+        delete_orphan_on_replace(self, "photo")
+        super().save(*args, **kwargs)
 
 
 class ClassOfferingQuerySet(models.QuerySet["ClassOffering"]):
@@ -121,7 +142,12 @@ class ClassOffering(models.Model):
     is_private = models.BooleanField(default=False, help_text="Hidden from public portal; private registration only.")
     private_for_name = models.CharField(max_length=255, blank=True, help_text="Name shown when private.")
     recurring_pattern = models.CharField(max_length=255, blank=True, help_text="Free-text recurrence description.")
-    image = models.ImageField(upload_to="classes/images/", blank=True, help_text="Hero image.")
+    image = models.ImageField(
+        upload_to="classes/images/",
+        blank=True,
+        validators=[validate_image_size],
+        help_text="Hero image.",
+    )
     requires_model_release = models.BooleanField(
         default=False, help_text="When on, registrants also sign model release."
     )
@@ -155,6 +181,10 @@ class ClassOffering(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+    def save(self, *args, **kwargs) -> None:
+        delete_orphan_on_replace(self, "image")
+        super().save(*args, **kwargs)
 
     def submit_for_review(self) -> None:
         if self.status != self.Status.DRAFT:

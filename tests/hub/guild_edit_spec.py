@@ -405,3 +405,73 @@ def describe_guild_detail_edit_buttons():
         # modal rendered on every page, so those aren't reliable markers.
         assert b'@click="openProductCreateModal()"' not in response.content
         assert b"open-modal', 'edit-guild'" not in response.content
+
+
+def _tiny_png_bytes() -> bytes:
+    return (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+        b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xf8\xcf"
+        b"\xc0\x00\x00\x00\x03\x00\x01\x5b\x0d\xc1\x6a\x00\x00\x00\x00IEND\xae"
+        b"B`\x82"
+    )
+
+
+@pytest.mark.django_db
+def describe_guild_banner_delete():
+    """Tests for the POST-only guild banner clearing endpoint."""
+
+    def it_requires_login(client: Client):
+        guild = GuildFactory()
+
+        response = client.post(reverse("hub_guild_banner_delete", args=[guild.pk]))
+
+        assert response.status_code == 302
+        assert "/accounts/login/" in response.url
+
+    def it_rejects_non_POST_requests(client: Client):
+        _user_with_role("b_get", fog_role=Member.FogRole.ADMIN)
+        guild = GuildFactory()
+        client.login(username="b_get", password="pass")
+
+        response = client.get(reverse("hub_guild_banner_delete", args=[guild.pk]))
+
+        assert response.status_code == 405
+
+    def it_forbids_regular_members(client: Client):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        _user_with_role("b_reg", fog_role=Member.FogRole.MEMBER)
+        guild = GuildFactory(banner_image=SimpleUploadedFile("keep.png", _tiny_png_bytes(), content_type="image/png"))
+        original_name = guild.banner_image.name
+        client.login(username="b_reg", password="pass")
+
+        response = client.post(reverse("hub_guild_banner_delete", args=[guild.pk]))
+
+        assert response.status_code == 403
+        guild.refresh_from_db()
+        assert guild.banner_image.name == original_name
+
+    def it_clears_the_banner_and_redirects_to_guild_detail(client: Client):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        _user_with_role("b_admin", fog_role=Member.FogRole.ADMIN)
+        guild = GuildFactory(banner_image=SimpleUploadedFile("banner.png", _tiny_png_bytes(), content_type="image/png"))
+        assert guild.banner_image
+        client.login(username="b_admin", password="pass")
+
+        response = client.post(reverse("hub_guild_banner_delete", args=[guild.pk]))
+
+        assert response.status_code == 302
+        assert response.url == f"/guilds/{guild.pk}/"
+        guild.refresh_from_db()
+        assert not guild.banner_image
+
+    def it_is_a_noop_when_no_banner_is_set(client: Client):
+        _user_with_role("b_empty", fog_role=Member.FogRole.ADMIN)
+        guild = GuildFactory()
+        client.login(username="b_empty", password="pass")
+
+        response = client.post(reverse("hub_guild_banner_delete", args=[guild.pk]))
+
+        assert response.status_code == 302
+        assert response.url == f"/guilds/{guild.pk}/"
