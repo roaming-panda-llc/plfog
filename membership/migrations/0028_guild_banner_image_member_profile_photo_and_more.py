@@ -33,6 +33,11 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="space",
             name="photo",
-            field=models.ImageField(blank=True, upload_to="spaces/", validators=[core.validators.validate_image_size]),
+            field=models.ImageField(
+                blank=True,
+                help_text="Optional photo of the space, shown on the space detail page.",
+                upload_to="spaces/",
+                validators=[core.validators.validate_image_size],
+            ),
         ),
     ]

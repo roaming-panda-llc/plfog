@@ -784,7 +784,12 @@ class Space(models.Model):
         choices=Status.choices,
         default=Status.AVAILABLE,
     )
-    photo = models.ImageField(upload_to="spaces/", blank=True, validators=[validate_image_size])
+    photo = models.ImageField(
+        upload_to="spaces/",
+        blank=True,
+        validators=[validate_image_size],
+        help_text="Optional photo of the space, shown on the space detail page.",
+    )
     floorplan_ref = models.CharField(max_length=100, blank=True)
     sublet_guild = models.ForeignKey(
         "Guild",

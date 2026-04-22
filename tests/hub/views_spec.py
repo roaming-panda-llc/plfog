@@ -457,3 +457,73 @@ def describe_legacy_settings_redirects():
 
         assert response.status_code == 302
         assert response.url == "/settings/?tab=emails"
+
+
+_PROFILE_PHOTO_DELETE_URL = "/settings/profile-photo/delete/"
+
+
+def _tiny_png_bytes() -> bytes:
+    return (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+        b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xf8\xcf"
+        b"\xc0\x00\x00\x00\x03\x00\x01\x5b\x0d\xc1\x6a\x00\x00\x00\x00IEND\xae"
+        b"B`\x82"
+    )
+
+
+@pytest.mark.django_db
+def describe_profile_photo_delete():
+    """Tests for the POST-only profile photo clearing endpoint."""
+
+    def it_requires_login(client: Client):
+        response = client.post(_PROFILE_PHOTO_DELETE_URL)
+
+        assert response.status_code == 302
+        assert "/accounts/login/" in response.url
+
+    def it_rejects_non_POST_requests(client: Client):
+        User.objects.create_user(username="gets", password="pass")
+        client.login(username="gets", password="pass")
+
+        response = client.get(_PROFILE_PHOTO_DELETE_URL)
+
+        assert response.status_code == 405
+
+    def it_errors_when_user_has_no_linked_member(client: Client):
+        user = User.objects.create_user(username="unlinked", password="pass")
+        Member.objects.filter(user=user).delete()
+        # Refresh so the cached .member attribute on user is cleared.
+        User.objects.get(pk=user.pk)
+        client.login(username="unlinked", password="pass")
+
+        response = client.post(_PROFILE_PHOTO_DELETE_URL, follow=True)
+
+        assert response.status_code == 200
+        msgs = [str(m) for m in response.context["messages"]]
+        assert any("not linked" in m for m in msgs)
+
+    def it_clears_the_profile_photo_and_redirects_to_profile_tab(client: Client):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        user = User.objects.create_user(username="hasphoto", password="pass")
+        member = user.member
+        member.profile_photo = SimpleUploadedFile("me.png", _tiny_png_bytes(), content_type="image/png")
+        member.save()
+        assert member.profile_photo
+        client.login(username="hasphoto", password="pass")
+
+        response = client.post(_PROFILE_PHOTO_DELETE_URL)
+
+        assert response.status_code == 302
+        assert response.url.endswith("/settings/?tab=profile")
+        member.refresh_from_db()
+        assert not member.profile_photo
+
+    def it_is_a_noop_when_no_photo_is_set(client: Client):
+        User.objects.create_user(username="nophoto", password="pass")
+        client.login(username="nophoto", password="pass")
+
+        response = client.post(_PROFILE_PHOTO_DELETE_URL)
+
+        assert response.status_code == 302
+        assert response.url.endswith("/settings/?tab=profile")

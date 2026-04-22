@@ -16,7 +16,7 @@ renders its own UI; this template is for everything else.
 <div class="pl-fileinput" data-fileinput>
     {% if widget.is_initial %}
     <div class="pl-fileinput__current" data-current>
-        {% with name=widget.value.name|default:"" %}
+        {% with name=widget.value.name|default:""|lower %}
         {% if ".jpg" in name or ".jpeg" in name or ".png" in name or ".gif" in name or ".webp" in name or ".svg" in name %}
         <img src="{{ widget.value.url }}"
              alt="Current {{ widget.name }}"
