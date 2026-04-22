@@ -15,6 +15,7 @@ from django.contrib.auth.models import User
 from django.db.models import Count, Prefetch, Q
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST, require_http_methods
 
 from billing.exceptions import NoPaymentMethodError, TabLimitExceededError, TabLockedError
@@ -36,13 +37,17 @@ def _get_hub_context(request: HttpRequest) -> dict[str, Any]:
     """Build common sidebar context for all hub pages."""
     guilds = Guild.objects.order_by("name")
     initials = ""
+    photo_url = ""
     if request.user.is_authenticated:
         member: Member | None = getattr(request.user, "member", None)
         if member is not None:
             initials = member.initials
+            if member.profile_photo:
+                photo_url = member.profile_photo.url
     return {
         "guilds": guilds,
         "user_initials": initials,
+        "user_profile_photo_url": photo_url,
     }
 
 
@@ -616,6 +621,20 @@ def user_settings(request: HttpRequest) -> HttpResponse:
             "active_tab": active_tab,
         },
     )
+
+
+@login_required
+@require_POST
+def profile_photo_delete(request: HttpRequest) -> HttpResponse:
+    """Clear the logged-in member's profile photo and redirect back to settings."""
+    member = _get_member(request)
+    if member is None:
+        messages.error(request, "Your account is not linked to a membership.")
+        return redirect("hub_user_settings")
+    if member.profile_photo:
+        member.profile_photo.delete(save=True)
+        messages.success(request, "Profile photo removed.")
+    return redirect(f"{reverse('hub_user_settings')}?tab=profile")
 
 
 @login_required

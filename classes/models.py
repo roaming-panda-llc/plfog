@@ -10,6 +10,7 @@ from django.db import models
 from django.db.models import CheckConstraint, F, Q
 from django.utils import timezone
 
+from core.files import delete_orphan_on_replace
 from core.validators import validate_image_size
 
 DEFAULT_LIABILITY_TEXT = """ASSUMPTION OF RISK AND WAIVER OF LIABILITY
@@ -53,6 +54,10 @@ class Category(models.Model):
     def __str__(self) -> str:
         return self.name
 
+    def save(self, *args, **kwargs) -> None:
+        delete_orphan_on_replace(self, "hero_image")
+        super().save(*args, **kwargs)
+
 
 class Instructor(models.Model):
     user = models.OneToOneField(
@@ -81,6 +86,10 @@ class Instructor(models.Model):
 
     def __str__(self) -> str:
         return self.display_name
+
+    def save(self, *args, **kwargs) -> None:
+        delete_orphan_on_replace(self, "photo")
+        super().save(*args, **kwargs)
 
 
 class ClassOfferingQuerySet(models.QuerySet["ClassOffering"]):
@@ -172,6 +181,10 @@ class ClassOffering(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+    def save(self, *args, **kwargs) -> None:
+        delete_orphan_on_replace(self, "image")
+        super().save(*args, **kwargs)
 
     def submit_for_review(self) -> None:
         if self.status != self.Status.DRAFT:

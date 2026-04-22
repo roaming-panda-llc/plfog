@@ -28,6 +28,11 @@ urlpatterns = [
         name="hub_guild_product_delete",
     ),
     path("settings/", views.user_settings, name="hub_user_settings"),
+    path(
+        "settings/profile-photo/delete/",
+        views.profile_photo_delete,
+        name="hub_profile_photo_delete",
+    ),
     # Old settings routes redirect to the tabbed User Settings page.
     path(
         "settings/profile/",

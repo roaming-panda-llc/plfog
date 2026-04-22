@@ -10,10 +10,12 @@ CHANGELOG: list[dict[str, str | list[str]]] = [
         "date": "2026-04-21",
         "title": "Photos for member profiles, guild banners, and classes",
         "changes": [
-            "You can now upload a profile photo on your User Settings → Profile page — it shows up next to your name in the member directory in place of your initials",
+            "You can now upload a profile photo on your User Settings → Profile page — your photo replaces your initials in the member directory and in the top-right of the navbar",
             "Guild leads can add a banner image to their guild's page — it appears at the top of the guild detail page above the name and About section",
             "Class images (categories, instructors, and individual classes) and other photos uploaded through the admin now stay around between deploys instead of disappearing",
             "Image uploads have a 5 MB limit so things stay snappy and don't blow up our storage bill",
+            "Replacing or removing a photo now also deletes the old file from storage so we don't accumulate orphaned images over time",
+            "Friendlier 'Delete photo' button with a confirmation pop-up replaces the small Clear checkbox that used to sit under the file input",
         ],
     },
     {
