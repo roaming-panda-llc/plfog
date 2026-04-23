@@ -40,14 +40,18 @@ def _make_user_member(fog_role: str, *, username: str = "u") -> tuple[User, Memb
 
 @pytest.mark.django_db
 def describe_compute_actual_roles():
-    def it_returns_empty_frozenset_for_anonymous_user():
-        assert compute_actual_roles(AnonymousUser()) == frozenset()
+    def it_returns_guest_for_anonymous_user():
+        from hub.view_as import ROLE_GUEST
 
-    def it_returns_empty_frozenset_when_user_has_no_member():
+        assert compute_actual_roles(AnonymousUser()) == frozenset({ROLE_GUEST})
+
+    def it_returns_guest_when_user_has_no_member_or_instructor():
+        from hub.view_as import ROLE_GUEST
+
         user = User.objects.create_user(username="u", password="p")
         Member.objects.filter(user=user).delete()
         user = User.objects.get(pk=user.pk)
-        assert compute_actual_roles(user) == frozenset()
+        assert compute_actual_roles(user) == frozenset({ROLE_GUEST})
 
     def it_returns_admin_guild_officer_and_member_for_fog_admin():
         user, _ = _make_user_member(Member.FogRole.ADMIN, username="admin_u")
@@ -129,15 +133,23 @@ def describe_ViewAs():
             assert v.current_label == ""
 
     def describe_dropdown_options():
-        def it_lists_roles_highest_first_with_selected_flag():
-            v = ViewAs(actual=frozenset({ROLE_ADMIN, ROLE_GUILD_OFFICER, ROLE_MEMBER}), picked=ROLE_GUILD_OFFICER)
-            assert v.dropdown_options == [
-                {"name": ROLE_ADMIN, "label": "Admin", "selected": False},
-                {"name": ROLE_GUILD_OFFICER, "label": "Guild Officer", "selected": True},
-                {"name": ROLE_MEMBER, "label": "Member", "selected": False},
-            ]
+        def it_lists_every_role_for_admins_so_they_can_preview():
+            from hub.view_as import ROLE_GUEST, ROLE_INSTRUCTOR
 
-        def it_skips_roles_not_actually_held():
+            v = ViewAs(actual=frozenset({ROLE_ADMIN, ROLE_GUILD_OFFICER, ROLE_MEMBER}), picked=ROLE_GUILD_OFFICER)
+            names = [row["name"] for row in v.dropdown_options]
+            assert names == [ROLE_ADMIN, ROLE_INSTRUCTOR, ROLE_GUILD_OFFICER, ROLE_MEMBER, ROLE_GUEST]
+            selected = [row["name"] for row in v.dropdown_options if row["selected"]]
+            assert selected == [ROLE_GUILD_OFFICER]
+
+        def it_shows_instructor_with_non_member_label():
+            v = ViewAs(actual=frozenset({ROLE_ADMIN}), picked=ROLE_ADMIN)
+            from hub.view_as import ROLE_INSTRUCTOR
+
+            instructor_row = next(r for r in v.dropdown_options if r["name"] == ROLE_INSTRUCTOR)
+            assert instructor_row["label"] == "Instructor (Non-mem)"
+
+        def it_skips_roles_not_actually_held_for_non_admins():
             v = ViewAs(actual=frozenset({ROLE_GUILD_OFFICER, ROLE_MEMBER}), picked=None)
             names = [row["name"] for row in v.dropdown_options]
             assert names == [ROLE_GUILD_OFFICER, ROLE_MEMBER]
@@ -254,6 +266,20 @@ def describe_view_as_set_endpoint():
         )
 
         assert response.status_code == 403
+
+    def it_lets_admins_preview_any_role_including_guest(client):
+        from hub.view_as import SESSION_ROLE_KEY
+
+        user, _ = _make_user_member(Member.FogRole.ADMIN, username="set_preview_guest")
+        client.login(username=user.username, password="p")
+        for preview_role in ("guest", "instructor", "member", "guild_officer"):
+            response = client.post(
+                "/view-as/set/",
+                data=json.dumps({"role": preview_role}),
+                content_type="application/json",
+            )
+            assert response.status_code == 200, f"admin blocked from previewing {preview_role}"
+            assert client.session[SESSION_ROLE_KEY] == preview_role
 
     def it_rejects_malformed_json(client):
         user, _ = _make_user_member(Member.FogRole.ADMIN, username="set_malformed")

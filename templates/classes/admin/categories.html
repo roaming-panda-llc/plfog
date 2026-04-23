@@ -1,7 +1,8 @@
 {% extends "classes/admin/base.html" %}
+{% load classes_tags %}
 {% block tab_content %}
 <div style="display:flex; justify-content:flex-end; margin-bottom:1rem;">
-    <a class="hub-btn hub-btn--primary" href="{% url 'classes:admin_category_create' %}">+ New Category</a>
+    <a class="hub-btn hub-btn--primary hub-btn--sm" href="{% url 'classes:admin_category_create' %}">+ New Category</a>
 </div>
 <table style="width:100%; border-collapse:collapse;">
     <thead>
@@ -14,16 +15,18 @@
     </thead>
     <tbody>
     {% for c in categories %}
+        {% url 'classes:admin_category_delete' pk=c.pk as cat_delete_url %}
+        {% concat "del-cat-" c.pk as cat_modal_id %}
         <tr style="border-bottom:1px solid var(--hub-border);">
             <td style="padding:0.5rem 0.75rem;">{{ c.name }}</td>
             <td style="padding:0.5rem 0.75rem;">{{ c.slug }}</td>
             <td style="padding:0.5rem 0.75rem;">{{ c.sort_order }}</td>
-            <td style="padding:0.5rem 0.75rem; display:flex; gap:0.5rem;">
-                <a class="hub-btn" href="{% url 'classes:admin_category_edit' pk=c.pk %}">Edit</a>
-                <form method="post" action="{% url 'classes:admin_category_delete' pk=c.pk %}" style="display:inline;">
-                    {% csrf_token %}
-                    <button class="hub-btn">Delete</button>
-                </form>
+            <td style="padding:0.5rem 0.75rem; display:flex; gap:0.375rem; justify-content:flex-end;">
+                <a class="hub-btn hub-btn--sm hub-btn--ghost" href="{% url 'classes:admin_category_edit' pk=c.pk %}">Edit</a>
+                <button type="button"
+                        class="hub-btn hub-btn--sm hub-btn--danger"
+                        @click="$dispatch('open-confirm', '{{ cat_modal_id }}')">Delete</button>
+                {% include "components/confirm_modal.html" with confirm_id=cat_modal_id confirm_title="Delete this category?" confirm_message="Any classes still in this category will block the delete." confirm_action_url=cat_delete_url confirm_button_text="Delete Category" %}
             </td>
         </tr>
     {% empty %}

@@ -404,9 +404,10 @@ UNFOLD = {
             {
                 "items": [
                     {
-                        "title": "Voting",
-                        "icon": "how_to_vote",
-                        "link": reverse_lazy("admin:index"),
+                        "title": "Manage Classes",
+                        "icon": "school",
+                        "link": reverse_lazy("classes:admin_classes"),
+                        "permission": lambda request: request.user.is_superuser,
                     },
                     {
                         "title": "Members",
@@ -418,6 +419,11 @@ UNFOLD = {
                         "icon": "settings",
                         "link": reverse_lazy("admin:core_siteconfiguration_changelist"),
                         "permission": lambda request: request.user.is_superuser,
+                    },
+                    {
+                        "title": "Voting Dashboard",
+                        "icon": "how_to_vote",
+                        "link": reverse_lazy("admin:index"),
                     },
                 ],
             },

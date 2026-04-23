@@ -1,0 +1,29 @@
+{% extends "classes/instructor/base.html" %}
+{% block tab_content %}
+{% if registrations %}
+<table style="width:100%; border-collapse:collapse;">
+    <thead>
+        <tr style="border-bottom:2px solid var(--hub-border);">
+            <th style="text-align:left; padding:0.5rem 0.75rem; font-weight:600;">Name</th>
+            <th style="text-align:left; padding:0.5rem 0.75rem; font-weight:600;">Email</th>
+            <th style="text-align:left; padding:0.5rem 0.75rem; font-weight:600;">Class</th>
+            <th style="text-align:left; padding:0.5rem 0.75rem; font-weight:600;">Status</th>
+            <th style="text-align:left; padding:0.5rem 0.75rem; font-weight:600;">Registered</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for reg in registrations %}
+        <tr style="border-bottom:1px solid var(--hub-border);">
+            <td style="padding:0.5rem 0.75rem;">{{ reg.first_name }} {{ reg.last_name }}{% if reg.pronouns %} <span style="color:var(--hub-text-muted); font-size:0.8rem;">({{ reg.pronouns }})</span>{% endif %}</td>
+            <td style="padding:0.5rem 0.75rem;">{{ reg.email }}</td>
+            <td style="padding:0.5rem 0.75rem;">{{ reg.class_offering.title }}</td>
+            <td style="padding:0.5rem 0.75rem;">{{ reg.get_status_display }}</td>
+            <td style="padding:0.5rem 0.75rem;">{{ reg.registered_at|date:"M j, Y" }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+    <div style="padding:2rem 1rem; text-align:center; color:var(--hub-text-muted);">No registrations yet.</div>
+{% endif %}
+{% endblock %}

@@ -75,6 +75,24 @@ class SiteConfiguration(models.Model):
         blank=True,
         help_text="When classes were last synced from classes.pastlives.space. Set by the calendar service.",
     )
+    mailchimp_api_key = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="MailChimp API key",
+        help_text="MailChimp API key used for auto-subscribe on class registration and other integrations. Leave blank to disable.",
+    )
+    mailchimp_list_id = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="MailChimp list / audience ID",
+        help_text="MailChimp list (audience) ID new subscribers are added to.",
+    )
+    google_analytics_measurement_id = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="Google Analytics measurement ID",
+        help_text="GA4 measurement ID (e.g. G-XXXXXXX) — injected on the public classes portal. Leave blank to disable.",
+    )
 
     class Meta:
         verbose_name = "Site Settings"

@@ -1017,6 +1017,25 @@ textarea:focus {
     color: #fff;
 }
 
+/* Small size modifier for table-row / inline actions. */
+.hub-btn--sm {
+    padding: 0.3rem 0.7rem;
+    font-size: 0.8125rem;
+    border-radius: 4px;
+}
+
+/* Low-emphasis inline action (e.g. "Edit" in a table row). */
+.hub-btn--ghost {
+    background: transparent;
+    color: var(--hub-text-muted, #96ACBB);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.hub-btn--ghost:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--hub-text, #F4EFDD);
+    border-color: rgba(255, 255, 255, 0.22);
+}
+
 /* Delete confirmation page */
 .pl-admin-delete-list {
     list-style: disc;

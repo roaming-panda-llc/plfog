@@ -94,7 +94,8 @@ class Instructor(models.Model):
 
 class ClassOfferingQuerySet(models.QuerySet["ClassOffering"]):
     def public(self) -> "ClassOfferingQuerySet":
-        return self.filter(status="published")
+        """Published classes visible in the public portal (excludes private)."""
+        return self.filter(status="published", is_private=False)
 
     def pending_review(self) -> "ClassOfferingQuerySet":
         return self.filter(status="pending")
@@ -203,6 +204,19 @@ class ClassOffering(models.Model):
     def archive(self) -> None:
         self.status = self.Status.ARCHIVED
         self.save(update_fields=["status", "updated_at"])
+
+    @property
+    def spots_remaining(self) -> int:
+        """Capacity minus current confirmed + pending registrations."""
+        used = self.registrations.filter(
+            status__in=[Registration.Status.CONFIRMED, Registration.Status.PENDING]
+        ).count()
+        return max(0, self.capacity - used)
+
+    @property
+    def first_upcoming_session_at(self):
+        session = self.sessions.filter(starts_at__gte=timezone.now()).order_by("starts_at").first()
+        return session.starts_at if session else None
 
     def duplicate(self) -> "ClassOffering":
         """Clone this offering as a fresh draft with a unique slug and title."""
@@ -461,15 +475,6 @@ class ClassSettings(models.Model):
     )
     instructor_approval_required = models.BooleanField(
         default=True, help_text="When on, new classes go to admin for review before being published."
-    )
-    mailchimp_api_key = models.CharField(max_length=255, blank=True, help_text="MailChimp API key for auto-subscribe.")
-    mailchimp_list_id = models.CharField(
-        max_length=255, blank=True, help_text="MailChimp list ID for class registrants."
-    )
-    google_analytics_measurement_id = models.CharField(
-        max_length=50,
-        blank=True,
-        help_text="GA4 measurement ID (e.g. G-XXXXXXX). Leave blank to disable GA tag.",
     )
     confirmation_email_footer = models.TextField(blank=True, help_text="Custom footer appended to confirmation emails.")
 

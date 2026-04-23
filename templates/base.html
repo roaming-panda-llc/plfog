@@ -14,8 +14,9 @@
     {% load static %}
     <link rel="icon" type="image/png" href="{% static 'img/favicon.png' %}">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
     <a href="#main-content" class="skip-link">Skip to main content</a>
     <header class="site-header">
         <nav class="site-nav" aria-label="Main navigation">
@@ -42,6 +43,7 @@
         <p class="site-footer__copy">&copy; 2026 Past Lives Makerspace</p>
     </footer>
     {% include "includes/changelog_modal.html" %}
+    {% block extra_body %}{% endblock %}
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {

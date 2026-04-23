@@ -213,7 +213,6 @@ def _compute_new_votes_since(since: datetime | None) -> list[VoteStanding]:
     return results
 
 
-@login_required
 def member_directory(request: HttpRequest) -> HttpResponse:
     """Member directory page — lists all active members.
 
@@ -262,17 +261,26 @@ def snapshot_detail(request: HttpRequest, pk: int) -> HttpResponse:
 def _can_edit_guild(request: HttpRequest, guild: Guild) -> bool:
     """Return True when the request's user may edit this guild.
 
-    Handles anonymous users and users with no linked Member gracefully.
+    Only admins, guild officers, or this guild's own lead get edit controls.
+    Honors the ``view_as`` preview mode — an admin previewing as Guest or
+    Instructor sees the page without the edit buttons, matching what that
+    lower-role viewer would see.
     """
-    if not request.user.is_authenticated:  # pragma: no cover — defensive; callers are @login_required
+    if not request.user.is_authenticated:
+        return False
+    view_as = getattr(request, "view_as", None)
+    if view_as is None:
+        return False
+    if view_as.is_admin or view_as.is_guild_officer:
+        return True
+    if not view_as.is_member:
         return False
     member: Member | None = getattr(request.user, "member", None)
     if member is None:
         return False
-    return member.can_edit_guild(guild)
+    return guild.guild_lead_id == member.pk
 
 
-@login_required
 def guild_detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Guild detail page — shows about text, active products, and cart interface."""
     from billing.forms import CONTEXT_MEMBER_GUILD_PAGE, TabItemForm, build_product_split_formset
@@ -869,7 +877,6 @@ def _get_calendar_context(
     }
 
 
-@login_required
 def community_calendar(request: HttpRequest) -> HttpResponse:
     """Community Calendar page — upcoming events from all guild and general calendars."""
     ctx = _get_hub_context(request)
@@ -887,7 +894,6 @@ def community_calendar(request: HttpRequest) -> HttpResponse:
     return render(request, "hub/community_calendar.html", {**ctx, **cal_ctx})
 
 
-@login_required
 def calendar_events_partial(request: HttpRequest) -> HttpResponse:
     """HTMX partial — refreshes stale calendar sources and returns updated event HTML."""
     refresh_stale_sources()
@@ -981,7 +987,11 @@ def view_as_set(request: HttpRequest) -> JsonResponse:
     if role not in ALL_ROLES:
         return JsonResponse({"error": f"Unknown role '{role}'"}, status=400)
 
-    if not request.view_as.has_actual(role):  # type: ignore[attr-defined]
+    # Admins can preview any role (Guest, Non-member Instructor, Member, Officer).
+    # Everyone else can only pick roles they actually hold — a downgrade tool.
+    view_as = request.view_as  # type: ignore[attr-defined]
+    is_admin = view_as.has_actual("admin")
+    if not is_admin and not view_as.has_actual(role):
         return JsonResponse({"error": "Cannot view as a role you don't have"}, status=403)
 
     request.session[SESSION_ROLE_KEY] = role

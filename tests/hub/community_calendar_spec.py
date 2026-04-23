@@ -368,10 +368,9 @@ def _logged_in_user(client: Client, *, username: str = "caluser") -> User:
 
 
 def describe_community_calendar_view():
-    def it_requires_login(client: Client):
+    def it_is_accessible_to_anonymous_guests(client: Client):
         response = client.get("/calendar/")
-        assert response.status_code == 302
-        assert "/accounts/login/" in response["Location"]
+        assert response.status_code == 200
 
     def it_renders_for_logged_in_user(client: Client):
         _logged_in_user(client)

@@ -5,13 +5,66 @@ from __future__ import annotations
 from django.urls import reverse
 
 
-def describe_admin_classes_routing():
-    def it_redirects_admin_root_to_classes(admin_user, client):
-        client.force_login(admin_user)
-        response = client.get(reverse("classes:admin_root"))
-        assert response.status_code == 302
-        assert response.url.endswith(reverse("classes:admin_classes"))
+def describe_status_filter():
+    def it_shows_all_by_default(admin_user, client, db):
+        from classes.factories import ClassOfferingFactory
+        from classes.models import ClassOffering
 
+        client.force_login(admin_user)
+        ClassOfferingFactory(title="Drafty", status=ClassOffering.Status.DRAFT)
+        ClassOfferingFactory(title="Up-n-Live", status=ClassOffering.Status.PUBLISHED)
+        response = client.get(reverse("classes:admin_classes"))
+        assert response.status_code == 200
+        assert b"Drafty" in response.content
+        assert b"Up-n-Live" in response.content
+
+    def it_filters_by_status_when_param_given(admin_user, client, db):
+        from classes.factories import ClassOfferingFactory
+        from classes.models import ClassOffering
+
+        client.force_login(admin_user)
+        ClassOfferingFactory(title="Drafty", status=ClassOffering.Status.DRAFT)
+        ClassOfferingFactory(title="Old-News", status=ClassOffering.Status.ARCHIVED)
+        response = client.get(reverse("classes:admin_classes") + "?status=archived")
+        assert response.status_code == 200
+        assert b"Drafty" not in response.content
+        assert b"Old-News" in response.content
+
+
+def describe_delete_class():
+    def it_deletes_a_draft_with_no_registrations(admin_user, client, db):
+        from classes.factories import ClassOfferingFactory
+        from classes.models import ClassOffering
+
+        client.force_login(admin_user)
+        offering = ClassOfferingFactory(status=ClassOffering.Status.DRAFT)
+        response = client.post(reverse("classes:admin_class_delete", kwargs={"pk": offering.pk}))
+        assert response.status_code == 302
+        assert not ClassOffering.objects.filter(pk=offering.pk).exists()
+
+    def it_refuses_to_delete_when_registrations_exist(admin_user, client, db):
+        from classes.factories import ClassOfferingFactory, RegistrationFactory
+        from classes.models import ClassOffering
+
+        client.force_login(admin_user)
+        offering = ClassOfferingFactory(status=ClassOffering.Status.DRAFT)
+        RegistrationFactory(class_offering=offering)
+        response = client.post(reverse("classes:admin_class_delete", kwargs={"pk": offering.pk}))
+        assert response.status_code == 302
+        assert ClassOffering.objects.filter(pk=offering.pk).exists()
+
+    def it_ignores_get_requests(admin_user, client, db):
+        from classes.factories import ClassOfferingFactory
+        from classes.models import ClassOffering
+
+        client.force_login(admin_user)
+        offering = ClassOfferingFactory(status=ClassOffering.Status.DRAFT)
+        response = client.get(reverse("classes:admin_class_delete", kwargs={"pk": offering.pk}))
+        assert response.status_code == 302
+        assert ClassOffering.objects.filter(pk=offering.pk).exists()
+
+
+def describe_admin_classes_routing():
     def it_gates_tab_views_behind_admin_role(member_user, client):
         client.force_login(member_user)
         response = client.get(reverse("classes:admin_classes"))

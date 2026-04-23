@@ -1,0 +1,108 @@
+{% extends "classes/base_public.html" %}
+{% load classes_tags %}
+
+{% block title %}{{ offering.title }} — Past Lives Makerspace{% endblock %}
+
+{% block content %}
+<div class="view">
+  <div class="cp-container">
+    <div class="detail-card">
+      {% if offering.image %}
+        <img class="detail-hero" src="{{ offering.image.url }}" alt="">
+      {% elif offering.category.hero_image %}
+        <img class="detail-hero" src="{{ offering.category.hero_image.url }}" alt="">
+      {% endif %}
+      <div class="detail-head">
+        <div>
+          <div class="dc-cat">{{ offering.category.name }}</div>
+          <div class="dc-title">{{ offering.title }}</div>
+          <div class="dc-inst">
+            with <a href="{% url 'classes:public_instructor' slug=offering.instructor.slug %}">{{ offering.instructor.display_name }}</a>{% if offering.instructor.social_handle %} · {{ offering.instructor.social_handle }}{% endif %}
+          </div>
+        </div>
+        <a class="back-link" href="{% url 'classes:public_list' %}">&larr; All classes</a>
+      </div>
+      <div class="detail-body">
+        <div class="dc-pbar">
+          <div class="dc-pbig">{{ offering.price_cents|cents_as_price }}</div>
+          {% if member_price_cents %}<div class="dc-pmem">{{ member_price_cents|cents_as_price }} for members</div>{% endif %}
+          <div class="dc-pspot {{ spots_remaining|spots_class }}">
+            {% if spots_remaining == 0 %}
+              Sold out
+            {% elif spots_remaining <= 2 %}
+              {{ spots_remaining }} spot{{ spots_remaining|pluralize }} left
+            {% else %}
+              {{ spots_remaining }} spots available
+            {% endif %}
+          </div>
+        </div>
+
+        {% if upcoming_sessions %}
+          <div class="dc-sec">
+            {% with total_min=upcoming_sessions|total_session_minutes %}
+              <div class="dc-lbl">Schedule{% if total_min %} · {{ total_min|duration_words }} total{% endif %}</div>
+            {% endwith %}
+            {% for session in upcoming_sessions %}
+              <div class="dc-srow">
+                {% if upcoming_sessions|length > 1 %}<span class="dc-snum">{{ forloop.counter }}</span>{% endif %}
+                <span class="dc-sdate">{{ session.starts_at|date:"l, F j, Y" }}</span>
+                <span class="dc-stime">{{ session.starts_at|time:"g:i A" }} – {{ session.ends_at|time:"g:i A" }}</span>
+                <span class="dc-sdur">{{ session|session_duration_words }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% elif offering.scheduling_model == 'flexible' %}
+          <div class="dc-sec">
+            <div class="dc-lbl">Schedule</div>
+            <div class="dc-txt" style="color:var(--purple)">Flexible — schedule directly with the instructor.{% if offering.flexible_note %}
+
+{{ offering.flexible_note }}{% endif %}</div>
+          </div>
+        {% endif %}
+
+        {% if offering.description %}
+          <div class="dc-sec">
+            <div class="dc-lbl">About This Class</div>
+            <div class="dc-txt">{{ offering.description }}</div>
+          </div>
+        {% endif %}
+
+        <div class="dc-igrid">
+          {% if offering.prerequisites %}
+            <div class="dc-icard"><div class="dc-lbl">Prerequisites</div><div class="dc-txt">{{ offering.prerequisites }}</div></div>
+          {% endif %}
+          {% if offering.materials_included %}
+            <div class="dc-icard"><div class="dc-lbl">Materials Included</div><div class="dc-txt">{{ offering.materials_included }}</div></div>
+          {% endif %}
+          {% if offering.materials_to_bring %}
+            <div class="dc-icard"><div class="dc-lbl">Bring With You</div><div class="dc-txt">{{ offering.materials_to_bring }}</div></div>
+          {% endif %}
+          {% if offering.safety_requirements %}
+            <div class="dc-icard"><div class="dc-lbl">Safety</div><div class="dc-txt">{{ offering.safety_requirements }}</div></div>
+          {% endif %}
+          {% if offering.age_minimum %}
+            <div class="dc-icard"><div class="dc-lbl">Age</div><div class="dc-txt">{{ offering.age_minimum }}+{% if offering.age_guardian_note %} — {{ offering.age_guardian_note }}{% endif %}</div></div>
+          {% endif %}
+          {% if offering.instructor.bio %}
+            <div class="dc-icard"><div class="dc-lbl">About {{ offering.instructor.display_name }}</div><div class="dc-txt">{{ offering.instructor.bio }}</div></div>
+          {% endif %}
+        </div>
+
+        <div class="dc-sec" style="margin-top:12px">
+          <div class="dc-lbl">Location</div>
+          <div class="dc-txt">Past Lives Makerspace · 2808 SE 9th Ave, Portland, OR 97202</div>
+        </div>
+
+        <div class="dc-reg">
+          {% if spots_remaining > 0 %}
+            <a class="btn-reg" href="#register">Register — {{ offering.price_cents|cents_as_price }}</a>
+            <div style="margin-top:10px;font-size:11px;color:var(--text3);text-align:center">Online registration coming soon — check back shortly.</div>
+          {% else %}
+            <div class="btn-sold">Sold Out</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -22,11 +22,10 @@ def _linked_user(client: Client, *, username: str = "u1", guild=None) -> tuple:
 
 @pytest.mark.django_db
 def describe_guild_detail():
-    def it_requires_login(client: Client):
+    def it_is_accessible_to_anonymous_guests(client: Client):
         guild = GuildFactory()
         response = client.get(f"/guilds/{guild.pk}/")
-        assert response.status_code == 302
-        assert "/accounts/login/" in response["Location"]
+        assert response.status_code == 200
 
     def it_shows_guild_name(client: Client):
         User.objects.create_user(username="viewer", password="pass")

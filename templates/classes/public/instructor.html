@@ -1,0 +1,75 @@
+{% extends "classes/base_public.html" %}
+{% load classes_tags %}
+
+{% block title %}{{ instructor.display_name }} — Past Lives Makerspace{% endblock %}
+
+{% block content %}
+<div class="view">
+  <div class="cp-container">
+    <div class="detail-card">
+      <div class="detail-head">
+        <div>
+          <div class="dc-cat">Instructor</div>
+          <div class="dc-title">{{ instructor.display_name }}</div>
+        </div>
+        <a class="back-link" href="{% url 'classes:public_list' %}">&larr; All classes</a>
+      </div>
+      <div class="detail-body">
+        <div class="ip-hero">
+          {% if instructor.photo %}
+            <img class="ip-photo" src="{{ instructor.photo.url }}" alt="">
+          {% else %}
+            <div class="ip-photo-ph">{{ instructor.display_name|initials }}</div>
+          {% endif %}
+          <div>
+            <div class="ip-name">{{ instructor.display_name }}</div>
+            <div class="ip-links">
+              {% if instructor.social_handle %}<span>{{ instructor.social_handle }}</span>{% endif %}
+              {% if instructor.website %}<a href="{{ instructor.website }}" target="_blank" rel="noopener">{{ instructor.website }}</a>{% endif %}
+            </div>
+            {% if instructor.bio %}<div class="ip-bio">{{ instructor.bio }}</div>{% endif %}
+          </div>
+        </div>
+
+        {% if current_classes %}
+          <div class="ip-sec">
+            <h3>Current Classes</h3>
+            {% for offering in current_classes %}
+              <a class="ip-cls" href="{% url 'classes:public_class_detail' slug=offering.slug %}">
+                <div class="ip-cls-t">{{ offering.title }}</div>
+                <div class="ip-cls-m">
+                  {{ offering.category.name }} · {{ offering.price_cents|cents_as_price }}
+                  {% if offering.scheduling_model == 'flexible' %}
+                    · Flexible scheduling
+                  {% else %}
+                    {% with first=offering.first_upcoming_session_at %}
+                      {% if first %} · {{ first|date:"D, M j" }}{% endif %}
+                    {% endwith %}
+                  {% endif %}
+                  · {{ offering.spots_remaining }} spots left
+                </div>
+              </a>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        {% if past_classes %}
+          <div class="ip-sec">
+            <h3>Past Classes</h3>
+            {% for offering in past_classes %}
+              <div class="ip-cls past">
+                <div class="ip-cls-t">{{ offering.title }}</div>
+                <div class="ip-cls-m">{{ offering.category.name }}</div>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        {% if not current_classes and not past_classes %}
+          <div class="empty">No classes from this instructor yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
