@@ -99,6 +99,20 @@ class SiteConfigurationAdmin(ModelAdmin):
                 "description": "When enabled, upcoming classes are imported as Calendar Events with links to register. Use the sync button to fetch classes manually — this is not done automatically on save because it fetches hundreds of records.",
             },
         ),
+        (
+            "Integrations",
+            {
+                "fields": [
+                    "mailchimp_api_key",
+                    "mailchimp_list_id",
+                    "google_analytics_measurement_id",
+                ],
+                "description": (
+                    "Third-party integrations that apply site-wide. MailChimp auto-subscribes new class "
+                    "registrants; Google Analytics is injected on the public classes portal."
+                ),
+            },
+        ),
     ]
 
     def sync_classes_button(self, obj: SiteConfiguration | None) -> str:

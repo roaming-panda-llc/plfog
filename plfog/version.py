@@ -2,9 +2,23 @@
 
 from __future__ import annotations
 
-VERSION = "1.7.2"
+VERSION = "1.7.3"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.7.3",
+        "date": "2026-04-23",
+        "title": "Classes: public portal, instructor dashboard, and calendar integration",
+        "changes": [
+            "Browse classes at a new public page at /classes/ — grouped by category with sticky filters, hero, and polished card grid; gated behind an admin toggle in Classes → Settings so it only goes live when you're ready",
+            "Class detail and instructor profile pages with schedule, description, pricing, member discount, and links back to the portal",
+            "New Teaching section in the hub sidebar for instructors — lets them see their classes, submit drafts for admin review, view their registrations, and edit their own profile (photo, bio, website, social handle)",
+            "Classes admin gets a status filter (All / Draft / Pending / Published / Archived) with live counts and dims archived rows, plus a Delete button for drafts with zero registrations — Archive preserves history; Delete is only for cleanup",
+            "Published local classes now show up on the Community Calendar alongside the external feed during the transition period",
+            "Scheduled reminder email infrastructure in place — `manage.py send_class_reminders` emails confirmed registrants for sessions starting soon (reminder window configurable in Classes → Settings)",
+            "Small admin polish: shortened URLs from /classes/admin/classes/ → /classes/admin/, 'View public portal' link in the Classes admin header, proper small red delete buttons with confirmation modals across Categories, Discount Codes, and Classes",
+        ],
+    },
     {
         "version": "1.7.2",
         "date": "2026-04-23",

@@ -205,6 +205,55 @@ def sync_classes_calendar() -> int:
     return total
 
 
+def sync_local_class_events() -> int:
+    """Materialize upcoming local plfog class sessions into CalendarEvent rows.
+
+    Complements the Drupal-fed ``sync_classes_calendar`` during the transition
+    period (when ``SiteConfiguration.sync_classes_enabled`` is still on). Both
+    sources live under ``source="classes"`` but use distinct UID prefixes so
+    they don't collide.
+
+    Stale local events (class archived/unpublished, or session deleted) are
+    cleaned up at the end of each sync.
+    """
+    from classes.models import ClassOffering, ClassSession
+
+    now = timezone.now()
+    horizon = now + timedelta(days=180)
+
+    qs = ClassSession.objects.filter(
+        class_offering__status=ClassOffering.Status.PUBLISHED,
+        class_offering__is_private=False,
+        starts_at__gte=now,
+        starts_at__lte=horizon,
+    ).select_related("class_offering", "class_offering__category")
+
+    kept_uids: list[str] = []
+    for session in qs:
+        offering = session.class_offering
+        uid = f"local-class-{session.pk}"
+        kept_uids.append(uid)
+        CalendarEvent.objects.update_or_create(
+            guild=None,
+            uid=uid,
+            defaults={
+                "source": "classes",
+                "title": offering.title,
+                "description": offering.description[:500],
+                "location": "Past Lives Makerspace",
+                "url": f"/classes/{offering.slug}/",
+                "start_dt": session.starts_at,
+                "end_dt": session.ends_at,
+                "all_day": False,
+                "fetched_at": now,
+            },
+        )
+
+    # Purge stale local-class events that no longer map to a live session.
+    CalendarEvent.objects.filter(source="classes", uid__startswith="local-class-").exclude(uid__in=kept_uids).delete()
+    return len(kept_uids)
+
+
 def refresh_stale_sources(max_age_seconds: int = DEFAULT_MAX_AGE_SECONDS) -> None:
     """Refresh any calendar sources not synced within max_age_seconds.
 
@@ -243,3 +292,10 @@ def refresh_stale_sources(max_age_seconds: int = DEFAULT_MAX_AGE_SECONDS) -> Non
                 sync_classes_calendar()
             except Exception:  # noqa: BLE001
                 pass
+
+    # Always publish local plfog classes to the calendar — independent of the
+    # external Drupal feed toggle. Cheap (single join, no network).
+    try:
+        sync_local_class_events()
+    except Exception:  # noqa: BLE001
+        pass

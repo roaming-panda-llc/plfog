@@ -97,9 +97,9 @@ def describe_guild_voting():
 
 @pytest.mark.django_db
 def describe_member_directory():
-    def it_requires_login(client: Client):
+    def it_is_accessible_to_anonymous_guests(client: Client):
         response = client.get("/members/")
-        assert response.status_code == 302
+        assert response.status_code == 200
 
     def it_lists_active_opted_in_members(client: Client):
         User.objects.create_user(username="viewer", password="pass")
@@ -169,10 +169,10 @@ def describe_member_directory():
 
 @pytest.mark.django_db
 def describe_guild_detail():
-    def it_requires_login(client: Client):
+    def it_is_accessible_to_anonymous_guests(client: Client):
         guild = GuildFactory()
         response = client.get(f"/guilds/{guild.pk}/")
-        assert response.status_code == 302
+        assert response.status_code == 200
 
     def it_renders_guild_detail(client: Client):
         User.objects.create_user(username="viewer", password="pass")

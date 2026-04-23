@@ -5,20 +5,47 @@ from classes import views
 app_name = "classes"
 
 urlpatterns = [
-    path("admin/", views.admin_root, name="admin_root"),
-    path("admin/classes/", views.admin_classes, name="admin_classes"),
-    path("admin/classes/new/", views.admin_class_create, name="admin_class_create"),
-    path("admin/classes/<int:pk>/", views.admin_class_detail, name="admin_class_detail"),
-    path("admin/classes/<int:pk>/edit/", views.admin_class_edit, name="admin_class_edit"),
-    path("admin/classes/<int:pk>/approve/", views.admin_class_approve, name="admin_class_approve"),
-    path("admin/classes/<int:pk>/archive/", views.admin_class_archive, name="admin_class_archive"),
-    path("admin/classes/<int:pk>/duplicate/", views.admin_class_duplicate, name="admin_class_duplicate"),
+    # Public portal
+    path("", views.public_list, name="public_list"),
+    path("category/<slug:slug>/", views.public_category, name="public_category"),
+    path("instructors/<slug:slug>/", views.public_instructor, name="public_instructor"),
+    # Instructor dashboard
+    path("instructor/", views.instructor_dashboard, name="instructor_dashboard"),
+    path("instructor/classes/new/", views.instructor_class_create, name="instructor_class_create"),
+    path("instructor/classes/<int:pk>/edit/", views.instructor_class_edit, name="instructor_class_edit"),
+    path("instructor/classes/<int:pk>/submit/", views.instructor_class_submit, name="instructor_class_submit"),
+    path("instructor/registrations/", views.instructor_registrations, name="instructor_registrations"),
+    path("instructor/discount-codes/", views.instructor_discount_codes, name="instructor_discount_codes"),
+    path(
+        "instructor/discount-codes/new/", views.instructor_discount_code_create, name="instructor_discount_code_create"
+    ),
+    path(
+        "instructor/discount-codes/<int:pk>/edit/",
+        views.instructor_discount_code_edit,
+        name="instructor_discount_code_edit",
+    ),
+    path(
+        "instructor/discount-codes/<int:pk>/delete/",
+        views.instructor_discount_code_delete,
+        name="instructor_discount_code_delete",
+    ),
+    path("instructor/profile/", views.instructor_profile, name="instructor_profile"),
+    # Admin — /classes/admin/ IS the classes list; no double-"classes" path segment.
+    path("admin/", views.admin_classes, name="admin_classes"),
+    path("admin/new/", views.admin_class_create, name="admin_class_create"),
+    path("admin/<int:pk>/", views.admin_class_detail, name="admin_class_detail"),
+    path("admin/<int:pk>/edit/", views.admin_class_edit, name="admin_class_edit"),
+    path("admin/<int:pk>/approve/", views.admin_class_approve, name="admin_class_approve"),
+    path("admin/<int:pk>/archive/", views.admin_class_archive, name="admin_class_archive"),
+    path("admin/<int:pk>/duplicate/", views.admin_class_duplicate, name="admin_class_duplicate"),
+    path("admin/<int:pk>/delete/", views.admin_class_delete, name="admin_class_delete"),
     path("admin/categories/", views.admin_categories, name="admin_categories"),
     path("admin/categories/new/", views.admin_category_create, name="admin_category_create"),
     path("admin/categories/<int:pk>/edit/", views.admin_category_edit, name="admin_category_edit"),
     path("admin/categories/<int:pk>/delete/", views.admin_category_delete, name="admin_category_delete"),
     path("admin/instructors/", views.admin_instructors, name="admin_instructors"),
     path("admin/instructors/new/", views.admin_instructor_invite, name="admin_instructor_invite"),
+    path("admin/instructors/promote/", views.admin_instructor_promote, name="admin_instructor_promote"),
     path("admin/registrations/", views.admin_registrations, name="admin_registrations"),
     path("admin/registrations/<int:pk>/", views.admin_registration_detail, name="admin_registration_detail"),
     path("admin/registrations/<int:pk>/cancel/", views.admin_registration_cancel, name="admin_registration_cancel"),
@@ -27,4 +54,6 @@ urlpatterns = [
     path("admin/discount-codes/<int:pk>/edit/", views.admin_discount_code_edit, name="admin_discount_code_edit"),
     path("admin/discount-codes/<int:pk>/delete/", views.admin_discount_code_delete, name="admin_discount_code_delete"),
     path("admin/settings/", views.admin_settings, name="admin_settings"),
+    # Public class detail — keep last so admin/, category/, instructors/ win.
+    path("<slug:slug>/", views.public_class_detail, name="public_class_detail"),
 ]

@@ -1,18 +1,29 @@
 {% extends "hub/base.html" %}
 {% load hub_tags %}
+{% load classes_tags %}
 
 {% block title %}Classes Admin — {{ active_tab|title }}{% endblock %}
 
 {% block content %}
+{% classes_settings as portal %}
 <div class="hub-card">
-    <h1>Classes</h1>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:0.75rem;">
+        <h1 style="margin:0;">Classes</h1>
+        <div style="display:flex; gap:0.375rem; flex-wrap:wrap;">
+            {% if portal.enabled_publicly %}
+                <a class="hub-btn hub-btn--sm hub-btn--ghost" href="{% url 'classes:public_list' %}" target="_blank" rel="noopener"
+                   title="Opens in a new tab">View public portal ↗</a>
+            {% endif %}
+            <a class="hub-btn hub-btn--sm hub-btn--ghost" href="{% url 'classes:admin_settings' %}"
+               title="Global class settings: waiver text, member discount, reminder window, public portal toggle">⚙ Settings</a>
+        </div>
+    </div>
     <nav style="display: flex; border-bottom: 1px solid var(--hub-border); gap: 0; margin-bottom: 1.25rem; flex-wrap: wrap;" role="tablist">
-        <a href="{% url 'classes:admin_classes' %}" class="vote-tab{% if active_tab == 'classes' %} vote-tab--active{% endif %}">Classes</a>
         <a href="{% url 'classes:admin_categories' %}" class="vote-tab{% if active_tab == 'categories' %} vote-tab--active{% endif %}">Categories</a>
         <a href="{% url 'classes:admin_instructors' %}" class="vote-tab{% if active_tab == 'instructors' %} vote-tab--active{% endif %}">Instructors</a>
+        <a href="{% url 'classes:admin_classes' %}" class="vote-tab{% if active_tab == 'classes' %} vote-tab--active{% endif %}">Classes</a>
         <a href="{% url 'classes:admin_registrations' %}" class="vote-tab{% if active_tab == 'registrations' %} vote-tab--active{% endif %}">Registrations</a>
         <a href="{% url 'classes:admin_discount_codes' %}" class="vote-tab{% if active_tab == 'discount_codes' %} vote-tab--active{% endif %}">Discount Codes</a>
-        <a href="{% url 'classes:admin_settings' %}" class="vote-tab{% if active_tab == 'settings' %} vote-tab--active{% endif %}">Settings</a>
     </nav>
     {% block tab_content %}{% endblock %}
 </div>

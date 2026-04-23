@@ -21,9 +21,6 @@ def describe_admin_settings():
                 "model_release_waiver_text": "NEW MODEL RELEASE",
                 "default_member_discount_pct": 15,
                 "reminder_hours_before": 48,
-                "mailchimp_api_key": "",
-                "mailchimp_list_id": "",
-                "google_analytics_measurement_id": "G-ABC123",
                 "confirmation_email_footer": "",
             },
         )
@@ -32,7 +29,6 @@ def describe_admin_settings():
 
         settings_obj = ClassSettings.load()
         assert settings_obj.default_member_discount_pct == 15
-        assert settings_obj.google_analytics_measurement_id == "G-ABC123"
 
     def it_gates_behind_admin_role(member_user, client, db):
         client.force_login(member_user)

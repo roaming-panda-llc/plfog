@@ -1,0 +1,23 @@
+{% extends "hub/base.html" %}
+{% load classes_tags %}
+
+{% block title %}Teaching — {{ active_tab|title }}{% endblock %}
+
+{% block content %}
+{% classes_settings as portal %}
+<div class="hub-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:0.75rem;">
+        <h1 style="margin:0;">Teaching</h1>
+        {% if portal.enabled_publicly %}
+            <a class="hub-btn hub-btn--sm" href="{% url 'classes:public_instructor' slug=instructor.slug %}" target="_blank" rel="noopener">View public profile ↗</a>
+        {% endif %}
+    </div>
+    <nav style="display:flex; border-bottom:1px solid var(--hub-border); gap:0; margin-bottom:1.25rem; flex-wrap:wrap;" role="tablist">
+        <a href="{% url 'classes:instructor_dashboard' %}" class="vote-tab{% if active_tab == 'classes' %} vote-tab--active{% endif %}">My Classes</a>
+        <a href="{% url 'classes:instructor_registrations' %}" class="vote-tab{% if active_tab == 'registrations' %} vote-tab--active{% endif %}">Registrations</a>
+        <a href="{% url 'classes:instructor_discount_codes' %}" class="vote-tab{% if active_tab == 'discount_codes' %} vote-tab--active{% endif %}">Discount Codes</a>
+        <a href="{% url 'classes:instructor_profile' %}" class="vote-tab{% if active_tab == 'profile' %} vote-tab--active{% endif %}">Profile</a>
+    </nav>
+    {% block tab_content %}{% endblock %}
+</div>
+{% endblock %}

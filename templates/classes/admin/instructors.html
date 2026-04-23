@@ -1,7 +1,8 @@
 {% extends "classes/admin/base.html" %}
 {% block tab_content %}
-<div style="display:flex; justify-content:flex-end; margin-bottom:1rem;">
-    <a class="hub-btn hub-btn--primary" href="{% url 'classes:admin_instructor_invite' %}">+ Invite Instructor</a>
+<div style="display:flex; justify-content:flex-end; gap:0.375rem; margin-bottom:1rem;">
+    <a class="hub-btn hub-btn--ghost hub-btn--sm" href="{% url 'classes:admin_instructor_promote' %}">+ Promote Existing User</a>
+    <a class="hub-btn hub-btn--primary hub-btn--sm" href="{% url 'classes:admin_instructor_invite' %}">+ Invite Instructor</a>
 </div>
 <table style="width:100%; border-collapse:collapse;">
     <thead>
