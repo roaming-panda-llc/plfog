@@ -147,7 +147,7 @@ class MemberAdmin(ModelAdmin):
             instances = [i for i in instances if not isinstance(i, MemberEmailInline)]
         return instances
 
-    def get_fieldsets(self, request: HttpRequest, obj: object = None) -> list[tuple[str, dict]]:
+    def get_fieldsets(self, request: HttpRequest, obj: Member | None = None) -> list[tuple[str, dict]]:
         """Build fieldsets dynamically — fog_role only visible to superusers."""
         membership_fields: list[str] = [
             "membership_plan",

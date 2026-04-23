@@ -67,7 +67,9 @@ def compute_actual_roles(user: "AbstractBaseUser | AnonymousUser | None") -> fro
 
     # Query fresh each request rather than `user.member` — avoids stale reverse-OneToOne
     # cache when Member.status is updated outside the instance (e.g. signal updates).
-    member = MemberModel.objects.filter(user=user).first()
+    # user.pk is guaranteed non-None here by the is_authenticated guard above; mypy
+    # can't infer that because AbstractBaseUser.pk is typed Any | None.
+    member = MemberModel.objects.filter(user_id=user.pk).first()  # type: ignore[misc]
 
     # Lazy import — avoids circulars during Django app loading.
     from classes.models import Instructor
