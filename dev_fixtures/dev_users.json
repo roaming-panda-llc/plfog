@@ -1,0 +1,361 @@
+[
+  {
+    "model": "membership.membershipplan",
+    "pk": 900001,
+    "fields": {
+      "name": "Local Dev Plan",
+      "monthly_price": "0.00",
+      "deposit_required": null,
+      "notes": "Fixture plan for local development.",
+      "created_at": "2026-04-15T00:00:00Z"
+    }
+  },
+  {
+    "model": "membership.member",
+    "pk": 900001,
+    "fields": {
+      "airtable_record_id": null,
+      "user": null,
+      "full_legal_name": "Super User",
+      "preferred_name": "",
+      "_pre_signup_email": "super@example.com",
+      "phone": "",
+      "discord_handle": "",
+      "other_contact_info": "",
+      "pronouns": "",
+      "about_me": "",
+      "billing_name": "",
+      "emergency_contact_name": "",
+      "emergency_contact_phone": "",
+      "emergency_contact_relationship": "",
+      "membership_plan": 900001,
+      "status": "active",
+      "member_type": "standard",
+      "fog_role": "admin",
+      "join_date": null,
+      "cancellation_date": null,
+      "committed_until": null,
+      "show_in_directory": false,
+      "notes": "Fixture admin user for local development.",
+      "created_at": "2026-04-15T00:00:00Z"
+    }
+  },
+  {
+    "model": "membership.member",
+    "pk": 900002,
+    "fields": {
+      "airtable_record_id": null,
+      "user": null,
+      "full_legal_name": "Normal User",
+      "preferred_name": "",
+      "_pre_signup_email": "normal@example.com",
+      "phone": "",
+      "discord_handle": "",
+      "other_contact_info": "",
+      "pronouns": "",
+      "about_me": "",
+      "billing_name": "",
+      "emergency_contact_name": "",
+      "emergency_contact_phone": "",
+      "emergency_contact_relationship": "",
+      "membership_plan": 900001,
+      "status": "active",
+      "member_type": "standard",
+      "fog_role": "member",
+      "join_date": null,
+      "cancellation_date": null,
+      "committed_until": null,
+      "show_in_directory": false,
+      "notes": "Fixture normal user for local development.",
+      "created_at": "2026-04-15T00:00:00Z"
+    }
+  },
+  {
+    "model": "membership.member",
+    "pk": 900003,
+    "fields": {
+      "airtable_record_id": null,
+      "user": null,
+      "full_legal_name": "Clay",
+      "preferred_name": "",
+      "_pre_signup_email": "clay@example.com",
+      "phone": "",
+      "discord_handle": "",
+      "other_contact_info": "",
+      "pronouns": "",
+      "about_me": "",
+      "billing_name": "",
+      "emergency_contact_name": "",
+      "emergency_contact_phone": "",
+      "emergency_contact_relationship": "",
+      "membership_plan": 900001,
+      "status": "active",
+      "member_type": "guild_lead",
+      "fog_role": "member",
+      "join_date": null,
+      "cancellation_date": null,
+      "committed_until": null,
+      "show_in_directory": false,
+      "notes": "Fixture Ceramic guild lead for local development.",
+      "created_at": "2026-04-15T00:00:00Z"
+    }
+  },
+  {
+    "model": "membership.member",
+    "pk": 900004,
+    "fields": {
+      "airtable_record_id": null,
+      "user": null,
+      "full_legal_name": "Ash",
+      "preferred_name": "",
+      "_pre_signup_email": "ash@example.com",
+      "phone": "",
+      "discord_handle": "",
+      "other_contact_info": "",
+      "pronouns": "",
+      "about_me": "",
+      "billing_name": "",
+      "emergency_contact_name": "",
+      "emergency_contact_phone": "",
+      "emergency_contact_relationship": "",
+      "membership_plan": 900001,
+      "status": "active",
+      "member_type": "guild_lead",
+      "fog_role": "member",
+      "join_date": null,
+      "cancellation_date": null,
+      "committed_until": null,
+      "show_in_directory": false,
+      "notes": "Fixture Wood guild lead for local development.",
+      "created_at": "2026-04-15T00:00:00Z"
+    }
+  },
+  {
+    "model": "membership.member",
+    "pk": 900005,
+    "fields": {
+      "airtable_record_id": null,
+      "user": null,
+      "full_legal_name": "Rusty",
+      "preferred_name": "",
+      "_pre_signup_email": "rusty@example.com",
+      "phone": "",
+      "discord_handle": "",
+      "other_contact_info": "",
+      "pronouns": "",
+      "about_me": "",
+      "billing_name": "",
+      "emergency_contact_name": "",
+      "emergency_contact_phone": "",
+      "emergency_contact_relationship": "",
+      "membership_plan": 900001,
+      "status": "active",
+      "member_type": "guild_lead",
+      "fog_role": "member",
+      "join_date": null,
+      "cancellation_date": null,
+      "committed_until": null,
+      "show_in_directory": false,
+      "notes": "Fixture Metal guild lead for local development.",
+      "created_at": "2026-04-15T00:00:00Z"
+    }
+  },
+  {
+    "model": "membership.member",
+    "pk": 900006,
+    "fields": {
+      "airtable_record_id": null,
+      "user": null,
+      "full_legal_name": "Lacey",
+      "preferred_name": "",
+      "_pre_signup_email": "lacey@example.com",
+      "phone": "",
+      "discord_handle": "",
+      "other_contact_info": "",
+      "pronouns": "",
+      "about_me": "",
+      "billing_name": "",
+      "emergency_contact_name": "",
+      "emergency_contact_phone": "",
+      "emergency_contact_relationship": "",
+      "membership_plan": 900001,
+      "status": "active",
+      "member_type": "guild_lead",
+      "fog_role": "member",
+      "join_date": null,
+      "cancellation_date": null,
+      "committed_until": null,
+      "show_in_directory": false,
+      "notes": "Fixture Textiles guild lead for local development.",
+      "created_at": "2026-04-15T00:00:00Z"
+    }
+  },
+  {
+    "model": "auth.user",
+    "pk": 900001,
+    "fields": {
+      "password": "pbkdf2_sha256$1200000$plfog-local-dev$hOOoJ1dugzdheCEGYcJJZSC3Zz+SkRErrNDHyd2QK0Q=",
+      "last_login": null,
+      "is_superuser": true,
+      "username": "super@example.com",
+      "first_name": "Super",
+      "last_name": "User",
+      "email": "super@example.com",
+      "is_staff": true,
+      "is_active": true,
+      "date_joined": "2026-04-15T00:00:00Z",
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "auth.user",
+    "pk": 900002,
+    "fields": {
+      "password": "pbkdf2_sha256$1200000$plfog-local-dev$hOOoJ1dugzdheCEGYcJJZSC3Zz+SkRErrNDHyd2QK0Q=",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "normal@example.com",
+      "first_name": "Normal",
+      "last_name": "User",
+      "email": "normal@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2026-04-15T00:00:00Z",
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "auth.user",
+    "pk": 900003,
+    "fields": {
+      "password": "pbkdf2_sha256$1200000$plfog-local-dev$hOOoJ1dugzdheCEGYcJJZSC3Zz+SkRErrNDHyd2QK0Q=",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "clay@example.com",
+      "first_name": "Clay",
+      "last_name": "",
+      "email": "clay@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2026-04-15T00:00:00Z",
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "auth.user",
+    "pk": 900004,
+    "fields": {
+      "password": "pbkdf2_sha256$1200000$plfog-local-dev$hOOoJ1dugzdheCEGYcJJZSC3Zz+SkRErrNDHyd2QK0Q=",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "ash@example.com",
+      "first_name": "Ash",
+      "last_name": "",
+      "email": "ash@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2026-04-15T00:00:00Z",
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "auth.user",
+    "pk": 900005,
+    "fields": {
+      "password": "pbkdf2_sha256$1200000$plfog-local-dev$hOOoJ1dugzdheCEGYcJJZSC3Zz+SkRErrNDHyd2QK0Q=",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "rusty@example.com",
+      "first_name": "Rusty",
+      "last_name": "",
+      "email": "rusty@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2026-04-15T00:00:00Z",
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "auth.user",
+    "pk": 900006,
+    "fields": {
+      "password": "pbkdf2_sha256$1200000$plfog-local-dev$hOOoJ1dugzdheCEGYcJJZSC3Zz+SkRErrNDHyd2QK0Q=",
+      "last_login": null,
+      "is_superuser": false,
+      "username": "lacey@example.com",
+      "first_name": "Lacey",
+      "last_name": "",
+      "email": "lacey@example.com",
+      "is_staff": false,
+      "is_active": true,
+      "date_joined": "2026-04-15T00:00:00Z",
+      "groups": [],
+      "user_permissions": []
+    }
+  },
+  {
+    "model": "membership.guild",
+    "pk": 900001,
+    "fields": {
+      "name": "Ceramic",
+      "is_active": true,
+      "guild_lead": 900003,
+      "notes": "Fixture guild for local development.",
+      "about": "",
+      "calendar_url": "",
+      "calendar_color": "#4B9FEE",
+      "calendar_last_fetched_at": null,
+      "created_at": "2026-04-15T00:00:00Z"
+    }
+  },
+  {
+    "model": "membership.guild",
+    "pk": 900002,
+    "fields": {
+      "name": "Wood",
+      "is_active": true,
+      "guild_lead": 900004,
+      "notes": "Fixture guild for local development.",
+      "about": "",
+      "calendar_url": "",
+      "calendar_color": "#4B9FEE",
+      "calendar_last_fetched_at": null,
+      "created_at": "2026-04-15T00:00:00Z"
+    }
+  },
+  {
+    "model": "membership.guild",
+    "pk": 900003,
+    "fields": {
+      "name": "Metal",
+      "is_active": true,
+      "guild_lead": 900005,
+      "notes": "Fixture guild for local development.",
+      "about": "",
+      "calendar_url": "",
+      "calendar_color": "#4B9FEE",
+      "calendar_last_fetched_at": null,
+      "created_at": "2026-04-15T00:00:00Z"
+    }
+  },
+  {
+    "model": "membership.guild",
+    "pk": 900004,
+    "fields": {
+      "name": "Textiles",
+      "is_active": true,
+      "guild_lead": 900006,
+      "notes": "Fixture guild for local development.",
+      "about": "",
+      "calendar_url": "",
+      "calendar_color": "#4B9FEE",
+      "calendar_last_fetched_at": null,
+      "created_at": "2026-04-15T00:00:00Z"
+    }
+  }
+]
