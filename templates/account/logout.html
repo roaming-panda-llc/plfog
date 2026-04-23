@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Log Out - Past Lives{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <h1 class="auth-page__title">Log Out</h1>
+    <p class="auth-page__subtitle">Are you sure you want to end your session?</p>
+    <div class="auth-card">
+        <form method="POST" action="{% url 'account_logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn--primary btn--full">Log Out</button>
+        </form>
+        <div class="auth-links">
+            <p><a href="{% url 'home' %}">Cancel</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

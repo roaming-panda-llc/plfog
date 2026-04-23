@@ -15,6 +15,17 @@ def describe_allauth_urls():
         response = client.get("/accounts/login/")
         assert response.status_code == 200
 
+    def it_logout_page_uses_custom_template(client):
+        user = User.objects.create_user(username="logoutuser", email="logout@example.com", password="pass")
+        client.force_login(user)
+
+        response = client.get("/accounts/logout/")
+
+        assert response.status_code == 200
+        template_names = [t.name for t in response.templates]
+        assert "account/logout.html" in template_names
+        assert "Are you sure you want to end your session?" in response.content.decode()
+
     def it_signup_page_returns_200(client):
         # Default is invite_only, so signup_closed is rendered
         response = client.get("/accounts/signup/")
