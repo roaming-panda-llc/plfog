@@ -53,4 +53,8 @@ urlpatterns = [
     path("calendar/events/", views.calendar_events_partial, name="hub_community_calendar_events"),
     path("calendar/export.ics", views.calendar_export_ics, name="hub_calendar_export_ics"),
     path("view-as/set/", views.view_as_set, name="hub_view_as_set"),
+    path("manage/voting/", views.admin_voting_dashboard, name="hub_admin_voting_dashboard"),
+    path("manage/members/", views.admin_members, name="hub_admin_members"),
+    path("manage/members/<int:pk>/edit/", views.admin_member_edit, name="hub_admin_member_edit"),
+    path("manage/site-settings/", views.admin_site_settings, name="hub_admin_site_settings"),
 ]

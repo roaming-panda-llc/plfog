@@ -1,0 +1,75 @@
+{% extends "hub/base.html" %}
+
+{% block title %}Site Settings — Past Lives{% endblock %}
+
+{% block extra_head %}
+<style>
+  .site-settings-form input[type="text"],
+  .site-settings-form input[type="url"],
+  .site-settings-form input[type="email"],
+  .site-settings-form input[type="number"],
+  .site-settings-form select,
+  .site-settings-form textarea {
+    background: rgba(255,255,255,0.04);
+    color: var(--hub-text);
+    border: 1px solid var(--hub-border);
+    border-radius: 6px;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.9375rem;
+    width: 100%;
+    box-sizing: border-box;
+    font-family: inherit;
+  }
+  .site-settings-form input:focus,
+  .site-settings-form select:focus,
+  .site-settings-form textarea:focus {
+    outline: none;
+    border-color: #EEB44B;
+    background: rgba(255,255,255,0.06);
+  }
+  .site-settings-form input[type="color"] {
+    width: 64px;
+    height: 40px;
+    padding: 2px;
+    border: 1px solid var(--hub-border);
+    border-radius: 6px;
+    background: rgba(255,255,255,0.04);
+    cursor: pointer;
+  }
+  .site-settings-form input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #EEB44B;
+    cursor: pointer;
+  }
+  .site-settings-form .field-row { display: flex; flex-direction: column; gap: 0.35rem; }
+  .site-settings-form .field-checkbox { flex-direction: row; align-items: center; gap: 0.625rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hub-card">
+  <h1 class="hub-page-title" style="margin:0 0 0.25rem;">Site Settings</h1>
+  <p style="color:var(--hub-text-muted);margin:0 0 1.5rem;">Site-wide configuration. Singleton — saves overwrite the existing record.</p>
+
+  <form method="post" class="site-settings-form" style="display:flex;flex-direction:column;gap:1.25rem;max-width:680px;">
+    {% csrf_token %}
+    {% for field in form %}
+    <div class="field-row{% if field.field.widget.input_type == 'checkbox' %} field-checkbox{% endif %}">
+      {% if field.field.widget.input_type == 'checkbox' %}
+        {{ field }}
+        <label for="{{ field.id_for_label }}" style="font-weight:600;color:var(--hub-text);cursor:pointer;">{{ field.label }}</label>
+      {% else %}
+        <label for="{{ field.id_for_label }}" style="font-weight:600;color:var(--hub-text);">{{ field.label }}</label>
+        {{ field }}
+      {% endif %}
+      {% if field.help_text %}<small style="color:var(--hub-text-muted);">{{ field.help_text }}</small>{% endif %}
+      {% if field.errors %}<div style="color:#f87171;font-size:0.8125rem;">{{ field.errors }}</div>{% endif %}
+    </div>
+    {% endfor %}
+    <div>
+      <button type="submit" class="hub-btn hub-btn--primary">Save settings</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

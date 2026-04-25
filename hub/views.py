@@ -21,8 +21,8 @@ from django.views.decorators.http import require_POST, require_http_methods
 from billing.exceptions import NoPaymentMethodError, TabLimitExceededError, TabLockedError
 from billing.models import BillingSettings, Tab, TabCharge
 from hub.calendar_service import refresh_stale_sources
+from hub.view_as import ALL_ROLES, SESSION_ROLE_KEY, fog_admin_required
 from hub.forms import BetaFeedbackForm, EmailPreferencesForm, GuildEditForm, ProfileSettingsForm, VotePreferenceForm
-from hub.view_as import ALL_ROLES, SESSION_ROLE_KEY
 from membership.cycle import get_cycle_context
 from membership.models import FundingSnapshot, Guild, Member, VotePreference
 
@@ -987,8 +987,6 @@ def view_as_set(request: HttpRequest) -> JsonResponse:
     if role not in ALL_ROLES:
         return JsonResponse({"error": f"Unknown role '{role}'"}, status=400)
 
-    # Admins can preview any role (Guest, Non-member Instructor, Member, Officer).
-    # Everyone else can only pick roles they actually hold — a downgrade tool.
     view_as = request.view_as  # type: ignore[attr-defined]
     is_admin = view_as.has_actual("admin")
     if not is_admin and not view_as.has_actual(role):
@@ -997,3 +995,115 @@ def view_as_set(request: HttpRequest) -> JsonResponse:
     request.session[SESSION_ROLE_KEY] = role
 
     return JsonResponse({"role": role})
+
+
+@fog_admin_required
+def admin_voting_dashboard(request: HttpRequest) -> HttpResponse:
+    """Admin voting dashboard — pool stats, vote leaders, snapshot actions."""
+    from plfog.dashboard import dashboard_callback
+
+    ctx = _get_hub_context(request)
+    ctx = dashboard_callback(request, ctx)
+    return render(request, "hub/admin/voting_dashboard.html", ctx)
+
+
+@fog_admin_required
+def admin_members(request: HttpRequest) -> HttpResponse:
+    """Admin members management — paginated list with status + role filters."""
+    from django.core.paginator import Paginator
+
+    ctx = _get_hub_context(request)
+    status_filter = request.GET.get("status", "active")
+    qs = Member.objects.select_related("user", "membership_plan").order_by("full_legal_name")
+    if status_filter and status_filter != "all":
+        qs = qs.filter(status=status_filter)
+    paginator = Paginator(qs, 50)
+    page = paginator.get_page(request.GET.get("page", 1))
+    return render(
+        request,
+        "hub/admin/members.html",
+        {
+            **ctx,
+            "page": page,
+            "status_filter": status_filter,
+            "status_choices": Member.Status.choices,
+        },
+    )
+
+
+@fog_admin_required
+def admin_member_edit(request: HttpRequest, pk: int) -> HttpResponse:
+    """Hub-native edit form for a single Member."""
+    from django import forms as django_forms
+
+    member = get_object_or_404(Member, pk=pk)
+
+    class MemberEditForm(django_forms.ModelForm):
+        class Meta:
+            model = Member
+            fields = [
+                "full_legal_name",
+                "preferred_name",
+                "pronouns",
+                "discord_handle",
+                "about_me",
+                "membership_plan",
+                "status",
+                "member_type",
+                "fog_role",
+                "show_in_directory",
+            ]
+
+    if request.method == "POST":
+        form = MemberEditForm(request.POST, instance=member)
+        if form.is_valid():
+            form.save()
+            display = member.full_legal_name or (member.user.email if member.user else f"member #{member.pk}")
+            messages.success(request, f"Saved {display}.")
+            return redirect("hub_admin_members")
+    else:
+        form = MemberEditForm(instance=member)
+
+    ctx = _get_hub_context(request)
+    return render(request, "hub/admin/member_edit.html", {**ctx, "form": form, "member": member})
+
+
+@fog_admin_required
+def admin_site_settings(request: HttpRequest) -> HttpResponse:
+    """Admin site settings — edit the SiteConfiguration singleton."""
+    from django import forms as django_forms
+
+    from core.models import SiteConfiguration
+
+    config = SiteConfiguration.load()
+
+    class SiteSettingsForm(django_forms.ModelForm):
+        class Meta:
+            model = SiteConfiguration
+            fields = [
+                "registration_mode",
+                "general_calendar_url",
+                "general_calendar_color",
+                "sync_classes_enabled",
+                "classes_calendar_color",
+                "mailchimp_api_key",
+                "mailchimp_list_id",
+                "google_analytics_measurement_id",
+            ]
+            widgets = {
+                "general_calendar_color": django_forms.TextInput(attrs={"type": "color"}),
+                "classes_calendar_color": django_forms.TextInput(attrs={"type": "color"}),
+                "general_calendar_url": django_forms.URLInput(attrs={"placeholder": "https://…"}),
+            }
+
+    if request.method == "POST":
+        form = SiteSettingsForm(request.POST, instance=config)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Site settings saved.")
+            return redirect("hub_admin_site_settings")
+    else:
+        form = SiteSettingsForm(instance=config)
+
+    ctx = _get_hub_context(request)
+    return render(request, "hub/admin/site_settings.html", {**ctx, "form": form})

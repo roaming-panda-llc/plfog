@@ -130,12 +130,22 @@ class CategoryForm(forms.ModelForm):
         fields = ["name", "slug", "sort_order", "hero_image"]
 
 
-class PromoteUserToInstructorForm(forms.Form):
-    """Promote an existing User (with any role except Guest) into an Instructor."""
+class _UserByLegalNameField(forms.ModelChoiceField):
+    """ModelChoiceField that labels each User with their Member's full legal name."""
 
-    user = forms.ModelChoiceField(
+    def label_from_instance(self, obj) -> str:  # noqa: ANN001
+        member = getattr(obj, "member", None)
+        legal_name = (getattr(member, "full_legal_name", "") or "").strip() if member else ""
+        full_name = obj.get_full_name().strip()
+        return legal_name or full_name or obj.email or obj.username
+
+
+class PromoteUserToInstructorForm(forms.Form):
+    """Add an existing User as an Instructor."""
+
+    user = _UserByLegalNameField(
         queryset=get_user_model().objects.none(),
-        help_text="The user to promote. Members, admins, and staff can all be made instructors.",
+        help_text="Pick the member to add as an instructor.",
     )
     display_name = forms.CharField(max_length=255, required=False, help_text="Defaults to the user's current name.")
     bio = forms.CharField(widget=forms.Textarea, required=False)
@@ -147,7 +157,10 @@ class PromoteUserToInstructorForm(forms.Form):
         User = get_user_model()
         already_instructors = Instructor.objects.values_list("user_id", flat=True)
         self.fields["user"].queryset = (
-            User.objects.filter(is_active=True).exclude(pk__in=already_instructors).order_by("email")
+            User.objects.filter(is_active=True)
+            .exclude(pk__in=already_instructors)
+            .select_related("member")
+            .order_by("member__full_legal_name", "email")
         )
 
     def save(self) -> Instructor:
@@ -166,56 +179,6 @@ class PromoteUserToInstructorForm(forms.Form):
         return Instructor.objects.create(
             user=user,
             display_name=display_name,
-            slug=slug,
-            bio=self.cleaned_data.get("bio", ""),
-        )
-
-
-class InstructorInviteForm(forms.Form):
-    display_name = forms.CharField(max_length=255)
-    email = forms.EmailField()
-    bio = forms.CharField(widget=forms.Textarea, required=False)
-
-    def clean_email(self) -> str:
-        email = self.cleaned_data["email"].lower().strip()
-        User = get_user_model()
-        if User.objects.filter(email__iexact=email).exists():
-            raise forms.ValidationError("A user with this email already exists. Link them manually in Django admin.")
-        return email
-
-    def save(self) -> Instructor:
-        from allauth.account.models import EmailAddress
-
-        from classes.models import Instructor
-        from membership.models import Member
-
-        User = get_user_model()
-        email = self.cleaned_data["email"]
-        user = User.objects.create_user(username=email, email=email)
-        user.set_unusable_password()
-        user.save()
-        EmailAddress.objects.update_or_create(
-            user=user,
-            email=email,
-            defaults={"verified": True, "primary": True},
-        )
-
-        # The `ensure_user_has_member` signal auto-creates a Member on User save,
-        # defaulting to Status.ACTIVE. For someone we're onboarding strictly as
-        # an instructor, flip the placeholder Member to Status.INVITED so role
-        # gates don't treat them as an active makerspace member.
-        Member.objects.filter(user=user, status=Member.Status.ACTIVE).update(status=Member.Status.INVITED)
-
-        base_slug = slugify(self.cleaned_data["display_name"]) or "instructor"
-        slug = base_slug
-        n = 1
-        while Instructor.objects.filter(slug=slug).exists():
-            n += 1
-            slug = f"{base_slug}-{n}"
-
-        return Instructor.objects.create(
-            user=user,
-            display_name=self.cleaned_data["display_name"],
             slug=slug,
             bio=self.cleaned_data.get("bio", ""),
         )
@@ -246,7 +209,6 @@ class ClassSettingsForm(forms.ModelForm):
     class Meta:
         model = ClassSettings
         fields = [
-            "enabled_publicly",
             "liability_waiver_text",
             "model_release_waiver_text",
             "default_member_discount_pct",

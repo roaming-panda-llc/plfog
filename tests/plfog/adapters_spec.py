@@ -81,7 +81,7 @@ def describe_AdminRedirectAccountAdapter():
             assert user.is_superuser is True
 
     def describe_get_login_redirect_url():
-        def it_redirects_staff_to_admin(rf):
+        def it_lands_staff_on_community_calendar(rf):
             from plfog.adapters import AdminRedirectAccountAdapter
 
             adapter = AdminRedirectAccountAdapter()
@@ -89,9 +89,9 @@ def describe_AdminRedirectAccountAdapter():
 
             url = adapter.get_login_redirect_url(request)
 
-            assert url == reverse("admin:index")
+            assert url == reverse("hub_community_calendar")
 
-        def it_redirects_non_staff_to_hub(rf):
+        def it_lands_non_staff_on_community_calendar(rf):
             from plfog.adapters import AdminRedirectAccountAdapter
 
             adapter = AdminRedirectAccountAdapter()
@@ -99,9 +99,9 @@ def describe_AdminRedirectAccountAdapter():
 
             url = adapter.get_login_redirect_url(request)
 
-            assert url == reverse("hub_guild_voting")
+            assert url == reverse("hub_community_calendar")
 
-        def it_redirects_staff_superuser_to_admin(rf):
+        def it_lands_superusers_on_community_calendar(rf):
             from plfog.adapters import AdminRedirectAccountAdapter
 
             adapter = AdminRedirectAccountAdapter()
@@ -109,20 +109,10 @@ def describe_AdminRedirectAccountAdapter():
 
             url = adapter.get_login_redirect_url(request)
 
-            assert url == reverse("admin:index")
-
-        def it_redirects_superuser_without_staff_to_hub(rf):
-            from plfog.adapters import AdminRedirectAccountAdapter
-
-            adapter = AdminRedirectAccountAdapter()
-            request = _make_request_with_user(rf, is_staff=False, is_superuser=True)
-
-            url = adapter.get_login_redirect_url(request)
-
-            assert url == reverse("hub_guild_voting")
+            assert url == reverse("hub_community_calendar")
 
         @override_settings(LOGIN_REDIRECT_URL="/dashboard/")
-        def it_ignores_custom_url_for_staff(rf):
+        def it_ignores_custom_url_setting(rf):
             from plfog.adapters import AdminRedirectAccountAdapter
 
             adapter = AdminRedirectAccountAdapter()
@@ -130,7 +120,7 @@ def describe_AdminRedirectAccountAdapter():
 
             url = adapter.get_login_redirect_url(request)
 
-            assert url == reverse("admin:index")
+            assert url == reverse("hub_community_calendar")
 
     def describe_sync_permissions():
         """Tests for _sync_permissions — ADMIN_DOMAINS override + Member role mapping."""

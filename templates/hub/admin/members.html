@@ -1,0 +1,54 @@
+{% extends "hub/base.html" %}
+
+{% block title %}Manage Members — Past Lives{% endblock %}
+
+{% block content %}
+<div class="hub-card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
+    <h1 class="hub-page-title" style="margin:0;">Manage Members</h1>
+    <span style="color:var(--hub-text-muted);font-size:0.875rem;">{{ page.paginator.count }} member{{ page.paginator.count|pluralize }}</span>
+  </div>
+
+  <nav style="display:flex;gap:0.375rem;flex-wrap:wrap;margin-bottom:1.25rem;">
+    <a href="?status=all" class="hub-btn hub-btn--sm{% if status_filter == 'all' %} hub-btn--primary{% endif %}">All</a>
+    {% for value, label in status_choices %}
+    <a href="?status={{ value }}" class="hub-btn hub-btn--sm{% if status_filter == value %} hub-btn--primary{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+
+  <table style="width:100%;border-collapse:collapse;font-size:0.9375rem;">
+    <thead>
+      <tr style="border-bottom:1px solid var(--hub-border);">
+        <th style="text-align:left;padding:0.5rem 0.75rem;color:var(--hub-text-muted);font-weight:500;font-size:0.875rem;">Name</th>
+        <th style="text-align:left;padding:0.5rem 0.75rem;color:var(--hub-text-muted);font-weight:500;font-size:0.875rem;">Email</th>
+        <th style="text-align:left;padding:0.5rem 0.75rem;color:var(--hub-text-muted);font-weight:500;font-size:0.875rem;">Status</th>
+        <th style="text-align:left;padding:0.5rem 0.75rem;color:var(--hub-text-muted);font-weight:500;font-size:0.875rem;">Role</th>
+        <th style="text-align:right;padding:0.5rem 0.75rem;color:var(--hub-text-muted);font-weight:500;font-size:0.875rem;">Edit</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for member in page %}
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+        <td style="padding:0.55rem 0.75rem;color:var(--hub-text);">{{ member.full_legal_name|default:"—" }}</td>
+        <td style="padding:0.55rem 0.75rem;color:var(--hub-text-muted);">{{ member.user.email|default:"—" }}</td>
+        <td style="padding:0.55rem 0.75rem;color:var(--hub-text-muted);">{{ member.get_status_display }}</td>
+        <td style="padding:0.55rem 0.75rem;color:var(--hub-text-muted);">{{ member.get_fog_role_display }}</td>
+        <td style="text-align:right;padding:0.55rem 0.75rem;">
+          <a href="{% url 'hub_admin_member_edit' member.pk %}" class="hub-btn hub-btn--sm" hx-boost="false">Edit</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" style="padding:1.5rem;text-align:center;color:var(--hub-text-muted);">No members match this filter.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if page.paginator.num_pages > 1 %}
+  <div style="display:flex;gap:0.5rem;justify-content:center;margin-top:1rem;align-items:center;">
+    {% if page.has_previous %}<a href="?status={{ status_filter }}&page={{ page.previous_page_number }}" class="hub-btn hub-btn--sm">Previous</a>{% endif %}
+    <span style="color:var(--hub-text-muted);font-size:0.875rem;">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a href="?status={{ status_filter }}&page={{ page.next_page_number }}" class="hub-btn hub-btn--sm">Next</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
