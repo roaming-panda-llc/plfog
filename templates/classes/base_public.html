@@ -5,11 +5,24 @@ plm-classes prototype (github.com/Past-Lives-Makerspace/plm-classes). Ported
 CSS is scoped to .cp-page so the plfog site chrome stays unaffected.
 {% endcomment %}
 
+{% block body_class %}classes-portal{% endblock %}
+
 {% block content %}<div class="cp-page">{% block portal_content %}{% endblock %}</div>{% endblock %}
 
 {% block extra_head %}
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
 <style>
+body.classes-portal {
+  background:#061f33;
+  background-image:url('https://images.squarespace-cdn.com/content/v1/634b3a44e68be653dc708619/1666300097251-9IIOE8TATR0ZNXU037QK/BACKDROP+reduced+copy.jpg?format=2500w');
+  background-size:cover;background-attachment:fixed;background-position:center;
+}
+body.classes-portal .hub-content::before{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse 70% 50% at 50% 15%,rgba(6,26,44,.45) 0%,rgba(6,26,44,.6) 30%,rgba(6,26,44,.78) 60%,rgba(6,26,44,.85) 100%);
+}
+body.classes-portal .hub-content > *{position:relative;z-index:1}
+
 .cp-page {
   --navy:#092e4c;--navy-light:#0d3a5e;--navy-dark:#061f33;
   --gold:#eeb44b;--gold-light:#f5ca6e;--gold-glow:#eeb44b30;
@@ -44,8 +57,9 @@ CSS is scoped to .cp-page so the plfog site chrome stays unaffected.
 .cp-page .cta-secondary{background:transparent;color:var(--cream);border:1px solid var(--steel-dim) !important}
 .cp-page .cta-secondary:hover{border-color:var(--gold) !important;color:var(--gold);text-decoration:none}
 
-.cp-page #cat-nav{position:sticky;top:0;z-index:50;background:rgba(4,20,36,.75);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(26,69,104,.3);padding:10px 0}
-.cp-page #cat-inner{display:flex;gap:6px;flex-wrap:wrap;align-items:center;max-width:var(--max);margin:0 auto;padding:0 24px}
+.cp-page #cat-nav{position:sticky;top:var(--topbar-height,56px);z-index:50;background:rgba(238,180,75,0.08);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-top:1px solid rgba(238,180,75,0.18);border-bottom:1px solid rgba(238,180,75,0.18);padding:10px 2.5rem;margin:0 -2.5rem 12px}
+.cp-page #cat-inner{display:flex;gap:6px;flex-wrap:wrap;align-items:center;max-width:var(--max);margin:0 auto;padding:0}
+@media(max-width:768px){.cp-page #cat-nav{padding:10px 1rem;margin:0 -1rem 12px}}
 .cp-page .cp{padding:6px 16px;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--steel-dim);transition:all .2s;white-space:nowrap;text-transform:uppercase;letter-spacing:.04em;text-decoration:none;display:inline-block}
 .cp-page .cp:hover{color:var(--cream);border-color:var(--gold);background:var(--gold-glow);text-decoration:none}
 .cp-page .cp.on{background:var(--gold);color:var(--navy-dark);border-color:var(--gold);box-shadow:0 0 16px var(--gold-glow)}

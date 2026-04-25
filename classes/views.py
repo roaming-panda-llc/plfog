@@ -438,8 +438,10 @@ def admin_classes(request: HttpRequest) -> HttpResponse:
 def admin_class_create(request: HttpRequest) -> HttpResponse:
     form = ClassOfferingForm(request.POST or None, request.FILES or None)
     if request.method == "POST" and form.is_valid():
-        form.save()
-        messages.success(request, "Class created.")
+        offering = form.save(commit=False)
+        offering.status = ClassOffering.Status.PUBLISHED
+        offering.save()
+        messages.success(request, f"{offering.title} is published.")
         return redirect("classes:admin_classes")
     return render(
         request,
