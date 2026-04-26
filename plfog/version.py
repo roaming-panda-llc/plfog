@@ -2,9 +2,18 @@
 
 from __future__ import annotations
 
-VERSION = "1.7.5"
+VERSION = "1.7.6"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.7.6",
+        "date": "2026-04-26",
+        "title": "Free classes & workshops — one click to make a class free",
+        "changes": [
+            'When you create or edit a class, there\'s now a "This is a free class / workshop" checkbox right above the price field. Tick it and the class is free — members and visitors register without entering any payment info, and they get a confirmation email immediately.',
+            'Free classes show as "Free" everywhere on the site (the class card, the detail page, and the registration summary) instead of a $0 price tag.',
+        ],
+    },
     {
         "version": "1.7.5",
         "date": "2026-04-25",

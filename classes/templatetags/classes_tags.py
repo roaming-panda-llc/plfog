@@ -12,10 +12,12 @@ register = template.Library()
 
 @register.filter
 def cents_as_price(value: int | None) -> str:
-    """Format integer cents as a dollar string. Whole dollars drop the decimals."""
+    """Format integer cents as a dollar string. Zero renders as "Free"; whole dollars drop the decimals."""
     if value is None:
         return ""
     cents = int(value)
+    if cents == 0:
+        return "Free"
     dollars, remainder = divmod(cents, 100)
     if remainder == 0:
         return f"${dollars}"
