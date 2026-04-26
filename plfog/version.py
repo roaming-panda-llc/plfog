@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-VERSION = "1.7.5.1"
+VERSION = "1.7.6"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
     {
-        "version": "1.7.5.1",
+        "version": "1.7.6",
         "date": "2026-04-26",
-        "title": "Fixed: Register page styling sometimes broken when navigating from a class",
+        "title": "Free classes & workshops — and a fix for the Register page styling",
         "changes": [
+            'When you create or edit a class, there\'s now a "This is a free class / workshop" checkbox right above the price field. Tick it and the class is free — members and visitors register without entering any payment info, and they get a confirmation email immediately.',
+            'Free classes show as "Free" everywhere on the site (the class card, the detail page, and the registration summary) instead of a $0 price tag.',
             "Fixed a bug where the Register page on a class could load with no styling if you clicked through from another page in the same browser tab. The page now keeps its full styling no matter how you arrive at it.",
         ],
     },
