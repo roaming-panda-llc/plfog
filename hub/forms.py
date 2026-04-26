@@ -11,6 +11,7 @@ from django.core.mail import send_mail
 if TYPE_CHECKING:
     from django.contrib.auth.models import User
 
+from core.models import SiteConfiguration
 from membership.models import Guild, Member
 
 
@@ -134,6 +135,81 @@ class BetaFeedbackForm(forms.Form):
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=settings.BETA_FEEDBACK_EMAILS,
         )
+
+
+class MemberAdminEditForm(forms.ModelForm):
+    """Admin-side Member edit form with a unified role dropdown.
+
+    The `role` token doesn't map 1:1 to a model field — Member.apply_admin_role
+    handles the fog_role/status/Instructor dispatch. This form only validates
+    inputs; the view calls `member.apply_admin_role(cleaned_data["role"])`.
+    """
+
+    ROLE_CHOICES: list[tuple[str, str]] = [
+        (Member.FogRole.ADMIN, "Admin"),
+        (Member.FogRole.GUILD_OFFICER, "Guild Officer"),
+        (Member.FogRole.MEMBER, "Member"),
+        (Member.ADMIN_ROLE_INSTRUCTOR, "Instructor"),
+        (Member.ADMIN_ROLE_GUEST, "Guest"),
+    ]
+
+    role = forms.ChoiceField(
+        choices=ROLE_CHOICES,
+        label="Role",
+        help_text=(
+            "Admin / Guild Officer / Member set the hierarchy role. "
+            "Instructor also grants teaching access. "
+            "Guest deactivates the member (no hub access)."
+        ),
+    )
+
+    class Meta:
+        model = Member
+        fields = [
+            "full_legal_name",
+            "preferred_name",
+            "pronouns",
+            "discord_handle",
+            "about_me",
+            "status",
+            "member_type",
+            "show_in_directory",
+        ]
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.fields["role"].initial = self._derive_initial_role(self.instance)
+
+    @staticmethod
+    def _derive_initial_role(member: Member) -> str:
+        if member.status != Member.Status.ACTIVE:
+            return Member.ADMIN_ROLE_GUEST
+        if member.is_instructor and member.fog_role == Member.FogRole.MEMBER:
+            return Member.ADMIN_ROLE_INSTRUCTOR
+        return member.fog_role
+
+
+class SiteSettingsForm(forms.ModelForm):
+    """Admin form for the SiteConfiguration singleton."""
+
+    class Meta:
+        model = SiteConfiguration
+        fields = [
+            "registration_mode",
+            "general_calendar_url",
+            "general_calendar_color",
+            "sync_classes_enabled",
+            "classes_calendar_color",
+            "mailchimp_api_key",
+            "mailchimp_list_id",
+            "google_analytics_measurement_id",
+        ]
+        widgets = {
+            "general_calendar_color": forms.TextInput(attrs={"type": "color"}),
+            "classes_calendar_color": forms.TextInput(attrs={"type": "color"}),
+            "general_calendar_url": forms.URLInput(attrs={"placeholder": "https://…"}),
+        }
 
 
 class VotePreferenceForm(forms.Form):

@@ -343,6 +343,53 @@ class Member(models.Model):
         """
         return self.is_fog_admin or self.is_guild_officer or self.is_guild_lead or self.is_instructor
 
+    ADMIN_ROLE_INSTRUCTOR = "instructor"
+    ADMIN_ROLE_GUEST = "guest"
+
+    def apply_admin_role(self, picked_role: str) -> None:
+        """Apply a role token from the admin Member edit form.
+
+        Maps the dropdown's role token (`admin` / `guild_officer` / `member` /
+        `instructor` / `guest`) onto the right combination of `fog_role`,
+        `status`, and `Instructor` row, then saves. Idempotent — re-promoting
+        an existing instructor is a no-op for the Instructor table.
+        """
+        valid = {c.value for c in self.FogRole} | {self.ADMIN_ROLE_INSTRUCTOR, self.ADMIN_ROLE_GUEST}
+        if picked_role not in valid:
+            raise ValueError(f"Invalid admin role token: {picked_role!r}")
+
+        if picked_role == self.ADMIN_ROLE_INSTRUCTOR:
+            self.fog_role = self.FogRole.MEMBER
+            self.status = self.Status.ACTIVE
+        elif picked_role == self.ADMIN_ROLE_GUEST:
+            self.fog_role = self.FogRole.MEMBER
+            self.status = self.Status.FORMER
+        else:
+            self.fog_role = picked_role
+        self.save()
+
+        if picked_role == self.ADMIN_ROLE_INSTRUCTOR and self.user_id is not None:
+            self._ensure_instructor_record()
+
+    def _ensure_instructor_record(self) -> None:
+        """Create an Instructor row for self.user if one doesn't exist."""
+        from django.utils.text import slugify
+
+        from classes.models import Instructor
+
+        if Instructor.objects.filter(user_id=self.user_id).exists():
+            return
+
+        display_name = self.display_name or self.full_legal_name or self.user.email
+        base_slug = slugify(display_name) or f"instructor-{self.pk}"
+        slug = base_slug
+        n = 1
+        while Instructor.objects.filter(slug=slug).exists():
+            n += 1
+            slug = f"{base_slug}-{n}"
+
+        Instructor.objects.create(user=self.user, display_name=display_name, slug=slug)
+
     def set_fog_role(self, new_role: str, *, changed_by: Member) -> None:
         """Change this member's fog_role with permission checks.
 

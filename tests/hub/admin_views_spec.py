@@ -257,7 +257,7 @@ def describe_admin_site_settings():
 
 
 def describe_fog_admin_required():
-    def it_returns_403_when_request_has_no_view_as(rf):
+    def it_redirects_anonymous_users_to_login(rf):
         from django.contrib.auth.models import AnonymousUser
 
         from hub.view_as import fog_admin_required
@@ -268,7 +268,22 @@ def describe_fog_admin_required():
 
         request = rf.get("/")
         request.user = AnonymousUser()
-        # No view_as attribute attached — simulates middleware not running.
         response = view(request)
-        # @login_required wraps the result, so anonymous users get a redirect, not 403.
-        assert response.status_code in (302, 403)
+        # @login_required is the outermost wrapper, so anonymous users redirect
+        # before the view_as admin check ever runs.
+        assert response.status_code == 302
+
+    def it_returns_403_for_authenticated_non_admin(rf):
+        from hub.view_as import fog_admin_required
+
+        @fog_admin_required
+        def view(request):
+            return "ok"
+
+        user = _create_member_user(username="nonadmin_decorator")
+        request = rf.get("/")
+        request.user = user
+        # No view_as attribute attached — simulates the inner check rejecting
+        # a user who doesn't actually hold admin.
+        response = view(request)
+        assert response.status_code == 403

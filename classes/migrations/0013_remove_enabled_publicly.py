@@ -6,7 +6,6 @@ from django.db import migrations
 class Migration(migrations.Migration):
     dependencies = [
         ("classes", "0011_remove_classsettings_google_analytics_measurement_id_and_more"),
-        ("classes", "0012_copy_mailchimp_ga_to_site_settings"),
     ]
 
     operations = [

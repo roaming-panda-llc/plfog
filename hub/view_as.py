@@ -22,11 +22,14 @@ Every hub-side UI gate should read ``request.view_as`` (attached by
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
-    from django.http import HttpRequest
+    from django.http import HttpRequest, HttpResponse
+
+_ViewFunc = Callable[..., "HttpResponse"]
 
 ROLE_MEMBER = "member"
 ROLE_GUILD_OFFICER = "guild_officer"
@@ -215,7 +218,7 @@ class ViewAs:
         return cls(actual=actual, picked=picked)
 
 
-def fog_admin_required(view_func):  # noqa: ANN001
+def fog_admin_required(view_func: _ViewFunc) -> _ViewFunc:
     """Decorator that allows users whose actual role includes admin.
 
     Wraps ``@login_required``: anonymous users get bounced to login; authenticated
@@ -223,18 +226,19 @@ def fog_admin_required(view_func):  # noqa: ANN001
     preview can't grant or revoke access.
     """
     from functools import wraps
+    from typing import Any
 
     from django.contrib.auth.decorators import login_required
     from django.http import HttpResponseForbidden
 
     @wraps(view_func)
-    def wrapper(request, *args, **kwargs):  # noqa: ANN001
+    def wrapper(request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         view_as = getattr(request, "view_as", None)
         if view_as is None or not view_as.has_actual(ROLE_ADMIN):
             return HttpResponseForbidden("Admin access required.")
         return view_func(request, *args, **kwargs)
 
-    return login_required(wrapper)
+    return login_required(wrapper)  # type: ignore[return-value]
 
 
 class ViewAsMiddleware:

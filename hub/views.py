@@ -22,7 +22,15 @@ from billing.exceptions import NoPaymentMethodError, TabLimitExceededError, TabL
 from billing.models import BillingSettings, Tab, TabCharge
 from hub.calendar_service import refresh_stale_sources
 from hub.view_as import ALL_ROLES, SESSION_ROLE_KEY, fog_admin_required
-from hub.forms import BetaFeedbackForm, EmailPreferencesForm, GuildEditForm, ProfileSettingsForm, VotePreferenceForm
+from hub.forms import (
+    BetaFeedbackForm,
+    EmailPreferencesForm,
+    GuildEditForm,
+    MemberAdminEditForm,
+    ProfileSettingsForm,
+    SiteSettingsForm,
+    VotePreferenceForm,
+)
 from membership.cycle import get_cycle_context
 from membership.models import FundingSnapshot, Guild, Member, VotePreference
 
@@ -1069,77 +1077,19 @@ def admin_members(request: HttpRequest) -> HttpResponse:
 @fog_admin_required
 def admin_member_edit(request: HttpRequest, pk: int) -> HttpResponse:
     """Hub-native edit form for a single Member."""
-    from django import forms as django_forms
-
-    from classes.models import Instructor
-
     member = get_object_or_404(Member, pk=pk)
 
-    ROLE_CHOICES = [
-        (Member.FogRole.ADMIN, "Admin"),
-        (Member.FogRole.GUILD_OFFICER, "Guild Officer"),
-        (Member.FogRole.MEMBER, "Member"),
-        ("instructor", "Instructor"),
-        ("guest", "Guest"),
-    ]
-
-    def _initial_role() -> str:
-        if member.status != Member.Status.ACTIVE:
-            return "guest"
-        if Instructor.objects.filter(user=member.user).exists() and member.fog_role == Member.FogRole.MEMBER:
-            return "instructor"
-        return member.fog_role
-
-    class MemberEditForm(django_forms.ModelForm):
-        role = django_forms.ChoiceField(
-            choices=ROLE_CHOICES,
-            initial=_initial_role(),
-            label="Role",
-            help_text=(
-                "Admin / Guild Officer / Member set the hierarchy role. "
-                "Instructor also grants teaching access. "
-                "Guest deactivates the member (no hub access)."
-            ),
-        )
-
-        class Meta:
-            model = Member
-            fields = [
-                "full_legal_name",
-                "preferred_name",
-                "pronouns",
-                "discord_handle",
-                "about_me",
-                "status",
-                "member_type",
-                "show_in_directory",
-            ]
-
     if request.method == "POST":
-        form = MemberEditForm(request.POST, instance=member)
+        form = MemberAdminEditForm(request.POST, instance=member)
         if form.is_valid():
-            picked_role = form.cleaned_data["role"]
             obj = form.save(commit=False)
-            if picked_role == "instructor":
-                obj.fog_role = Member.FogRole.MEMBER
-                obj.status = Member.Status.ACTIVE
-            elif picked_role == "guest":
-                obj.fog_role = Member.FogRole.MEMBER
-                obj.status = Member.Status.FORMER
-            else:
-                obj.fog_role = picked_role
             obj.save()
-            if picked_role == "instructor" and member.user and not Instructor.objects.filter(user=member.user).exists():
-                Instructor.objects.create(
-                    user=member.user,
-                    display_name=obj.display_name or obj.full_legal_name or member.user.email,
-                    slug=f"instructor-{member.pk}",
-                )
+            obj.apply_admin_role(form.cleaned_data["role"])
             display = obj.full_legal_name or (obj.user.email if obj.user else f"member #{obj.pk}")
             messages.success(request, f"Saved {display}.")
             return redirect("hub_admin_members")
     else:
-        form = MemberEditForm(instance=member)
+        form = MemberAdminEditForm(instance=member)
 
     ctx = _get_hub_context(request)
     return render(request, "hub/admin/member_edit.html", {**ctx, "form": form, "member": member})
@@ -1148,30 +1098,9 @@ def admin_member_edit(request: HttpRequest, pk: int) -> HttpResponse:
 @fog_admin_required
 def admin_site_settings(request: HttpRequest) -> HttpResponse:
     """Admin site settings — edit the SiteConfiguration singleton."""
-    from django import forms as django_forms
-
     from core.models import SiteConfiguration
 
     config = SiteConfiguration.load()
-
-    class SiteSettingsForm(django_forms.ModelForm):
-        class Meta:
-            model = SiteConfiguration
-            fields = [
-                "registration_mode",
-                "general_calendar_url",
-                "general_calendar_color",
-                "sync_classes_enabled",
-                "classes_calendar_color",
-                "mailchimp_api_key",
-                "mailchimp_list_id",
-                "google_analytics_measurement_id",
-            ]
-            widgets = {
-                "general_calendar_color": django_forms.TextInput(attrs={"type": "color"}),
-                "classes_calendar_color": django_forms.TextInput(attrs={"type": "color"}),
-                "general_calendar_url": django_forms.URLInput(attrs={"placeholder": "https://…"}),
-            }
 
     if request.method == "POST":
         form = SiteSettingsForm(request.POST, instance=config)
