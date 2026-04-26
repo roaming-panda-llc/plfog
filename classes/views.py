@@ -8,7 +8,7 @@ from typing import Any, Callable
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Min, Q
-from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden
+from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -19,7 +19,6 @@ from classes.forms import (
     ClassSettingsForm,
     DiscountCodeForm,
     InstructorClassOfferingForm,
-    InstructorInviteForm,
     InstructorProfileForm,
     PromoteUserToInstructorForm,
 )
@@ -27,18 +26,6 @@ from classes.models import Category, ClassOffering, ClassSettings, DiscountCode,
 from core.models import SiteConfiguration
 
 _ViewFunc = Callable[..., HttpResponse]
-
-
-def enabled_publicly_required(view_func: _ViewFunc) -> _ViewFunc:
-    """Decorator: public-portal views return 404 while the portal is disabled."""
-
-    @wraps(view_func)
-    def wrapper(request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
-        if not ClassSettings.load().enabled_publicly:
-            raise Http404("Classes portal is not enabled.")
-        return view_func(request, *args, **kwargs)
-
-    return wrapper  # type: ignore[return-value]
 
 
 def _browsable_classes() -> Any:
@@ -58,7 +45,6 @@ def _browsable_classes() -> Any:
     )
 
 
-@enabled_publicly_required
 def public_list(request: HttpRequest) -> HttpResponse:
     """Public portal — hero + sticky category filter + grouped class cards."""
     settings_obj = ClassSettings.load()
@@ -97,7 +83,6 @@ def public_list(request: HttpRequest) -> HttpResponse:
     )
 
 
-@enabled_publicly_required
 def public_category(request: HttpRequest, slug: str) -> HttpResponse:
     """Public category landing — same layout as list, pre-filtered."""
     category = get_object_or_404(Category, slug=slug)
@@ -106,7 +91,6 @@ def public_category(request: HttpRequest, slug: str) -> HttpResponse:
     return public_list(request)
 
 
-@enabled_publicly_required
 def public_class_detail(request: HttpRequest, slug: str) -> HttpResponse:
     """Full class detail page — schedule, info grid, (future: registration form)."""
     offering = get_object_or_404(
@@ -132,7 +116,6 @@ def public_class_detail(request: HttpRequest, slug: str) -> HttpResponse:
     )
 
 
-@enabled_publicly_required
 def public_instructor(request: HttpRequest, slug: str) -> HttpResponse:
     """Public instructor profile — bio, photo, current + past classes."""
     instructor = get_object_or_404(Instructor, slug=slug, is_active=True)
@@ -455,8 +438,10 @@ def admin_classes(request: HttpRequest) -> HttpResponse:
 def admin_class_create(request: HttpRequest) -> HttpResponse:
     form = ClassOfferingForm(request.POST or None, request.FILES or None)
     if request.method == "POST" and form.is_valid():
-        form.save()
-        messages.success(request, "Class created.")
+        offering = form.save(commit=False)
+        offering.status = ClassOffering.Status.PUBLISHED
+        offering.save()
+        messages.success(request, f"{offering.title} is published.")
         return redirect("classes:admin_classes")
     return render(
         request,
@@ -597,22 +582,8 @@ def admin_instructors(request: HttpRequest) -> HttpResponse:
 
 
 @classes_admin_access_required
-def admin_instructor_invite(request: HttpRequest) -> HttpResponse:
-    form = InstructorInviteForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
-        instructor = form.save()
-        messages.success(request, f"Invited {instructor.display_name}.")
-        return redirect("classes:admin_instructors")
-    return render(
-        request,
-        "classes/admin/instructor_form.html",
-        {"active_tab": "instructors", "form": form},
-    )
-
-
-@classes_admin_access_required
 def admin_instructor_promote(request: HttpRequest) -> HttpResponse:
-    """Promote an existing User account into an Instructor — no invite email, just role grant."""
+    """Add an existing User as an Instructor — grants the role to a member account."""
     form = PromoteUserToInstructorForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         instructor = form.save()

@@ -2,9 +2,21 @@
 
 from __future__ import annotations
 
-VERSION = "1.7.3"
+VERSION = "1.7.4"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.7.4",
+        "date": "2026-04-25",
+        "title": "One unified view — Classes, Calendar, Payments, and admin all live in the FOG dashboard",
+        "changes": [
+            "The Classes page at /classes/ is now public for everyone — no admin toggle needed.",
+            "Everything now lives inside the FOG dashboard with the same sidebar and topnav. No more bouncing into a different admin layout — Classes, Community Calendar, Payments, Reports, Manage Members, Site Settings, and the new Voting Dashboard all open in the hub.",
+            "Admins see one sidebar with everything they need: Community Calendar, Manage Classes, Manage Members, Member Directory, My Tab, Payments, Reports, Site Settings, and Voting Dashboard.",
+            'The "Viewing as" dropdown stays in the topbar so admins can preview the hub as a Member, Guild Officer, Instructor, or Guest without switching accounts.',
+            'All instructors are members by default — the "Non-member Instructor" label is gone, instructors are just instructors.',
+        ],
+    },
     {
         "version": "1.7.3",
         "date": "2026-04-23",

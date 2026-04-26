@@ -65,7 +65,6 @@
                 <button type="button" @click="open = false" class="pl-modal__close" aria-label="Close">&times;</button>
             </div>
             <div class="pl-modal__body">
-                {% if guild.guild_lead.show_in_directory %}
                 <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.25rem;">
                     <div class="hub-member-avatar" style="width:48px;height:48px;font-size:1.25rem;">
                         {{ guild.guild_lead.display_name|make_list|first|upper }}
@@ -101,11 +100,6 @@
                     </div>
                     {% endif %}
                 </div>
-                {% endif %}
-                {% else %}
-                <p style="font-size:0.875rem;color:var(--hub-text-muted, #96ACBB);margin:0;">
-                    This member has chosen to keep their profile private. Their information is not listed in the member directory.
-                </p>
                 {% endif %}
             </div>
         </div>

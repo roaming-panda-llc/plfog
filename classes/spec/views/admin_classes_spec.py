@@ -112,6 +112,10 @@ def describe_create_class():
             },
         )
         assert response.status_code == 302
+        from classes.models import ClassOffering
+
+        created = ClassOffering.objects.get(slug="new-class")
+        assert created.status == ClassOffering.Status.PUBLISHED
 
 
 def describe_edit_class():

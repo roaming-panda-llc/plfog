@@ -6,7 +6,6 @@ import logging
 from decimal import Decimal
 
 from django.contrib import messages as django_messages
-from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.db.models import DecimalField, Q, Sum, Value
 from django.db.models.functions import Coalesce
@@ -20,6 +19,7 @@ from billing import stripe_utils, webhook_handlers
 from billing.exceptions import TabLimitExceededError, TabLockedError
 from billing.forms import CONTEXT_ADMIN_DASHBOARD, TabItemForm
 from billing.models import BillingSettings, Tab, TabCharge, TabEntry
+from hub.view_as import fog_admin_required
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +138,7 @@ def stripe_webhook(request: HttpRequest) -> HttpResponse:
 _VALID_TABS = {"overview", "open-tabs", "settings", "stripe"}
 
 
-@staff_member_required
+@fog_admin_required
 def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
     """Admin payments dashboard — five-tab view of billing data."""
     from django.contrib import admin as django_admin
@@ -248,7 +248,7 @@ def admin_tab_dashboard(request: HttpRequest) -> HttpResponse:
     return render(request, "billing/admin_dashboard.html", context)
 
 
-@staff_member_required
+@fog_admin_required
 def admin_add_tab_entry(request: HttpRequest) -> HttpResponse:
     """Admin quick-add: add a charge to any member's tab.
 
@@ -303,7 +303,7 @@ def admin_add_tab_entry(request: HttpRequest) -> HttpResponse:
     return _render(form, splits_formset)
 
 
-@staff_member_required
+@fog_admin_required
 def billing_admin_tab_detail_api(request: HttpRequest, tab_pk: int) -> JsonResponse:
     """Return JSON tab detail for the tab detail modal."""
     try:
@@ -360,7 +360,7 @@ def billing_admin_tab_detail_api(request: HttpRequest, tab_pk: int) -> JsonRespo
     )
 
 
-@staff_member_required
+@fog_admin_required
 @require_POST
 def billing_admin_save_settings(request: HttpRequest) -> HttpResponse:
     """Save BillingSettings singleton from the Settings tab form."""
@@ -376,7 +376,7 @@ def billing_admin_save_settings(request: HttpRequest) -> HttpResponse:
     return redirect("/billing/admin/dashboard/?tab=settings")
 
 
-@staff_member_required
+@fog_admin_required
 @require_POST
 def billing_admin_retry_charge(request: HttpRequest, charge_pk: int) -> JsonResponse:
     """Immediately retry a single failed charge. Returns JSON with new status."""
@@ -397,7 +397,7 @@ def billing_admin_retry_charge(request: HttpRequest, charge_pk: int) -> JsonResp
     return JsonResponse({"status": "failed"})
 
 
-@staff_member_required
+@fog_admin_required
 def admin_reports(request: HttpRequest) -> HttpResponse:
     """Reports page — filtered entry list + per-guild payout summary.
 
@@ -447,7 +447,7 @@ def admin_reports(request: HttpRequest) -> HttpResponse:
     return render(request, "billing/admin_reports.html", context)
 
 
-@staff_member_required
+@fog_admin_required
 def admin_reports_csv(request: HttpRequest) -> StreamingHttpResponse:
     """Streaming CSV download for the reports page, same filters via GET."""
     from billing.reports import ReportFilterForm, stream_report_csv
@@ -456,7 +456,7 @@ def admin_reports_csv(request: HttpRequest) -> StreamingHttpResponse:
     return stream_report_csv(**filter_form.filter_kwargs())
 
 
-@staff_member_required
+@fog_admin_required
 @require_POST
 def billing_test_platform_connection(request: HttpRequest) -> JsonResponse:
     """AJAX: verify a candidate platform Stripe secret key.
@@ -476,7 +476,7 @@ def billing_test_platform_connection(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"ok": True, **result})
 
 
-@staff_member_required
+@fog_admin_required
 @require_POST
 def billing_save_connect_platform(request: HttpRequest) -> HttpResponse:
     """Save the platform Stripe credentials to BillingSettings."""

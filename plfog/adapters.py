@@ -86,10 +86,8 @@ class AdminRedirectAccountAdapter(DefaultAccountAdapter):
         )
 
     def get_login_redirect_url(self, request: HttpRequest) -> str:
-        """Redirect staff to /admin/, everyone else to the member hub."""
-        if request.user.is_staff:
-            return reverse("admin:index")
-        return reverse("hub_guild_voting")
+        """Land everyone on the Community Calendar after login."""
+        return reverse("hub_community_calendar")
 
     def send_mail(self, template_prefix: str, email: str, context: dict) -> None:
         """In DEBUG mode, stash the login code on the request for display in the UI."""

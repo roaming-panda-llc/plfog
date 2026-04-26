@@ -459,10 +459,6 @@ class Registration(models.Model):
 
 
 class ClassSettings(models.Model):
-    enabled_publicly = models.BooleanField(
-        default=False,
-        help_text="When False, /classes/ public routes return 404. Admin + instructor dashboards stay available.",
-    )
     liability_waiver_text = models.TextField(help_text="Full liability waiver text shown to all registrants.")
     model_release_waiver_text = models.TextField(
         help_text="Full model-release waiver text shown when a class requires it."

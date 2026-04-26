@@ -21,8 +21,16 @@ from django.views.decorators.http import require_POST, require_http_methods
 from billing.exceptions import NoPaymentMethodError, TabLimitExceededError, TabLockedError
 from billing.models import BillingSettings, Tab, TabCharge
 from hub.calendar_service import refresh_stale_sources
-from hub.forms import BetaFeedbackForm, EmailPreferencesForm, GuildEditForm, ProfileSettingsForm, VotePreferenceForm
-from hub.view_as import ALL_ROLES, SESSION_ROLE_KEY
+from hub.view_as import ALL_ROLES, SESSION_ROLE_KEY, fog_admin_required
+from hub.forms import (
+    BetaFeedbackForm,
+    EmailPreferencesForm,
+    GuildEditForm,
+    MemberAdminEditForm,
+    ProfileSettingsForm,
+    SiteSettingsForm,
+    VotePreferenceForm,
+)
 from membership.cycle import get_cycle_context
 from membership.models import FundingSnapshot, Guild, Member, VotePreference
 
@@ -223,9 +231,22 @@ def member_directory(request: HttpRequest) -> HttpResponse:
     """
     ctx = _get_hub_context(request)
     current_member = _get_member(request)
+    view_as = getattr(request, "view_as", None)
+    is_admin = view_as is not None and view_as.is_admin
+    from classes.models import Instructor
+
+    instructor_user_ids = Instructor.objects.values_list("user_id", flat=True)
+    must_show = (
+        Q(fog_role=Member.FogRole.ADMIN)
+        | Q(fog_role=Member.FogRole.GUILD_OFFICER)
+        | Q(led_guilds__isnull=False)
+        | Q(user_id__in=instructor_user_ids)
+    )
+    member_qs = Member.objects.filter(status=Member.Status.ACTIVE).distinct()
+    if not is_admin:
+        member_qs = member_qs.filter(Q(show_in_directory=True) | must_show)
     members = (
-        Member.objects.filter(status=Member.Status.ACTIVE, show_in_directory=True)
-        .select_related("membership_plan", "user")
+        member_qs.select_related("membership_plan", "user")
         .prefetch_related(
             Prefetch(
                 "user__emailaddress_set",
@@ -238,7 +259,7 @@ def member_directory(request: HttpRequest) -> HttpResponse:
     return render(
         request,
         "hub/member_directory.html",
-        {**ctx, "members": members, "current_member": current_member},
+        {**ctx, "members": members, "current_member": current_member, "is_admin": is_admin},
     )
 
 
@@ -987,8 +1008,6 @@ def view_as_set(request: HttpRequest) -> JsonResponse:
     if role not in ALL_ROLES:
         return JsonResponse({"error": f"Unknown role '{role}'"}, status=400)
 
-    # Admins can preview any role (Guest, Non-member Instructor, Member, Officer).
-    # Everyone else can only pick roles they actually hold — a downgrade tool.
     view_as = request.view_as  # type: ignore[attr-defined]
     is_admin = view_as.has_actual("admin")
     if not is_admin and not view_as.has_actual(role):
@@ -997,3 +1016,100 @@ def view_as_set(request: HttpRequest) -> JsonResponse:
     request.session[SESSION_ROLE_KEY] = role
 
     return JsonResponse({"role": role})
+
+
+@fog_admin_required
+def admin_voting_dashboard(request: HttpRequest) -> HttpResponse:
+    """Admin voting dashboard — pool stats, vote leaders, snapshot actions."""
+    from plfog.dashboard import dashboard_callback
+
+    ctx = _get_hub_context(request)
+    ctx = dashboard_callback(request, ctx)
+    return render(request, "hub/admin/voting_dashboard.html", ctx)
+
+
+@fog_admin_required
+def admin_members(request: HttpRequest) -> HttpResponse:
+    """Admin members management — paginated list with search + status/role/type filters."""
+    from django.core.paginator import Paginator
+    from django.db.models import Q
+
+    ctx = _get_hub_context(request)
+    status_filter = request.GET.get("status", "active")
+    role_filter = request.GET.get("role", "")
+    type_filter = request.GET.get("type", "")
+    search = request.GET.get("q", "").strip()
+
+    qs = Member.objects.select_related("user", "membership_plan").order_by("full_legal_name")
+    if status_filter and status_filter != "all":
+        qs = qs.filter(status=status_filter)
+    if role_filter:
+        qs = qs.filter(fog_role=role_filter)
+    if type_filter:
+        qs = qs.filter(member_type=type_filter)
+    if search:
+        qs = qs.filter(
+            Q(full_legal_name__icontains=search)
+            | Q(preferred_name__icontains=search)
+            | Q(user__email__icontains=search)
+            | Q(discord_handle__icontains=search)
+        )
+
+    paginator = Paginator(qs, 50)
+    page = paginator.get_page(request.GET.get("page", 1))
+    return render(
+        request,
+        "hub/admin/members.html",
+        {
+            **ctx,
+            "page": page,
+            "status_filter": status_filter,
+            "role_filter": role_filter,
+            "type_filter": type_filter,
+            "search": search,
+            "status_choices": Member.Status.choices,
+            "role_choices": Member.FogRole.choices,
+            "type_choices": Member.MemberType.choices,
+        },
+    )
+
+
+@fog_admin_required
+def admin_member_edit(request: HttpRequest, pk: int) -> HttpResponse:
+    """Hub-native edit form for a single Member."""
+    member = get_object_or_404(Member, pk=pk)
+
+    if request.method == "POST":
+        form = MemberAdminEditForm(request.POST, instance=member)
+        if form.is_valid():
+            obj = form.save(commit=False)
+            obj.save()
+            obj.apply_admin_role(form.cleaned_data["role"])
+            display = obj.full_legal_name or (obj.user.email if obj.user else f"member #{obj.pk}")
+            messages.success(request, f"Saved {display}.")
+            return redirect("hub_admin_members")
+    else:
+        form = MemberAdminEditForm(instance=member)
+
+    ctx = _get_hub_context(request)
+    return render(request, "hub/admin/member_edit.html", {**ctx, "form": form, "member": member})
+
+
+@fog_admin_required
+def admin_site_settings(request: HttpRequest) -> HttpResponse:
+    """Admin site settings — edit the SiteConfiguration singleton."""
+    from core.models import SiteConfiguration
+
+    config = SiteConfiguration.load()
+
+    if request.method == "POST":
+        form = SiteSettingsForm(request.POST, instance=config)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Site settings saved.")
+            return redirect("hub_admin_site_settings")
+    else:
+        form = SiteSettingsForm(instance=config)
+
+    ctx = _get_hub_context(request)
+    return render(request, "hub/admin/site_settings.html", {**ctx, "form": form})

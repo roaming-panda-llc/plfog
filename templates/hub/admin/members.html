@@ -1,0 +1,114 @@
+{% extends "hub/base.html" %}
+
+{% block title %}Manage Members — Past Lives{% endblock %}
+
+{% block extra_head %}
+<style>
+  .members-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .members-filters input[type="search"],
+  .members-filters select {
+    background: rgba(255,255,255,0.04);
+    color: var(--hub-text);
+    border: 1px solid var(--hub-border);
+    border-radius: 6px;
+    padding: 0.4rem 0.65rem;
+    font-size: 0.875rem;
+    font-family: inherit;
+  }
+  .members-filters input[type="search"] { min-width: 240px; flex: 1 1 240px; max-width: 360px; }
+  .members-filters input:focus, .members-filters select:focus {
+    outline: none; border-color: #EEB44B; background: rgba(255,255,255,0.06);
+  }
+  .members-filters select option { background: #092E4C; color: #F4EFDD; }
+  .members-filters .filter-label {
+    font-size: 0.75rem;
+    color: var(--hub-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-right: 0.25rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hub-card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
+    <h1 class="hub-page-title" style="margin:0;">Manage Members</h1>
+    <span style="color:var(--hub-text-muted);font-size:0.875rem;">{{ page.paginator.count }} member{{ page.paginator.count|pluralize }}</span>
+  </div>
+
+  <form method="get" class="members-filters">
+    <input type="search" name="q" value="{{ search }}" placeholder="Search name, email, discord…" autocomplete="off">
+
+    <span class="filter-label">Status</span>
+    <select name="status">
+      <option value="all"{% if status_filter == 'all' %} selected{% endif %}>All</option>
+      {% for value, label in status_choices %}
+      <option value="{{ value }}"{% if status_filter == value %} selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+
+    <span class="filter-label">Role</span>
+    <select name="role">
+      <option value=""{% if not role_filter %} selected{% endif %}>Any</option>
+      {% for value, label in role_choices %}
+      <option value="{{ value }}"{% if role_filter == value %} selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+
+    <span class="filter-label">Type</span>
+    <select name="type">
+      <option value=""{% if not type_filter %} selected{% endif %}>Any</option>
+      {% for value, label in type_choices %}
+      <option value="{{ value }}"{% if type_filter == value %} selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+
+    <button type="submit" class="hub-btn hub-btn--sm hub-btn--primary">Apply</button>
+    {% if search or role_filter or type_filter or status_filter != 'active' %}
+    <a href="{% url 'hub_admin_members' %}" class="hub-btn hub-btn--sm hub-btn--ghost">Reset</a>
+    {% endif %}
+  </form>
+
+  <table style="width:100%;border-collapse:collapse;font-size:0.9375rem;">
+    <thead>
+      <tr style="border-bottom:1px solid var(--hub-border);">
+        <th style="text-align:left;padding:0.5rem 0.75rem;color:var(--hub-text-muted);font-weight:500;font-size:0.875rem;">Name</th>
+        <th style="text-align:left;padding:0.5rem 0.75rem;color:var(--hub-text-muted);font-weight:500;font-size:0.875rem;">Email</th>
+        <th style="text-align:left;padding:0.5rem 0.75rem;color:var(--hub-text-muted);font-weight:500;font-size:0.875rem;">Status</th>
+        <th style="text-align:left;padding:0.5rem 0.75rem;color:var(--hub-text-muted);font-weight:500;font-size:0.875rem;">Role</th>
+        <th style="text-align:right;padding:0.5rem 0.75rem;color:var(--hub-text-muted);font-weight:500;font-size:0.875rem;">Edit</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for member in page %}
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+        <td style="padding:0.55rem 0.75rem;color:var(--hub-text);">{{ member.full_legal_name|default:"—" }}</td>
+        <td style="padding:0.55rem 0.75rem;color:var(--hub-text-muted);">{{ member.user.email|default:"—" }}</td>
+        <td style="padding:0.55rem 0.75rem;color:var(--hub-text-muted);">{{ member.get_status_display }}</td>
+        <td style="padding:0.55rem 0.75rem;color:var(--hub-text-muted);">{{ member.get_fog_role_display }}</td>
+        <td style="text-align:right;padding:0.55rem 0.75rem;">
+          <a href="{% url 'hub_admin_member_edit' member.pk %}" class="hub-btn hub-btn--sm" hx-boost="false">Edit</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" style="padding:1.5rem;text-align:center;color:var(--hub-text-muted);">No members match your filters.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if page.paginator.num_pages > 1 %}
+  <div style="display:flex;gap:0.5rem;justify-content:center;margin-top:1rem;align-items:center;">
+    {% if page.has_previous %}<a href="?q={{ search }}&status={{ status_filter }}&role={{ role_filter }}&type={{ type_filter }}&page={{ page.previous_page_number }}" class="hub-btn hub-btn--sm">Previous</a>{% endif %}
+    <span style="color:var(--hub-text-muted);font-size:0.875rem;">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a href="?q={{ search }}&status={{ status_filter }}&role={{ role_filter }}&type={{ type_filter }}&page={{ page.next_page_number }}" class="hub-btn hub-btn--sm">Next</a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

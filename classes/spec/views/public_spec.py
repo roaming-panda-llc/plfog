@@ -14,15 +14,7 @@ from classes.factories import (
     ClassSessionFactory,
     InstructorFactory,
 )
-from classes.models import ClassOffering, ClassSettings
-
-
-@pytest.fixture
-def public_portal_enabled(db):
-    settings_obj = ClassSettings.load()
-    settings_obj.enabled_publicly = True
-    settings_obj.save()
-    return settings_obj
+from classes.models import ClassOffering
 
 
 @pytest.fixture
@@ -45,20 +37,14 @@ def published_class(db):
 
 
 def describe_public_list():
-    def it_404s_when_portal_disabled(db, client):
-        # Defaults: enabled_publicly=False.
-        ClassSettings.load()
-        response = client.get(reverse("classes:public_list"))
-        assert response.status_code == 404
-
-    def it_renders_hero_and_published_classes(public_portal_enabled, published_class, client):
+    def it_renders_hero_and_published_classes(published_class, client):
         response = client.get(reverse("classes:public_list"))
         assert response.status_code == 200
         assert b"Classes" in response.content
         assert b"Intro to Wheel Throwing" in response.content
         assert b"Deenie" in response.content
 
-    def it_hides_draft_and_pending_classes(public_portal_enabled, published_class, client):
+    def it_hides_draft_and_pending_classes(published_class, client):
         ClassOfferingFactory(
             title="Secret Draft",
             slug="secret-draft",
@@ -69,7 +55,7 @@ def describe_public_list():
         response = client.get(reverse("classes:public_list"))
         assert b"Secret Draft" not in response.content
 
-    def it_hides_private_classes(public_portal_enabled, published_class, client):
+    def it_hides_private_classes(published_class, client):
         private_offering = ClassOfferingFactory(
             title="Private Lesson",
             slug="private-lesson",
@@ -86,7 +72,7 @@ def describe_public_list():
         response = client.get(reverse("classes:public_list"))
         assert b"Private Lesson" not in response.content
 
-    def it_hides_published_classes_with_no_upcoming_sessions(public_portal_enabled, client):
+    def it_hides_published_classes_with_no_upcoming_sessions(db, client):
         category = CategoryFactory()
         instructor = InstructorFactory()
         stale = ClassOfferingFactory(
@@ -105,7 +91,7 @@ def describe_public_list():
         response = client.get(reverse("classes:public_list"))
         assert b"Past Class" not in response.content
 
-    def it_includes_flexible_classes_even_without_sessions(public_portal_enabled, client):
+    def it_includes_flexible_classes_even_without_sessions(db, client):
         category = CategoryFactory()
         instructor = InstructorFactory()
         ClassOfferingFactory(
@@ -120,7 +106,7 @@ def describe_public_list():
         assert response.status_code == 200
         assert b"Flexible Workshop" in response.content
 
-    def it_filters_to_selected_category(public_portal_enabled, published_class, client):
+    def it_filters_to_selected_category(published_class, client):
         other_cat = CategoryFactory(name="Blacksmithing", slug="blacksmithing")
         other_offering = ClassOfferingFactory(
             title="Intro to Forging",
@@ -140,17 +126,11 @@ def describe_public_list():
 
 
 def describe_public_category():
-    def it_404s_when_portal_disabled(db, client):
-        ClassSettings.load()
-        CategoryFactory(slug="ceramics")
-        response = client.get(reverse("classes:public_category", kwargs={"slug": "ceramics"}))
-        assert response.status_code == 404
-
-    def it_404s_unknown_category(public_portal_enabled, client):
+    def it_404s_unknown_category(db, client):
         response = client.get(reverse("classes:public_category", kwargs={"slug": "no-such-cat"}))
         assert response.status_code == 404
 
-    def it_renders_only_classes_in_the_category(public_portal_enabled, published_class, client):
+    def it_renders_only_classes_in_the_category(published_class, client):
         other_cat = CategoryFactory(name="Woodworking", slug="woodworking")
         other_offering = ClassOfferingFactory(
             title="Intro to Chisels",
@@ -171,11 +151,7 @@ def describe_public_category():
 
 
 def describe_public_class_detail():
-    def it_404s_when_portal_disabled(db, client, published_class):
-        response = client.get(reverse("classes:public_class_detail", kwargs={"slug": published_class.slug}))
-        assert response.status_code == 404
-
-    def it_renders_the_detail_page(public_portal_enabled, published_class, client):
+    def it_renders_the_detail_page(published_class, client):
         response = client.get(reverse("classes:public_class_detail", kwargs={"slug": published_class.slug}))
         assert response.status_code == 200
         assert b"Intro to Wheel Throwing" in response.content
@@ -183,12 +159,12 @@ def describe_public_class_detail():
         assert b"Schedule" in response.content
         assert b"2808 SE 9th Ave" in response.content
 
-    def it_404s_on_draft_classes(public_portal_enabled, client):
+    def it_404s_on_draft_classes(db, client):
         offering = ClassOfferingFactory(status=ClassOffering.Status.DRAFT, slug="secret")
         response = client.get(reverse("classes:public_class_detail", kwargs={"slug": offering.slug}))
         assert response.status_code == 404
 
-    def it_404s_on_private_classes(public_portal_enabled, client):
+    def it_404s_on_private_classes(db, client):
         offering = ClassOfferingFactory(
             status=ClassOffering.Status.PUBLISHED,
             is_private=True,
@@ -197,7 +173,7 @@ def describe_public_class_detail():
         response = client.get(reverse("classes:public_class_detail", kwargs={"slug": offering.slug}))
         assert response.status_code == 404
 
-    def it_shows_sold_out_when_no_spots_remain(public_portal_enabled, published_class, client):
+    def it_shows_sold_out_when_no_spots_remain(published_class, client):
         from classes.factories import RegistrationFactory
         from classes.models import Registration
 
@@ -209,17 +185,12 @@ def describe_public_class_detail():
 
 
 def describe_public_instructor():
-    def it_404s_when_portal_disabled(db, client):
-        instructor = InstructorFactory(slug="deenie")
-        response = client.get(reverse("classes:public_instructor", kwargs={"slug": instructor.slug}))
-        assert response.status_code == 404
-
-    def it_404s_inactive_instructor(public_portal_enabled, client):
+    def it_404s_inactive_instructor(db, client):
         instructor = InstructorFactory(slug="retired", is_active=False)
         response = client.get(reverse("classes:public_instructor", kwargs={"slug": instructor.slug}))
         assert response.status_code == 404
 
-    def it_renders_profile_with_current_classes(public_portal_enabled, published_class, client):
+    def it_renders_profile_with_current_classes(published_class, client):
         response = client.get(reverse("classes:public_instructor", kwargs={"slug": published_class.instructor.slug}))
         assert response.status_code == 200
         assert b"Deenie" in response.content
@@ -227,11 +198,11 @@ def describe_public_instructor():
 
 
 def describe_google_analytics_gate():
-    def it_omits_ga_tag_when_id_not_set(public_portal_enabled, published_class, client):
+    def it_omits_ga_tag_when_id_not_set(published_class, client):
         response = client.get(reverse("classes:public_list"))
         assert b"googletagmanager.com" not in response.content
 
-    def it_injects_ga_tag_when_id_is_configured(public_portal_enabled, published_class, client):
+    def it_injects_ga_tag_when_id_is_configured(published_class, client):
         from core.models import SiteConfiguration
 
         site = SiteConfiguration.load()
