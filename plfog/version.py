@@ -2,9 +2,18 @@
 
 from __future__ import annotations
 
-VERSION = "1.7.4"
+VERSION = "1.7.5"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.7.5",
+        "date": "2026-04-25",
+        "title": "One Classes & Workshops page for everyone",
+        "changes": [
+            "There's now a single Classes & Workshops page in the sidebar — the same page everyone sees, members and visitors alike. Admins and instructors get a Manage button right on that page that opens the classes admin (or the Teaching dashboard for instructors), so you don't lose anything, it's just one entry point instead of two.",
+            'Fixed: a class you publish now shows up on the Classes & Workshops page right away, even before its sessions are scheduled — it appears with an "Upcoming dates TBA" note until you add dates.',
+        ],
+    },
     {
         "version": "1.7.4",
         "date": "2026-04-25",

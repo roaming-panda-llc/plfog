@@ -31,8 +31,11 @@ _ViewFunc = Callable[..., HttpResponse]
 def _browsable_classes() -> Any:
     """Published, non-private classes annotated with first upcoming session date.
 
-    Classes without any upcoming sessions are hidden unless they use flexible
-    scheduling. Ordered by category sort, then soonest upcoming session.
+    Every published, non-private class is shown — the template renders an
+    "Upcoming dates TBA" placeholder when no future sessions exist, so a
+    just-created class is visible immediately whether or not its schedule is
+    finalized. Ordered by category sort, then soonest upcoming session
+    (classes with no upcoming session sort to the bottom of each category).
     """
     now = timezone.now()
     return (
@@ -40,7 +43,6 @@ def _browsable_classes() -> Any:
         .select_related("category", "instructor")
         .prefetch_related("sessions")
         .annotate(first_session_at=Min("sessions__starts_at", filter=Q(sessions__starts_at__gte=now)))
-        .filter(Q(first_session_at__isnull=False) | Q(scheduling_model=ClassOffering.SchedulingModel.FLEXIBLE))
         .order_by("category__sort_order", "category__name", "first_session_at", "title")
     )
 

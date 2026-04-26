@@ -14,6 +14,11 @@
   </div>
   <div id="hero-cta">
     <a class="cta-primary" href="#catalog">Browse Classes</a>
+    {% if request.view_as.is_admin %}
+      <a class="cta-secondary" href="{% url 'classes:admin_classes' %}">Manage Classes &amp; Workshops</a>
+    {% elif request.view_as.is_instructor %}
+      <a class="cta-secondary" href="{% url 'classes:instructor_dashboard' %}">Manage My Classes</a>
+    {% endif %}
   </div>
 </div>
 
