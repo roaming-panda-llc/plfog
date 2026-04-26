@@ -78,10 +78,7 @@ def describe_admin_members():
         target.member.full_legal_name = "Findable Person"
         target.member.member_type = Member.MemberType.STANDARD
         target.member.save()
-        response = client.get(
-            reverse("hub_admin_members")
-            + "?status=all&q=Findable&role=admin&type=standard"
-        )
+        response = client.get(reverse("hub_admin_members") + "?status=all&q=Findable&role=admin&type=standard")
         assert response.status_code == 200
         assert response.context["search"] == "Findable"
         assert response.context["role_filter"] == "admin"
