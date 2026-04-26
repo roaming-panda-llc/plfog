@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
-VERSION = "1.7.5"
+VERSION = "1.7.5.1"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.7.5.1",
+        "date": "2026-04-26",
+        "title": "Fixed: Register page styling sometimes broken when navigating from a class",
+        "changes": [
+            "Fixed a bug where the Register page on a class could load with no styling if you clicked through from another page in the same browser tab. The page now keeps its full styling no matter how you arrive at it.",
+        ],
+    },
     {
         "version": "1.7.5",
         "date": "2026-04-25",

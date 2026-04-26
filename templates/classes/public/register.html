@@ -1,28 +1,11 @@
 {% extends "classes/base_public.html" %}
+{% load static %}
 {% load classes_tags %}
 
 {% block title %}Register — {{ offering.title }} — Past Lives Makerspace{% endblock %}
 
 {% block classes_extra_head %}
-<style>
-.cp-page .reg-form{display:flex;flex-direction:column;gap:14px}
-.cp-page .reg-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-@media(max-width:600px){.cp-page .reg-row{grid-template-columns:1fr}}
-.cp-page .reg-field label{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:5px}
-.cp-page .reg-field input[type=text],.cp-page .reg-field input[type=email],.cp-page .reg-field input[type=tel],.cp-page .reg-field textarea{width:100%;padding:9px 11px;background:rgba(9,46,76,.35);border:1px solid var(--border);border-radius:6px;color:var(--cream);font-family:var(--font);font-size:13px}
-.cp-page .reg-field input:focus,.cp-page .reg-field textarea:focus{outline:none;border-color:var(--gold);background:rgba(14,50,80,.5)}
-.cp-page .reg-field textarea{min-height:70px;resize:vertical}
-.cp-page .reg-errors{color:var(--red);font-size:11px;margin-top:4px;list-style:none;padding:0}
-.cp-page .reg-help{color:var(--text3);font-size:11px;margin-top:4px}
-.cp-page .reg-waiver{margin-top:6px;padding:14px 16px;background:rgba(9,46,76,.3);border:1px solid var(--border);border-radius:var(--r)}
-.cp-page .reg-waiver h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:8px}
-.cp-page .reg-waiver-text{font-size:12px;color:var(--steel);line-height:1.6;max-height:200px;overflow:auto;white-space:pre-wrap;padding:10px 12px;background:rgba(0,0,0,.2);border-radius:6px;margin-bottom:10px}
-.cp-page .reg-check{display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--cream);cursor:pointer}
-.cp-page .reg-check input{margin-top:3px;accent-color:var(--gold)}
-.cp-page .reg-summary{padding:14px 16px;background:rgba(238,180,75,.06);border:1px solid rgba(238,180,75,.18);border-radius:var(--r);font-size:13px;color:var(--cream)}
-.cp-page .reg-summary .total{font-size:20px;font-weight:900;color:var(--gold);font-family:var(--heading)}
-.cp-page .reg-error-block{padding:10px 12px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);border-radius:6px;color:var(--red);font-size:12px}
-</style>
+<link rel="stylesheet" href="{% static 'css/classes-register.css' %}">
 {% endblock %}
 
 {% block portal_content %}
