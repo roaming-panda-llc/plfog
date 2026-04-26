@@ -31,7 +31,7 @@
 {% block content %}
 <link rel="stylesheet" href="{% static 'css/calendar.css' %}">
 
-<div class="hub-page-header" style="display:flex;align-items:center;gap:0.625rem;">
+<div class="hub-page-header" style="display:flex;align-items:center;gap:0.625rem;flex-wrap:wrap;">
     <h1 class="hub-page-title">Community Calendar</h1>
     <span x-data="{ open: false }" style="position:relative;display:inline-flex;align-items:center;">
         <button type="button"
@@ -49,6 +49,9 @@
             Events refresh automatically every 5 minutes — no need to reload the page.
         </div>
     </span>
+    {% if user.is_authenticated and not request.GET.public %}
+    <a href="?public=1" class="hub-btn hub-btn--sm hub-btn--ghost" style="margin-left:auto;" hx-boost="false" title="Preview the calendar the way a logged-out visitor sees it">View Publicly</a>
+    {% endif %}
 </div>
 
 <div

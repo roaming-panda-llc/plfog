@@ -2029,6 +2029,23 @@ a:hover { color: var(--color-yellow-hover); }
     text-decoration: none;
 }
 .pl-public-topbar__login:hover { background: #f5ca6e; text-decoration: none; }
+.pl-public-topbar__exit-preview {
+    background: rgba(238, 180, 75, 0.12);
+    color: var(--color-tuscan-yellow, #EEB44B);
+    border: 1px solid rgba(238, 180, 75, 0.4);
+    padding: 7px 14px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.pl-public-topbar__exit-preview:hover {
+    background: rgba(238, 180, 75, 0.22);
+    text-decoration: none;
+}
 
 /* When no sidebar (anonymous), the wrapper occupies the full viewport. */
 .hub-main-wrapper--public { margin-left: 0; }
