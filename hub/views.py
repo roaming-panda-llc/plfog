@@ -225,9 +225,18 @@ def member_directory(request: HttpRequest) -> HttpResponse:
     current_member = _get_member(request)
     view_as = getattr(request, "view_as", None)
     is_admin = view_as is not None and view_as.is_admin
-    member_qs = Member.objects.filter(status=Member.Status.ACTIVE)
+    from classes.models import Instructor
+
+    instructor_user_ids = Instructor.objects.values_list("user_id", flat=True)
+    must_show = (
+        Q(fog_role=Member.FogRole.ADMIN)
+        | Q(fog_role=Member.FogRole.GUILD_OFFICER)
+        | Q(led_guilds__isnull=False)
+        | Q(user_id__in=instructor_user_ids)
+    )
+    member_qs = Member.objects.filter(status=Member.Status.ACTIVE).distinct()
     if not is_admin:
-        member_qs = member_qs.filter(show_in_directory=True)
+        member_qs = member_qs.filter(Q(show_in_directory=True) | must_show)
     members = (
         member_qs.select_related("membership_plan", "user")
         .prefetch_related(
@@ -1082,9 +1091,10 @@ def admin_member_edit(request: HttpRequest, pk: int) -> HttpResponse:
         return member.fog_role
 
     class MemberEditForm(django_forms.ModelForm):
-        fog_role = django_forms.ChoiceField(
+        role = django_forms.ChoiceField(
             choices=ROLE_CHOICES,
             initial=_initial_role(),
+            label="Role",
             help_text=(
                 "Admin / Guild Officer / Member set the hierarchy role. "
                 "Instructor also grants teaching access. "
@@ -1102,14 +1112,13 @@ def admin_member_edit(request: HttpRequest, pk: int) -> HttpResponse:
                 "about_me",
                 "status",
                 "member_type",
-                "fog_role",
                 "show_in_directory",
             ]
 
     if request.method == "POST":
         form = MemberEditForm(request.POST, instance=member)
         if form.is_valid():
-            picked_role = form.cleaned_data["fog_role"]
+            picked_role = form.cleaned_data["role"]
             obj = form.save(commit=False)
             if picked_role == "instructor":
                 obj.fog_role = Member.FogRole.MEMBER

@@ -320,6 +320,29 @@ class Member(models.Model):
         """True when this member may edit the given guild (admin, officer, or that guild's lead)."""
         return self.is_fog_admin or self.is_guild_officer or guild.guild_lead_id == self.pk
 
+    @property
+    def is_guild_lead(self) -> bool:
+        """True when this member leads at least one guild."""
+        return Guild.objects.filter(guild_lead=self).exists()
+
+    @property
+    def is_instructor(self) -> bool:
+        """True when this member's user has a linked Instructor record."""
+        if self.user_id is None:
+            return False
+        from classes.models import Instructor
+
+        return Instructor.objects.filter(user_id=self.user_id).exists()
+
+    @property
+    def must_be_listed_in_directory(self) -> bool:
+        """Roles that can never opt out of the member directory.
+
+        Admins, Guild Officers, Guild Leads, and Instructors are public-facing —
+        members need to be able to find them. They cannot hide via show_in_directory.
+        """
+        return self.is_fog_admin or self.is_guild_officer or self.is_guild_lead or self.is_instructor
+
     def set_fog_role(self, new_role: str, *, changed_by: Member) -> None:
         """Change this member's fog_role with permission checks.
 

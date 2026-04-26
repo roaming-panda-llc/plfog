@@ -49,6 +49,24 @@ class GuildEditForm(forms.ModelForm):
 class ProfileSettingsForm(forms.ModelForm):
     """Form for editing member profile fields."""
 
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        # Admins, Guild Officers, Guild Leads, and Instructors are always listed —
+        # the field gets force-true on save and is shown disabled with a note.
+        if self.instance and self.instance.pk and self.instance.must_be_listed_in_directory:
+            field = self.fields["show_in_directory"]
+            field.disabled = True
+            field.initial = True
+            field.help_text = "Your role (admin, officer, guild lead, or instructor) requires a public profile."
+
+    def save(self, commit: bool = True) -> Member:
+        member = super().save(commit=False)
+        if member.must_be_listed_in_directory:
+            member.show_in_directory = True
+        if commit:
+            member.save()
+        return member
+
     class Meta:
         model = Member
         fields = [

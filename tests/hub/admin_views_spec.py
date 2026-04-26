@@ -23,7 +23,9 @@ def _create_member_user(*, username: str, fog_role: str = Member.FogRole.MEMBER)
     user = User.objects.create_user(username=username, email=f"{username}@x.com", password="p")
     member = user.member
     member.fog_role = fog_role
-    member.save(update_fields=["fog_role"])
+    if not member.full_legal_name:
+        member.full_legal_name = username.title()
+    member.save()
     return user
 
 
@@ -70,6 +72,90 @@ def describe_admin_members():
         assert response.status_code == 200
         assert response.context["status_filter"] == "all"
 
+    def it_filters_by_search_role_and_type(client):
+        _create_superuser(client)
+        target = _create_member_user(username="searchtarget", fog_role=Member.FogRole.ADMIN)
+        target.member.full_legal_name = "Findable Person"
+        target.member.member_type = Member.MemberType.STANDARD
+        target.member.save()
+        response = client.get(
+            reverse("hub_admin_members")
+            + "?status=all&q=Findable&role=admin&type=standard"
+        )
+        assert response.status_code == 200
+        assert response.context["search"] == "Findable"
+        assert response.context["role_filter"] == "admin"
+        assert response.context["type_filter"] == "standard"
+        assert b"Findable Person" in response.content
+
+
+def describe_admin_member_edit_role_dispatch():
+    def it_promotes_to_instructor(client):
+        from classes.models import Instructor
+
+        _create_superuser(client)
+        target = _create_member_user(username="becomeinst")
+        response = client.post(
+            reverse("hub_admin_member_edit", args=[target.member.pk]),
+            data={
+                "full_legal_name": target.member.full_legal_name,
+                "preferred_name": "",
+                "pronouns": "",
+                "discord_handle": "",
+                "about_me": "",
+                "status": Member.Status.ACTIVE,
+                "member_type": Member.MemberType.STANDARD,
+                "role": "instructor",
+                "show_in_directory": "on",
+            },
+        )
+        assert response.status_code == 302
+        target.member.refresh_from_db()
+        assert target.member.fog_role == Member.FogRole.MEMBER
+        assert target.member.status == Member.Status.ACTIVE
+        assert Instructor.objects.filter(user=target).exists()
+
+    def it_demotes_to_guest_by_setting_status_former(client):
+        _create_superuser(client)
+        target = _create_member_user(username="becomeguest")
+        response = client.post(
+            reverse("hub_admin_member_edit", args=[target.member.pk]),
+            data={
+                "full_legal_name": target.member.full_legal_name,
+                "preferred_name": "",
+                "pronouns": "",
+                "discord_handle": "",
+                "about_me": "",
+                "status": Member.Status.ACTIVE,
+                "member_type": Member.MemberType.STANDARD,
+                "role": "guest",
+                "show_in_directory": "on",
+            },
+        )
+        assert response.status_code == 302
+        target.member.refresh_from_db()
+        assert target.member.status == Member.Status.FORMER
+        assert target.member.fog_role == Member.FogRole.MEMBER
+
+    def it_initial_role_reflects_existing_instructor_record(client):
+        from classes.factories import InstructorFactory
+
+        _create_superuser(client)
+        target = _create_member_user(username="alreadyinst")
+        InstructorFactory(user=target)
+        response = client.get(reverse("hub_admin_member_edit", args=[target.member.pk]))
+        assert response.status_code == 200
+        assert response.context["form"]["role"].initial == "instructor"
+
+    def it_initial_role_reflects_inactive_status_as_guest(client):
+        _create_superuser(client)
+        target = _create_member_user(username="formerguy")
+        target.member.status = Member.Status.FORMER
+        target.member.save(update_fields=["status"])
+        response = client.get(reverse("hub_admin_member_edit", args=[target.member.pk]))
+        assert response.status_code == 200
+        assert response.context["form"]["role"].initial == "guest"
+
 
 def describe_admin_member_edit():
     def it_requires_login(client):
@@ -104,7 +190,7 @@ def describe_admin_member_edit():
                 "about_me": "",
                 "status": Member.Status.ACTIVE,
                 "member_type": Member.MemberType.STANDARD,
-                "fog_role": Member.FogRole.MEMBER,
+                "role": Member.FogRole.MEMBER,
                 "show_in_directory": "on",
             },
         )
