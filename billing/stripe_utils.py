@@ -159,6 +159,50 @@ def create_payment_intent(
     }
 
 
+def create_class_checkout_session(
+    *,
+    amount_cents: int,
+    product_name: str,
+    customer_email: str,
+    success_url: str,
+    cancel_url: str,
+    metadata: dict[str, str],
+    idempotency_key: str,
+) -> dict[str, str]:
+    """Create a Stripe Checkout Session for a one-off class registration.
+
+    Used by the public class registration flow — Stripe collects card details
+    on its hosted page, then redirects back to ``success_url``. The webhook
+    handler for ``checkout.session.completed`` confirms the registration.
+
+    Returns dict with 'id' and 'url' (the hosted Checkout page).
+    The idempotency_key is REQUIRED to prevent duplicate sessions on retry.
+    """
+    client = _get_stripe_client()
+    session = client.v1.checkout.sessions.create(
+        params={
+            "mode": "payment",
+            "customer_email": customer_email,
+            "line_items": [
+                {
+                    "quantity": 1,
+                    "price_data": {
+                        "currency": "usd",
+                        "unit_amount": amount_cents,
+                        "product_data": {"name": product_name},
+                    },
+                }
+            ],
+            "metadata": metadata,
+            "payment_intent_data": {"metadata": metadata},
+            "success_url": success_url,
+            "cancel_url": cancel_url,
+        },
+        options={"idempotency_key": idempotency_key},
+    )
+    return {"id": session.id, "url": session.url or ""}
+
+
 def construct_webhook_event(*, payload: bytes, sig_header: str) -> stripe.Event:
     """Verify and construct a Stripe webhook event from the raw payload.
 

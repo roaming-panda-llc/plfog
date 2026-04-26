@@ -95,8 +95,9 @@
 
         <div class="dc-reg">
           {% if spots_remaining > 0 %}
-            <a class="btn-reg" href="#register">Register — {{ offering.price_cents|cents_as_price }}</a>
-            <div style="margin-top:10px;font-size:11px;color:var(--text3);text-align:center">Online registration coming soon — check back shortly.</div>
+            <a class="btn-reg" href="{% url 'classes:register' slug=offering.slug %}">
+              {% if offering.price_cents == 0 %}Register — Free{% else %}Register — {{ offering.price_cents|cents_as_price }}{% endif %}
+            </a>
           {% else %}
             <div class="btn-sold">Sold Out</div>
           {% endif %}

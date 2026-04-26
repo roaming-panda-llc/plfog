@@ -16,6 +16,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from billing import stripe_utils, webhook_handlers
+from classes import webhook_handlers as classes_webhook_handlers
 from billing.exceptions import TabLimitExceededError, TabLockedError
 from billing.forms import CONTEXT_ADMIN_DASHBOARD, TabItemForm
 from billing.models import BillingSettings, Tab, TabCharge, TabEntry
@@ -31,6 +32,7 @@ _WEBHOOK_HANDLERS = {
     "payment_method.detached": webhook_handlers.handle_payment_method_detached,
     "payment_method.updated": webhook_handlers.handle_payment_method_updated,
     "charge.dispute.created": webhook_handlers.handle_charge_dispute_created,
+    "checkout.session.completed": classes_webhook_handlers.handle_checkout_session_completed,
 }
 
 

@@ -1,0 +1,16 @@
+Hi {{ registration.first_name }},
+
+You're confirmed for "{{ offering.title }}" with {{ offering.instructor.display_name }}.
+
+{% if upcoming_sessions %}Schedule:
+{% for session in upcoming_sessions %}- {{ session.starts_at|date:"l, F j, Y" }} at {{ session.starts_at|time:"g:i A" }}
+{% endfor %}{% else %}Schedule: TBA — {{ offering.instructor.display_name }} will be in touch with dates.
+{% endif %}
+Location: Past Lives Makerspace, 2808 SE 9th Ave, Portland, OR 97202
+
+{% if amount_paid_cents %}You paid: ${{ amount_paid_dollars }}
+{% endif %}Manage your registration (or cancel): {{ self_serve_url }}
+{% if footer %}
+{{ footer }}{% endif %}
+See you soon!
+— Past Lives Makerspace

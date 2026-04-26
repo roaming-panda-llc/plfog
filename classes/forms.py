@@ -9,10 +9,19 @@ from django.contrib.auth import get_user_model
 from django.forms import inlineformset_factory
 from django.utils.text import slugify
 
-from classes.models import Category, ClassOffering, ClassSession, ClassSettings, DiscountCode, Instructor
+from classes.models import (
+    Category,
+    ClassOffering,
+    ClassSession,
+    ClassSettings,
+    DiscountCode,
+    Instructor,
+    Registration,
+    Waiver,
+)
 
 if TYPE_CHECKING:
-    pass
+    from membership.models import Member
 
 
 class ClassOfferingForm(forms.ModelForm):
@@ -203,6 +212,136 @@ class DiscountCodeForm(forms.ModelForm):
         if not data.get("discount_pct") and not data.get("discount_fixed_cents"):
             raise forms.ValidationError("Set either a percent OR a fixed-cents discount.")
         return data
+
+
+class RegistrationForm(forms.ModelForm):
+    """Public registration form — collects registrant + waiver signatures.
+
+    Computes the final price (member discount + optional discount code) and,
+    on save, creates the Registration plus signed Waiver records.
+    """
+
+    discount_code = forms.CharField(
+        max_length=40,
+        required=False,
+        label="Discount code (optional)",
+    )
+    liability_signature = forms.CharField(
+        max_length=255,
+        label="Type your full name to sign the liability waiver",
+    )
+    model_release_signature = forms.CharField(
+        max_length=255,
+        required=False,
+        label="Type your full name to sign the model release",
+    )
+    accepts_liability = forms.BooleanField(
+        label="I have read and agree to the liability waiver above.",
+    )
+    accepts_model_release = forms.BooleanField(
+        required=False,
+        label="I have read and agree to the model release above.",
+    )
+
+    class Meta:
+        model = Registration
+        fields = [
+            "first_name",
+            "last_name",
+            "pronouns",
+            "email",
+            "phone",
+            "prior_experience",
+            "looking_for",
+        ]
+        widgets = {
+            "prior_experience": forms.Textarea(attrs={"rows": 3}),
+            "looking_for": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(
+        self,
+        *args,
+        offering: ClassOffering,
+        settings_obj: ClassSettings,
+        member: "Member | None" = None,
+        client_ip: str = "",
+        **kwargs,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.offering = offering
+        self.settings_obj = settings_obj
+        self.member = member
+        self.client_ip = client_ip
+        self._validated_discount: DiscountCode | None = None
+        if not offering.requires_model_release:
+            # Hide model release fields entirely when the class doesn't need them.
+            self.fields.pop("model_release_signature")
+            self.fields.pop("accepts_model_release")
+
+    def clean_discount_code(self) -> DiscountCode | None:
+        raw = (self.cleaned_data.get("discount_code") or "").strip().upper()
+        if not raw:
+            return None
+        try:
+            code = DiscountCode.objects.get(code=raw)
+        except DiscountCode.DoesNotExist:
+            raise forms.ValidationError("That discount code isn't recognized.") from None
+        if not code.is_currently_valid():
+            raise forms.ValidationError("That discount code isn't valid right now.")
+        self._validated_discount = code
+        return code
+
+    def clean(self) -> dict:
+        data = super().clean()
+        if self.offering.spots_remaining <= 0:
+            raise forms.ValidationError("This class is sold out.")
+        if self.offering.requires_model_release and not data.get("accepts_model_release"):
+            self.add_error("accepts_model_release", "Model release acceptance is required for this class.")
+        return data
+
+    @property
+    def member_discount_pct(self) -> int:
+        """Member discount applies only when the registrant matches a verified member."""
+        if self.member is None:
+            return 0
+        return self.offering.member_discount_pct or 0
+
+    def compute_final_price_cents(self) -> int:
+        price = self.offering.price_cents
+        if self.member_discount_pct:
+            price = int(price * (100 - self.member_discount_pct) / 100)
+        code = self._validated_discount
+        if code is not None:
+            price = code.apply_to(price)
+        return max(0, price)
+
+    def save(self, commit: bool = True) -> Registration:
+        registration: Registration = super().save(commit=False)
+        registration.class_offering = self.offering
+        registration.discount_code = self._validated_discount
+        registration.amount_paid_cents = 0  # set on payment success or, for free classes, on confirm
+        if commit:
+            registration.save()
+            self._create_waivers(registration)
+        return registration
+
+    def _create_waivers(self, registration: Registration) -> None:
+        Waiver.objects.create(
+            registration=registration,
+            kind=Waiver.Kind.LIABILITY,
+            waiver_text=self.settings_obj.liability_waiver_text,
+            signature_text=self.cleaned_data["liability_signature"],
+            ip_address=self.client_ip or None,
+        )
+        if self.offering.requires_model_release:
+            Waiver.objects.create(
+                registration=registration,
+                kind=Waiver.Kind.MODEL_RELEASE,
+                waiver_text=self.settings_obj.model_release_waiver_text,
+                signature_text=self.cleaned_data["model_release_signature"],
+                ip_address=self.client_ip or None,
+            )
 
 
 class ClassSettingsForm(forms.ModelForm):

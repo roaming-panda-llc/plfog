@@ -10,8 +10,10 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Min, Q
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
+from classes.emails import send_registration_confirmation
 from classes.forms import (
     CategoryForm,
     ClassOfferingForm,
@@ -21,6 +23,7 @@ from classes.forms import (
     InstructorClassOfferingForm,
     InstructorProfileForm,
     PromoteUserToInstructorForm,
+    RegistrationForm,
 )
 from classes.models import Category, ClassOffering, ClassSettings, DiscountCode, Instructor, Registration
 from core.models import SiteConfiguration
@@ -146,6 +149,214 @@ def public_instructor(request: HttpRequest, slug: str) -> HttpResponse:
             "site_config": SiteConfiguration.load(),
         },
     )
+
+
+def _client_ip(request: HttpRequest) -> str:
+    """Best-effort client IP, honoring X-Forwarded-For when behind a proxy."""
+    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "")
+
+
+def _member_for_email(email: str):
+    """Verified Member matching this email, or None."""
+    from membership.models import Member
+
+    return (
+        Member.objects.filter(
+            user__emailaddress__email__iexact=email,
+            user__emailaddress__verified=True,
+        )
+        .distinct()
+        .first()
+    )
+
+
+def register(request: HttpRequest, slug: str) -> HttpResponse:
+    """Public registration form — collects info, signs waivers, kicks off Stripe Checkout.
+
+    Free classes (price_cents == 0 after discounts) confirm immediately and
+    skip Stripe. Paid classes redirect to a Stripe Checkout Session; the
+    webhook handler flips the registration to CONFIRMED on success.
+    """
+    offering = get_object_or_404(
+        ClassOffering.objects.public().select_related("category", "instructor"),
+        slug=slug,
+    )
+    settings_obj = ClassSettings.load()
+
+    # Two-pass form: first POST validates email so we can detect a member
+    # before computing price, then re-binds to surface the discounted total.
+    bound_email = (request.POST.get("email") or "").strip() if request.method == "POST" else ""
+    member = _member_for_email(bound_email) if bound_email else None
+
+    form = RegistrationForm(
+        request.POST or None,
+        offering=offering,
+        settings_obj=settings_obj,
+        member=member,
+        client_ip=_client_ip(request),
+    )
+
+    if request.method == "POST" and form.is_valid():
+        registration = form.save()
+        final_price = form.compute_final_price_cents()
+
+        if final_price == 0:
+            # Free class — confirm + email immediately, no Stripe round-trip.
+            registration.status = Registration.Status.CONFIRMED
+            registration.confirmed_at = timezone.now()
+            registration.amount_paid_cents = 0
+            registration.save(update_fields=["status", "confirmed_at", "amount_paid_cents"])
+            if registration.discount_code_id:
+                _bump_discount_use_count(registration.discount_code_id)
+            send_registration_confirmation(registration)
+            return redirect("classes:register_success", slug=offering.slug)
+
+        # Paid class — kick off Stripe Checkout.
+        from billing import stripe_utils
+
+        success_url = (
+            request.build_absolute_uri(reverse("classes:register_success", kwargs={"slug": offering.slug}))
+            + f"?reg={registration.self_serve_token}"
+        )
+        cancel_url = (
+            request.build_absolute_uri(reverse("classes:register_cancelled", kwargs={"slug": offering.slug}))
+            + f"?reg={registration.self_serve_token}"
+        )
+
+        try:
+            checkout = stripe_utils.create_class_checkout_session(
+                amount_cents=final_price,
+                product_name=offering.title,
+                customer_email=registration.email,
+                success_url=success_url,
+                cancel_url=cancel_url,
+                metadata={
+                    "registration_id": str(registration.pk),
+                    "class_slug": offering.slug,
+                    "kind": "class_registration",
+                },
+                idempotency_key=f"class-checkout-reg-{registration.pk}",
+            )
+        except Exception:
+            registration.delete()  # roll back the half-created registration
+            raise
+
+        registration.stripe_session_id = checkout["id"]
+        registration.amount_paid_cents = final_price  # provisional; webhook is canonical
+        registration.save(update_fields=["stripe_session_id", "amount_paid_cents"])
+        return redirect(checkout["url"])
+
+    member_price_cents = None
+    if offering.member_discount_pct:
+        member_price_cents = int(offering.price_cents * (100 - offering.member_discount_pct) / 100)
+
+    return render(
+        request,
+        "classes/public/register.html",
+        {
+            "offering": offering,
+            "form": form,
+            "settings_obj": settings_obj,
+            "site_config": SiteConfiguration.load(),
+            "member_price_cents": member_price_cents,
+            "spots_remaining": offering.spots_remaining,
+        },
+    )
+
+
+def register_success(request: HttpRequest, slug: str) -> HttpResponse:
+    """Landing page after successful checkout — webhook does the real work."""
+    offering = get_object_or_404(
+        ClassOffering.objects.public().select_related("category", "instructor"),
+        slug=slug,
+    )
+    return render(
+        request,
+        "classes/public/register_success.html",
+        {
+            "offering": offering,
+            "settings_obj": ClassSettings.load(),
+            "site_config": SiteConfiguration.load(),
+        },
+    )
+
+
+def register_cancelled(request: HttpRequest, slug: str) -> HttpResponse:
+    """User backed out of Stripe Checkout — clean up the unpaid registration."""
+    offering = get_object_or_404(
+        ClassOffering.objects.public().select_related("category", "instructor"),
+        slug=slug,
+    )
+    token = request.GET.get("reg", "").strip()
+    if token:
+        Registration.objects.filter(
+            self_serve_token=token,
+            status=Registration.Status.PENDING,
+            class_offering=offering,
+        ).delete()
+    return render(
+        request,
+        "classes/public/register_cancelled.html",
+        {
+            "offering": offering,
+            "settings_obj": ClassSettings.load(),
+            "site_config": SiteConfiguration.load(),
+        },
+    )
+
+
+def my_registration(request: HttpRequest, token: str) -> HttpResponse:
+    """Self-serve registration page — no auth, identified by the unguessable token."""
+    registration = get_object_or_404(
+        Registration.objects.select_related("class_offering", "class_offering__instructor"),
+        self_serve_token=token,
+    )
+    offering = registration.class_offering
+    upcoming_sessions = list(offering.sessions.filter(starts_at__gte=timezone.now()).order_by("starts_at"))
+    can_self_cancel = registration.status in {
+        Registration.Status.PENDING,
+        Registration.Status.CONFIRMED,
+        Registration.Status.WAITLISTED,
+    } and (not upcoming_sessions or upcoming_sessions[0].starts_at > timezone.now())
+    return render(
+        request,
+        "classes/public/my_registration.html",
+        {
+            "registration": registration,
+            "offering": offering,
+            "upcoming_sessions": upcoming_sessions,
+            "can_self_cancel": can_self_cancel,
+            "settings_obj": ClassSettings.load(),
+            "site_config": SiteConfiguration.load(),
+        },
+    )
+
+
+def my_registration_cancel(request: HttpRequest, token: str) -> HttpResponse:
+    """Self-cancel a registration. Refunds aren't automated — admins handle them."""
+    registration = get_object_or_404(Registration, self_serve_token=token)
+    if request.method != "POST":
+        return redirect("classes:my_registration", token=token)
+    if registration.status not in {
+        Registration.Status.PENDING,
+        Registration.Status.CONFIRMED,
+        Registration.Status.WAITLISTED,
+    }:
+        messages.info(request, "This registration is already cancelled.")
+        return redirect("classes:my_registration", token=token)
+    registration.cancel(reason="self-serve")
+    messages.success(request, "Your registration is cancelled.")
+    return redirect("classes:my_registration", token=token)
+
+
+def _bump_discount_use_count(discount_code_id: int) -> None:
+    """Atomic +1 on use_count — called on confirmed registration."""
+    from django.db.models import F
+
+    DiscountCode.objects.filter(pk=discount_code_id).update(use_count=F("use_count") + 1)
 
 
 def admin_required(view_func: _ViewFunc) -> _ViewFunc:

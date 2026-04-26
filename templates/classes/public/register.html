@@ -1,0 +1,139 @@
+{% extends "classes/base_public.html" %}
+{% load classes_tags %}
+
+{% block title %}Register — {{ offering.title }} — Past Lives Makerspace{% endblock %}
+
+{% block classes_extra_head %}
+<style>
+.cp-page .reg-form{display:flex;flex-direction:column;gap:14px}
+.cp-page .reg-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:600px){.cp-page .reg-row{grid-template-columns:1fr}}
+.cp-page .reg-field label{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:5px}
+.cp-page .reg-field input[type=text],.cp-page .reg-field input[type=email],.cp-page .reg-field input[type=tel],.cp-page .reg-field textarea{width:100%;padding:9px 11px;background:rgba(9,46,76,.35);border:1px solid var(--border);border-radius:6px;color:var(--cream);font-family:var(--font);font-size:13px}
+.cp-page .reg-field input:focus,.cp-page .reg-field textarea:focus{outline:none;border-color:var(--gold);background:rgba(14,50,80,.5)}
+.cp-page .reg-field textarea{min-height:70px;resize:vertical}
+.cp-page .reg-errors{color:var(--red);font-size:11px;margin-top:4px;list-style:none;padding:0}
+.cp-page .reg-help{color:var(--text3);font-size:11px;margin-top:4px}
+.cp-page .reg-waiver{margin-top:6px;padding:14px 16px;background:rgba(9,46,76,.3);border:1px solid var(--border);border-radius:var(--r)}
+.cp-page .reg-waiver h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:8px}
+.cp-page .reg-waiver-text{font-size:12px;color:var(--steel);line-height:1.6;max-height:200px;overflow:auto;white-space:pre-wrap;padding:10px 12px;background:rgba(0,0,0,.2);border-radius:6px;margin-bottom:10px}
+.cp-page .reg-check{display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--cream);cursor:pointer}
+.cp-page .reg-check input{margin-top:3px;accent-color:var(--gold)}
+.cp-page .reg-summary{padding:14px 16px;background:rgba(238,180,75,.06);border:1px solid rgba(238,180,75,.18);border-radius:var(--r);font-size:13px;color:var(--cream)}
+.cp-page .reg-summary .total{font-size:20px;font-weight:900;color:var(--gold);font-family:var(--heading)}
+.cp-page .reg-error-block{padding:10px 12px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);border-radius:6px;color:var(--red);font-size:12px}
+</style>
+{% endblock %}
+
+{% block portal_content %}
+<div class="view">
+  <div class="cp-container">
+    <div class="detail-card">
+      <div class="detail-head">
+        <div>
+          <div class="dc-cat">Register</div>
+          <div class="dc-title">{{ offering.title }}</div>
+          <div class="dc-inst">with {{ offering.instructor.display_name }}</div>
+        </div>
+        <a class="back-link" href="{% url 'classes:public_class_detail' slug=offering.slug %}">&larr; Class details</a>
+      </div>
+      <div class="detail-body">
+        <div class="reg-summary">
+          <div>{{ offering.title }}</div>
+          <div class="total">{{ offering.price_cents|cents_as_price }}</div>
+          {% if member_price_cents %}<div style="font-size:11px;color:var(--steel-dim);margin-top:2px">Members: {{ member_price_cents|cents_as_price }} (auto-applied if your email matches a verified member)</div>{% endif %}
+          {% if spots_remaining <= 3 %}<div style="font-size:11px;color:var(--red);margin-top:6px">Only {{ spots_remaining }} spot{{ spots_remaining|pluralize }} left</div>{% endif %}
+        </div>
+
+        {% if form.non_field_errors %}
+          <div class="reg-error-block" style="margin-top:12px">
+            {% for err in form.non_field_errors %}{{ err }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+          </div>
+        {% endif %}
+
+        <form method="post" class="reg-form" style="margin-top:14px">
+          {% csrf_token %}
+          <div class="reg-row">
+            <div class="reg-field">
+              <label for="{{ form.first_name.id_for_label }}">First name</label>
+              {{ form.first_name }}
+              {% if form.first_name.errors %}<ul class="reg-errors">{% for e in form.first_name.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+            </div>
+            <div class="reg-field">
+              <label for="{{ form.last_name.id_for_label }}">Last name</label>
+              {{ form.last_name }}
+              {% if form.last_name.errors %}<ul class="reg-errors">{% for e in form.last_name.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+            </div>
+          </div>
+          <div class="reg-row">
+            <div class="reg-field">
+              <label for="{{ form.email.id_for_label }}">Email</label>
+              {{ form.email }}
+              {% if form.email.errors %}<ul class="reg-errors">{% for e in form.email.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+            </div>
+            <div class="reg-field">
+              <label for="{{ form.phone.id_for_label }}">Phone (optional)</label>
+              {{ form.phone }}
+              {% if form.phone.errors %}<ul class="reg-errors">{% for e in form.phone.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+            </div>
+          </div>
+          <div class="reg-field">
+            <label for="{{ form.pronouns.id_for_label }}">Pronouns (optional)</label>
+            {{ form.pronouns }}
+          </div>
+          <div class="reg-field">
+            <label for="{{ form.prior_experience.id_for_label }}">Any prior experience? (optional)</label>
+            {{ form.prior_experience }}
+          </div>
+          <div class="reg-field">
+            <label for="{{ form.looking_for.id_for_label }}">What are you hoping to get out of this class? (optional)</label>
+            {{ form.looking_for }}
+          </div>
+          <div class="reg-field">
+            <label for="{{ form.discount_code.id_for_label }}">Discount code (optional)</label>
+            {{ form.discount_code }}
+            {% if form.discount_code.errors %}<ul class="reg-errors">{% for e in form.discount_code.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+          </div>
+
+          <div class="reg-waiver">
+            <h3>Liability Waiver</h3>
+            <div class="reg-waiver-text">{{ settings_obj.liability_waiver_text }}</div>
+            <div class="reg-field">
+              <label for="{{ form.liability_signature.id_for_label }}">Type your full name to sign</label>
+              {{ form.liability_signature }}
+              {% if form.liability_signature.errors %}<ul class="reg-errors">{% for e in form.liability_signature.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+            </div>
+            <label class="reg-check" style="margin-top:8px">
+              {{ form.accepts_liability }}
+              <span>I have read and agree to the liability waiver above.</span>
+            </label>
+            {% if form.accepts_liability.errors %}<ul class="reg-errors">{% for e in form.accepts_liability.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+          </div>
+
+          {% if offering.requires_model_release %}
+          <div class="reg-waiver">
+            <h3>Model Release</h3>
+            <div class="reg-waiver-text">{{ settings_obj.model_release_waiver_text }}</div>
+            <div class="reg-field">
+              <label for="{{ form.model_release_signature.id_for_label }}">Type your full name to sign</label>
+              {{ form.model_release_signature }}
+              {% if form.model_release_signature.errors %}<ul class="reg-errors">{% for e in form.model_release_signature.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+            </div>
+            <label class="reg-check" style="margin-top:8px">
+              {{ form.accepts_model_release }}
+              <span>I have read and agree to the model release above.</span>
+            </label>
+            {% if form.accepts_model_release.errors %}<ul class="reg-errors">{% for e in form.accepts_model_release.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+          </div>
+          {% endif %}
+
+          <button type="submit" class="btn-reg" style="margin-top:8px">
+            {% if offering.price_cents == 0 %}Confirm Registration{% else %}Continue to Payment — {{ offering.price_cents|cents_as_price }}{% endif %}
+          </button>
+          <div class="reg-help" style="text-align:center">Payment is processed securely by Stripe. We never see your card details.</div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
