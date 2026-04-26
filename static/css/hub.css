@@ -1972,3 +1972,63 @@ a:hover { color: var(--color-yellow-hover); }
     white-space: nowrap;
     border: 0;
 }
+
+/* ========================================
+   Public Top Bar (anonymous visitors)
+   Used on Classes & Workshops, register, etc. when no user is logged in.
+   ======================================== */
+.pl-public-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    height: var(--topbar-height);
+    background-color: rgba(6, 31, 51, 0.85);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-bottom: 1px solid rgba(238, 180, 75, 0.18);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.5rem;
+    gap: 1rem;
+}
+.pl-public-topbar__brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-cream, #f4efdd);
+    font-family: 'Playfair Display', Georgia, serif;
+    font-weight: 800;
+    font-size: 16px;
+    text-decoration: none;
+}
+.pl-public-topbar__brand:hover { text-decoration: none; opacity: 0.9; }
+.pl-public-topbar__nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+}
+.pl-public-topbar__link {
+    color: var(--color-steel, #96acbb);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.pl-public-topbar__link:hover { color: var(--color-tuscan-yellow, #EEB44B); text-decoration: none; }
+.pl-public-topbar__login {
+    background: var(--color-tuscan-yellow, #EEB44B);
+    color: #061f33;
+    padding: 8px 18px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-decoration: none;
+}
+.pl-public-topbar__login:hover { background: #f5ca6e; text-decoration: none; }
+
+/* When no sidebar (anonymous), the wrapper occupies the full viewport. */
+.hub-main-wrapper--public { margin-left: 0; }

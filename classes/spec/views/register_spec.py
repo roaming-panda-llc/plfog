@@ -86,6 +86,22 @@ def describe_register_view():
         assert b"Liability Waiver" in response.content
         assert b"Continue to Payment" in response.content
 
+    def it_prefills_form_for_a_logged_in_member(paid_offering, client, member_user):
+        member = member_user.member
+        member.full_legal_name = "Robin Hood"
+        member.phone = "503-555-0100"
+        member.pronouns = "they/them"
+        member.save()
+        client.force_login(member_user)
+        response = client.get(reverse("classes:register", kwargs={"slug": paid_offering.slug}))
+        assert response.status_code == 200
+        body = response.content.decode()
+        assert 'value="Robin"' in body
+        assert 'value="Hood"' in body
+        assert 'value="member@example.com"' in body
+        assert 'value="503-555-0100"' in body
+        assert 'value="they/them"' in body
+
     def it_404s_for_unpublished_class(db, client):
         offering = ClassOfferingFactory(status=ClassOffering.Status.DRAFT, slug="hidden")
         response = client.get(reverse("classes:register", kwargs={"slug": offering.slug}))

@@ -173,6 +173,24 @@ def _member_for_email(email: str):
     )
 
 
+def _registration_initial_for_user(user) -> dict[str, str]:
+    """Pre-fill values pulled from the logged-in user's Member record."""
+    if not user or not user.is_authenticated:
+        return {}
+    member = getattr(user, "member", None)
+    if member is None:
+        return {"email": user.email or ""}
+    name = (member.preferred_name or member.full_legal_name or user.get_full_name() or "").strip()
+    first_name, _, last_name = name.partition(" ")
+    return {
+        "first_name": first_name or user.first_name or "",
+        "last_name": last_name.strip() or user.last_name or "",
+        "email": member.primary_email or user.email or "",
+        "phone": member.phone or "",
+        "pronouns": member.pronouns or "",
+    }
+
+
 def register(request: HttpRequest, slug: str) -> HttpResponse:
     """Public registration form — collects info, signs waivers, kicks off Stripe Checkout.
 
@@ -188,8 +206,10 @@ def register(request: HttpRequest, slug: str) -> HttpResponse:
 
     # Two-pass form: first POST validates email so we can detect a member
     # before computing price, then re-binds to surface the discounted total.
+    # GET requests pre-fill from the logged-in user's Member record when present.
     bound_email = (request.POST.get("email") or "").strip() if request.method == "POST" else ""
     member = _member_for_email(bound_email) if bound_email else None
+    initial = {} if request.method == "POST" else _registration_initial_for_user(request.user)
 
     form = RegistrationForm(
         request.POST or None,
@@ -197,6 +217,7 @@ def register(request: HttpRequest, slug: str) -> HttpResponse:
         settings_obj=settings_obj,
         member=member,
         client_ip=_client_ip(request),
+        initial=initial,
     )
 
     if request.method == "POST" and form.is_valid():
