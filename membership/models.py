@@ -368,19 +368,26 @@ class Member(models.Model):
             self.fog_role = picked_role
         self.save()
 
-        if picked_role == self.ADMIN_ROLE_INSTRUCTOR and self.user_id is not None:
+        if picked_role == self.ADMIN_ROLE_INSTRUCTOR:
             self._ensure_instructor_record()
 
     def _ensure_instructor_record(self) -> None:
-        """Create an Instructor row for self.user if one doesn't exist."""
+        """Create an Instructor row for self.user if one doesn't exist.
+
+        No-op when no User is linked — instructors require a real account.
+        """
         from django.utils.text import slugify
 
         from classes.models import Instructor
 
-        if Instructor.objects.filter(user_id=self.user_id).exists():
+        user = self.user
+        if user is None:
             return
 
-        display_name = self.display_name or self.full_legal_name or self.user.email
+        if Instructor.objects.filter(user_id=user.pk).exists():
+            return
+
+        display_name = self.display_name or self.full_legal_name or user.email
         base_slug = slugify(display_name) or f"instructor-{self.pk}"
         slug = base_slug
         n = 1
@@ -388,7 +395,7 @@ class Member(models.Model):
             n += 1
             slug = f"{base_slug}-{n}"
 
-        Instructor.objects.create(user=self.user, display_name=display_name, slug=slug)
+        Instructor.objects.create(user=user, display_name=display_name, slug=slug)
 
     def set_fog_role(self, new_role: str, *, changed_by: Member) -> None:
         """Change this member's fog_role with permission checks.
