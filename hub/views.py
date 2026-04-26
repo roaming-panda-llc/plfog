@@ -223,9 +223,13 @@ def member_directory(request: HttpRequest) -> HttpResponse:
     """
     ctx = _get_hub_context(request)
     current_member = _get_member(request)
+    view_as = getattr(request, "view_as", None)
+    is_admin = view_as is not None and view_as.is_admin
+    member_qs = Member.objects.filter(status=Member.Status.ACTIVE)
+    if not is_admin:
+        member_qs = member_qs.filter(show_in_directory=True)
     members = (
-        Member.objects.filter(status=Member.Status.ACTIVE, show_in_directory=True)
-        .select_related("membership_plan", "user")
+        member_qs.select_related("membership_plan", "user")
         .prefetch_related(
             Prefetch(
                 "user__emailaddress_set",
@@ -238,7 +242,7 @@ def member_directory(request: HttpRequest) -> HttpResponse:
     return render(
         request,
         "hub/member_directory.html",
-        {**ctx, "members": members, "current_member": current_member},
+        {**ctx, "members": members, "current_member": current_member, "is_admin": is_admin},
     )
 
 
@@ -1009,14 +1013,31 @@ def admin_voting_dashboard(request: HttpRequest) -> HttpResponse:
 
 @fog_admin_required
 def admin_members(request: HttpRequest) -> HttpResponse:
-    """Admin members management — paginated list with status + role filters."""
+    """Admin members management — paginated list with search + status/role/type filters."""
     from django.core.paginator import Paginator
+    from django.db.models import Q
 
     ctx = _get_hub_context(request)
     status_filter = request.GET.get("status", "active")
+    role_filter = request.GET.get("role", "")
+    type_filter = request.GET.get("type", "")
+    search = request.GET.get("q", "").strip()
+
     qs = Member.objects.select_related("user", "membership_plan").order_by("full_legal_name")
     if status_filter and status_filter != "all":
         qs = qs.filter(status=status_filter)
+    if role_filter:
+        qs = qs.filter(fog_role=role_filter)
+    if type_filter:
+        qs = qs.filter(member_type=type_filter)
+    if search:
+        qs = qs.filter(
+            Q(full_legal_name__icontains=search)
+            | Q(preferred_name__icontains=search)
+            | Q(user__email__icontains=search)
+            | Q(discord_handle__icontains=search)
+        )
+
     paginator = Paginator(qs, 50)
     page = paginator.get_page(request.GET.get("page", 1))
     return render(
@@ -1026,7 +1047,12 @@ def admin_members(request: HttpRequest) -> HttpResponse:
             **ctx,
             "page": page,
             "status_filter": status_filter,
+            "role_filter": role_filter,
+            "type_filter": type_filter,
+            "search": search,
             "status_choices": Member.Status.choices,
+            "role_choices": Member.FogRole.choices,
+            "type_choices": Member.MemberType.choices,
         },
     )
 
@@ -1036,9 +1062,36 @@ def admin_member_edit(request: HttpRequest, pk: int) -> HttpResponse:
     """Hub-native edit form for a single Member."""
     from django import forms as django_forms
 
+    from classes.models import Instructor
+
     member = get_object_or_404(Member, pk=pk)
 
+    ROLE_CHOICES = [
+        (Member.FogRole.ADMIN, "Admin"),
+        (Member.FogRole.GUILD_OFFICER, "Guild Officer"),
+        (Member.FogRole.MEMBER, "Member"),
+        ("instructor", "Instructor"),
+        ("guest", "Guest"),
+    ]
+
+    def _initial_role() -> str:
+        if member.status != Member.Status.ACTIVE:
+            return "guest"
+        if Instructor.objects.filter(user=member.user).exists() and member.fog_role == Member.FogRole.MEMBER:
+            return "instructor"
+        return member.fog_role
+
     class MemberEditForm(django_forms.ModelForm):
+        fog_role = django_forms.ChoiceField(
+            choices=ROLE_CHOICES,
+            initial=_initial_role(),
+            help_text=(
+                "Admin / Guild Officer / Member set the hierarchy role. "
+                "Instructor also grants teaching access. "
+                "Guest deactivates the member (no hub access)."
+            ),
+        )
+
         class Meta:
             model = Member
             fields = [
@@ -1047,7 +1100,6 @@ def admin_member_edit(request: HttpRequest, pk: int) -> HttpResponse:
                 "pronouns",
                 "discord_handle",
                 "about_me",
-                "membership_plan",
                 "status",
                 "member_type",
                 "fog_role",
@@ -1057,8 +1109,24 @@ def admin_member_edit(request: HttpRequest, pk: int) -> HttpResponse:
     if request.method == "POST":
         form = MemberEditForm(request.POST, instance=member)
         if form.is_valid():
-            form.save()
-            display = member.full_legal_name or (member.user.email if member.user else f"member #{member.pk}")
+            picked_role = form.cleaned_data["fog_role"]
+            obj = form.save(commit=False)
+            if picked_role == "instructor":
+                obj.fog_role = Member.FogRole.MEMBER
+                obj.status = Member.Status.ACTIVE
+            elif picked_role == "guest":
+                obj.fog_role = Member.FogRole.MEMBER
+                obj.status = Member.Status.FORMER
+            else:
+                obj.fog_role = picked_role
+            obj.save()
+            if picked_role == "instructor" and member.user and not Instructor.objects.filter(user=member.user).exists():
+                Instructor.objects.create(
+                    user=member.user,
+                    display_name=obj.display_name or obj.full_legal_name or member.user.email,
+                    slug=f"instructor-{member.pk}",
+                )
+            display = obj.full_legal_name or (obj.user.email if obj.user else f"member #{obj.pk}")
             messages.success(request, f"Saved {display}.")
             return redirect("hub_admin_members")
     else:

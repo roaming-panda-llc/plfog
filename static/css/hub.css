@@ -1939,3 +1939,36 @@ a:hover { color: var(--color-yellow-hover); }
     border-top: 1px solid var(--hub-dropdown-border);
     margin-top: 4px;
 }
+
+.hub-sidebar__icons {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem 0.75rem 0.625rem;
+}
+
+.hub-sidebar__icon-link {
+    display: inline-flex;
+    align-items: center;
+    color: rgba(244, 239, 221, 0.4);
+    text-decoration: none;
+    transition: color 0.15s ease;
+    line-height: 0;
+}
+
+.hub-sidebar__icon-link:hover {
+    color: var(--color-tuscan-yellow);
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}

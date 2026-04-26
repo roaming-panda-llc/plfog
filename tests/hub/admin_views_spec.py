@@ -102,7 +102,6 @@ def describe_admin_member_edit():
                 "pronouns": "",
                 "discord_handle": "",
                 "about_me": "",
-                "membership_plan": target.member.membership_plan_id,
                 "status": Member.Status.ACTIVE,
                 "member_type": Member.MemberType.STANDARD,
                 "fog_role": Member.FogRole.MEMBER,
