@@ -24,7 +24,55 @@ if TYPE_CHECKING:
     from membership.models import Member
 
 
-class ClassOfferingForm(forms.ModelForm):
+class _FreeClassMixin:
+    """Adds an `is_free` checkbox that, when checked, forces price/discount to 0.
+
+    Source of truth remains `price_cents` on the model (0 = free). The checkbox
+    is a UX affordance so the instructor/admin doesn't have to know that "type 0
+    in cents" makes a class free — they just tick a box.
+    """
+
+    def add_is_free_field(self) -> None:
+        instance = getattr(self, "instance", None)
+        initial = bool(instance and instance.pk and instance.price_cents == 0)
+        self.fields["is_free"] = forms.BooleanField(  # type: ignore[attr-defined]
+            required=False,
+            initial=initial,
+            label="This is a free class / workshop",
+            help_text="Check this if there's no fee. Members will be able to register without entering payment info.",
+        )
+        # Price and discount aren't required when the class is free — the form's
+        # clean() enforces that price_cents is filled in for non-free classes.
+        self.fields["price_cents"].required = False  # type: ignore[attr-defined]
+        self.fields["member_discount_pct"].required = False  # type: ignore[attr-defined]
+        # Render the checkbox just above price so the visual flow is "Is this free?
+        # → if not, here's the price." Django keeps this order when iterating `form`.
+        ordered: list[str] = []
+        for name in self.fields:  # type: ignore[attr-defined]
+            if name == "price_cents":
+                ordered.append("is_free")
+            if name == "is_free":
+                continue
+            ordered.append(name)
+        self.order_fields(ordered)  # type: ignore[attr-defined]
+
+    def clean_is_free_pricing(self) -> None:
+        """Require price_cents when the class isn't free. Call from `clean()`."""
+        cleaned = self.cleaned_data  # type: ignore[attr-defined]
+        if cleaned.get("is_free"):
+            return
+        if cleaned.get("price_cents") in (None, ""):
+            self.add_error(  # type: ignore[attr-defined]
+                "price_cents", "Set a price (in cents) or check 'This is a free class / workshop'."
+            )
+
+    def apply_is_free_to_instance(self, offering: ClassOffering) -> None:
+        if self.cleaned_data.get("is_free"):  # type: ignore[attr-defined]
+            offering.price_cents = 0
+            offering.member_discount_pct = 0
+
+
+class ClassOfferingForm(_FreeClassMixin, forms.ModelForm):
     class Meta:
         model = ClassOffering
         fields = [
@@ -51,8 +99,25 @@ class ClassOfferingForm(forms.ModelForm):
             "requires_model_release",
         ]
 
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.add_is_free_field()
 
-class InstructorClassOfferingForm(forms.ModelForm):
+    def clean(self) -> dict:
+        data = super().clean()
+        self.clean_is_free_pricing()
+        return data
+
+    def save(self, commit: bool = True) -> ClassOffering:
+        offering = super().save(commit=False)
+        self.apply_is_free_to_instance(offering)
+        if commit:
+            offering.save()
+            self.save_m2m()
+        return offering
+
+
+class InstructorClassOfferingForm(_FreeClassMixin, forms.ModelForm):
     """Class form for instructors — no `instructor`, no `is_private`, slug auto-generated."""
 
     class Meta:
@@ -80,9 +145,16 @@ class InstructorClassOfferingForm(forms.ModelForm):
     def __init__(self, *args, instructor: Instructor | None = None, **kwargs) -> None:
         self.instructor = instructor
         super().__init__(*args, **kwargs)
+        self.add_is_free_field()
+
+    def clean(self) -> dict:
+        data = super().clean()
+        self.clean_is_free_pricing()
+        return data
 
     def save(self, commit: bool = True) -> ClassOffering:
         offering = super().save(commit=False)
+        self.apply_is_free_to_instance(offering)
         if self.instructor is not None and not offering.instructor_id:
             offering.instructor = self.instructor
             if not offering.created_by_id:

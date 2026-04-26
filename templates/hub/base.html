@@ -38,7 +38,7 @@
     </script>
     {% block extra_head %}{% endblock %}
 </head>
-<body class="{% block body_class %}{% endblock %}" hx-boost="true" x-data="{ sidebarOpen: window.innerWidth > 768 ? ((localStorage.getItem('hubSidebarOpen') !== null) ? (localStorage.getItem('hubSidebarOpen') === '1') : true) : false }" x-init="$watch('sidebarOpen', v => { if (window.innerWidth > 768) localStorage.setItem('hubSidebarOpen', v ? '1' : '0') })">
+<body class="{% block body_class %}{% endblock %}" hx-boost="true" hx-ext="head-support" x-data="{ sidebarOpen: window.innerWidth > 768 ? ((localStorage.getItem('hubSidebarOpen') !== null) ? (localStorage.getItem('hubSidebarOpen') === '1') : true) : false }" x-init="$watch('sidebarOpen', v => { if (window.innerWidth > 768) localStorage.setItem('hubSidebarOpen', v ? '1' : '0') })">
 {% block extra_body %}{% endblock %}
     {% if user.is_authenticated and not request.GET.public %}
     <div class="hub-sidebar-backdrop" :class="{ 'hub-sidebar-backdrop--visible': sidebarOpen }" @click="sidebarOpen = false"></div>
@@ -383,6 +383,9 @@
     {% include "components/toast.html" %}
     {% include "includes/changelog_modal.html" %}
     <script src="{% static 'js/htmx.min.js' %}"></script>
+    {# head-support: makes hx-boost merge <head> contents (per-page styles, link tags) — without it,
+       page-specific <link>/<style> in extra_head silently disappear on boosted navigations. #}
+    <script src="{% static 'js/htmx-ext-head-support.js' %}"></script>
     <script>
         document.body.addEventListener('htmx:configRequest', function(event) {
             event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
