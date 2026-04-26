@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 from functools import wraps
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
 from django.db.models import Count, Min, Q
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+
+if TYPE_CHECKING:
+    from membership.models import Member
 
 from classes.emails import send_registration_confirmation
 from classes.forms import (
@@ -159,7 +163,7 @@ def _client_ip(request: HttpRequest) -> str:
     return request.META.get("REMOTE_ADDR", "")
 
 
-def _member_for_email(email: str):
+def _member_for_email(email: str) -> "Member | None":
     """Verified Member matching this email, or None."""
     from membership.models import Member
 
@@ -173,7 +177,7 @@ def _member_for_email(email: str):
     )
 
 
-def _registration_initial_for_user(user) -> dict[str, str]:
+def _registration_initial_for_user(user: "AbstractBaseUser | AnonymousUser | None") -> dict[str, str]:
     """Pre-fill values pulled from the logged-in user's Member record."""
     if not user or not user.is_authenticated:
         return {}
