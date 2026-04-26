@@ -1,0 +1,26 @@
+{% extends "classes/base_public.html" %}
+
+{% block title %}Registration cancelled — {{ offering.title }}{% endblock %}
+
+{% block portal_content %}
+<div class="view">
+  <div class="cp-container">
+    <div class="detail-card">
+      <div class="detail-head">
+        <div>
+          <div class="dc-cat">Cancelled</div>
+          <div class="dc-title">Registration not completed</div>
+          <div class="dc-inst">{{ offering.title }}</div>
+        </div>
+        <a class="back-link" href="{% url 'classes:public_class_detail' slug=offering.slug %}">&larr; Class details</a>
+      </div>
+      <div class="detail-body">
+        <p style="color:var(--cream);font-size:14px;line-height:1.7">
+          You backed out of payment, so your spot wasn't reserved. No charge was made.
+        </p>
+        <a class="btn-reg" href="{% url 'classes:register' slug=offering.slug %}" style="margin-top:14px">Try again</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

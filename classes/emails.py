@@ -7,9 +7,44 @@ from typing import TYPE_CHECKING
 from django.conf import settings
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
+from django.urls import reverse
+from django.utils import timezone
 
 if TYPE_CHECKING:
     from classes.models import ClassSession, Registration
+
+
+def send_registration_confirmation(registration: "Registration") -> None:
+    """Email a registrant their confirmation + self-serve link.
+
+    Sent on payment success (paid classes) or immediately on submit
+    (free classes). Idempotent at the call site — the webhook handler
+    skips already-confirmed registrations before calling this.
+    """
+    from classes.models import ClassSettings
+
+    settings_obj = ClassSettings.load()
+    offering = registration.class_offering
+    upcoming_sessions = list(offering.sessions.filter(starts_at__gte=timezone.now()).order_by("starts_at"))
+    self_serve_url = reverse("classes:my_registration", kwargs={"token": registration.self_serve_token})
+    context = {
+        "registration": registration,
+        "offering": offering,
+        "upcoming_sessions": upcoming_sessions,
+        "self_serve_url": self_serve_url,
+        "amount_paid_cents": registration.amount_paid_cents,
+        "amount_paid_dollars": f"{registration.amount_paid_cents / 100:.2f}",
+        "footer": settings_obj.confirmation_email_footer,
+    }
+    body = render_to_string("classes/emails/confirmation.txt", context)
+    subject = f"You're confirmed for {offering.title}"
+    send_mail(
+        subject=subject,
+        message=body,
+        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+        recipient_list=[registration.email],
+        fail_silently=False,
+    )
 
 
 def send_reminder_email(registration: "Registration", session: "ClassSession") -> None:

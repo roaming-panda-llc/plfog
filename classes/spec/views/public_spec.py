@@ -72,7 +72,21 @@ def describe_public_list():
         response = client.get(reverse("classes:public_list"))
         assert b"Private Lesson" not in response.content
 
-    def it_hides_published_classes_with_no_upcoming_sessions(db, client):
+    def it_shows_published_classes_with_no_upcoming_sessions(db, client):
+        category = CategoryFactory()
+        instructor = InstructorFactory()
+        ClassOfferingFactory(
+            title="Brand New Class",
+            slug="brand-new-class",
+            category=category,
+            instructor=instructor,
+            status=ClassOffering.Status.PUBLISHED,
+        )
+        response = client.get(reverse("classes:public_list"))
+        assert b"Brand New Class" in response.content
+        assert b"Upcoming dates TBA" in response.content
+
+    def it_shows_published_classes_whose_only_sessions_are_past(db, client):
         category = CategoryFactory()
         instructor = InstructorFactory()
         stale = ClassOfferingFactory(
@@ -89,7 +103,7 @@ def describe_public_list():
             ends_at=past_start + timedelta(hours=2),
         )
         response = client.get(reverse("classes:public_list"))
-        assert b"Past Class" not in response.content
+        assert b"Past Class" in response.content
 
     def it_includes_flexible_classes_even_without_sessions(db, client):
         category = CategoryFactory()

@@ -9,6 +9,9 @@ urlpatterns = [
     path("", views.public_list, name="public_list"),
     path("category/<slug:slug>/", views.public_category, name="public_category"),
     path("instructors/<slug:slug>/", views.public_instructor, name="public_instructor"),
+    # Self-serve registration management (token-based, no auth)
+    path("my/<str:token>/", views.my_registration, name="my_registration"),
+    path("my/<str:token>/cancel/", views.my_registration_cancel, name="my_registration_cancel"),
     # Instructor dashboard
     path("instructor/", views.instructor_dashboard, name="instructor_dashboard"),
     path("instructor/classes/new/", views.instructor_class_create, name="instructor_class_create"),
@@ -53,6 +56,10 @@ urlpatterns = [
     path("admin/discount-codes/<int:pk>/edit/", views.admin_discount_code_edit, name="admin_discount_code_edit"),
     path("admin/discount-codes/<int:pk>/delete/", views.admin_discount_code_delete, name="admin_discount_code_delete"),
     path("admin/settings/", views.admin_settings, name="admin_settings"),
-    # Public class detail — keep last so admin/, category/, instructors/ win.
+    # Public registration — must come before the bare slug catch-all below.
+    path("<slug:slug>/register/", views.register, name="register"),
+    path("<slug:slug>/register/success/", views.register_success, name="register_success"),
+    path("<slug:slug>/register/cancelled/", views.register_cancelled, name="register_cancelled"),
+    # Public class detail — keep last so admin/, category/, instructors/, my/ win.
     path("<slug:slug>/", views.public_class_detail, name="public_class_detail"),
 ]

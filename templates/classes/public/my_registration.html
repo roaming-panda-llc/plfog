@@ -1,0 +1,70 @@
+{% extends "classes/base_public.html" %}
+{% load classes_tags %}
+
+{% block title %}Your registration — {{ offering.title }}{% endblock %}
+
+{% block portal_content %}
+<div class="view">
+  <div class="cp-container">
+    <div class="detail-card">
+      <div class="detail-head">
+        <div>
+          <div class="dc-cat">{{ registration.get_status_display }}</div>
+          <div class="dc-title">{{ offering.title }}</div>
+          <div class="dc-inst">with {{ offering.instructor.display_name }}</div>
+        </div>
+        <a class="back-link" href="{% url 'classes:public_class_detail' slug=offering.slug %}">Class page →</a>
+      </div>
+      <div class="detail-body">
+        {% if messages %}
+          {% for msg in messages %}
+            <div style="padding:10px 12px;margin-bottom:10px;background:rgba(45,212,160,.08);border:1px solid rgba(45,212,160,.25);border-radius:6px;color:var(--green);font-size:12px">{{ msg }}</div>
+          {% endfor %}
+        {% endif %}
+
+        <div class="dc-igrid">
+          <div class="dc-icard">
+            <div class="dc-lbl">Registrant</div>
+            <div class="dc-txt">{{ registration.first_name }} {{ registration.last_name }}<br>{{ registration.email }}{% if registration.phone %}<br>{{ registration.phone }}{% endif %}</div>
+          </div>
+          <div class="dc-icard">
+            <div class="dc-lbl">Status</div>
+            <div class="dc-txt">{{ registration.get_status_display }}{% if registration.amount_paid_cents %} · paid {{ registration.amount_paid_cents|cents_as_price }}{% endif %}</div>
+          </div>
+        </div>
+
+        {% if upcoming_sessions %}
+          <div class="dc-sec">
+            <div class="dc-lbl">Schedule</div>
+            {% for session in upcoming_sessions %}
+              <div class="dc-srow">
+                {% if upcoming_sessions|length > 1 %}<span class="dc-snum">{{ forloop.counter }}</span>{% endif %}
+                <span class="dc-sdate">{{ session.starts_at|date:"l, F j, Y" }}</span>
+                <span class="dc-stime">{{ session.starts_at|time:"g:i A" }} – {{ session.ends_at|time:"g:i A" }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="dc-sec">
+            <div class="dc-lbl">Schedule</div>
+            <div class="dc-txt" style="color:var(--text3)">TBA — {{ offering.instructor.display_name }} will be in touch.</div>
+          </div>
+        {% endif %}
+
+        <div class="dc-sec">
+          <div class="dc-lbl">Location</div>
+          <div class="dc-txt">Past Lives Makerspace · 2808 SE 9th Ave, Portland, OR 97202</div>
+        </div>
+
+        {% if can_self_cancel %}
+          <form method="post" action="{% url 'classes:my_registration_cancel' token=registration.self_serve_token %}" style="margin-top:18px" onsubmit="return confirm('Cancel your registration? You can re-register if spots are still available.')">
+            {% csrf_token %}
+            <button type="submit" class="hub-btn hub-btn--sm hub-btn--danger">Cancel my registration</button>
+            <div style="font-size:11px;color:var(--text3);margin-top:6px">Refunds for paid registrations are handled by an admin — email info@pastlives.space.</div>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
