@@ -383,8 +383,10 @@
     {% include "components/toast.html" %}
     {% include "includes/changelog_modal.html" %}
     <script src="{% static 'js/htmx.min.js' %}"></script>
-    {# head-support: makes hx-boost merge <head> contents (per-page styles, link tags) — without it,
-       page-specific <link>/<style> in extra_head silently disappear on boosted navigations. #}
+    {% comment %}
+        head-support: makes hx-boost merge <head> contents (per-page styles, link tags) — without it,
+        page-specific <link>/<style> in extra_head silently disappear on boosted navigations.
+    {% endcomment %}
     <script src="{% static 'js/htmx-ext-head-support.js' %}"></script>
     <script>
         document.body.addEventListener('htmx:configRequest', function(event) {
