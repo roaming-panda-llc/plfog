@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
-VERSION = "1.7.6"
+VERSION = "1.7.7"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.7.7",
+        "date": "2026-04-27",
+        "title": "Hotfix: site layout broken for everyone",
+        "changes": [
+            "Fixed a bug introduced in the last release where the entire site rendered at half-width with a stray line of text near the top — the page was unusable. Everything looks correct again.",
+        ],
+    },
     {
         "version": "1.7.6",
         "date": "2026-04-26",
