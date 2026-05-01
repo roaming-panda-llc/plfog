@@ -48,7 +48,9 @@ class GuildEditForm(forms.ModelForm):
 
 
 class ProfileSettingsForm(forms.ModelForm):
-    """Form for editing member profile fields."""
+    """Form for editing member profile fields plus per-field directory visibility."""
+
+    VISIBILITY_PREFIX = "show_"
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -60,10 +62,22 @@ class ProfileSettingsForm(forms.ModelForm):
             field.initial = True
             field.help_text = "Your role (admin, officer, guild lead, or instructor) requires a public profile."
 
+        current = self.instance.directory_visibility if self.instance and self.instance.pk else {}
+        for field_name in Member.DIRECTORY_TOGGLEABLE_FIELDS:
+            self.fields[f"{self.VISIBILITY_PREFIX}{field_name}"] = forms.BooleanField(
+                required=False,
+                initial=bool(current.get(field_name, True)),
+                label=f"Show {field_name.replace('_', ' ')} on my directory card",
+            )
+
     def save(self, commit: bool = True) -> Member:
         member = super().save(commit=False)
         if member.must_be_listed_in_directory:
             member.show_in_directory = True
+        member.directory_visibility = {
+            field_name: bool(self.cleaned_data.get(f"{self.VISIBILITY_PREFIX}{field_name}", True))
+            for field_name in Member.DIRECTORY_TOGGLEABLE_FIELDS
+        }
         if commit:
             member.save()
         return member

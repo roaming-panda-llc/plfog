@@ -49,7 +49,52 @@ def describe_profile_settings_form():
             "about_me",
             "profile_photo",
             "show_in_directory",
+            "show_pronouns",
+            "show_phone",
+            "show_email",
+            "show_discord_handle",
+            "show_other_contact_info",
+            "show_about_me",
+            "show_profile_photo",
         ]
+
+    def it_writes_visibility_flags_into_directory_visibility_json():
+        member = MemberFactory(full_legal_name="Visibility User")
+        form = ProfileSettingsForm(
+            {
+                "preferred_name": "VU",
+                "show_phone": "on",
+                "show_email": "on",
+                # pronouns, discord_handle, other_contact_info, about_me, profile_photo intentionally unchecked
+            },
+            instance=member,
+        )
+        assert form.is_valid(), form.errors
+        saved = form.save()
+        assert saved.directory_visibility == {
+            "pronouns": False,
+            "phone": True,
+            "email": True,
+            "discord_handle": False,
+            "other_contact_info": False,
+            "about_me": False,
+            "profile_photo": False,
+        }
+        assert saved.is_public("phone") is True
+        assert saved.is_public("about_me") is False
+        # Missing key still defaults to public:
+        assert saved.is_public("nonexistent") is True
+
+    def it_initializes_visibility_flags_from_member_state():
+        member = MemberFactory(
+            full_legal_name="Init User",
+            directory_visibility={"phone": False, "email": True},
+        )
+        form = ProfileSettingsForm(instance=member)
+        assert form.fields["show_phone"].initial is False
+        assert form.fields["show_email"].initial is True
+        # Unset key defaults to True (public):
+        assert form.fields["show_pronouns"].initial is True
 
 
 def describe_email_preferences_form():

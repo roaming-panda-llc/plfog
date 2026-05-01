@@ -1,4 +1,5 @@
 {% extends "hub/base.html" %}
+{% load hub_tags %}
 {% block title %}Member Directory{% endblock %}
 
 {% block content %}
@@ -35,7 +36,7 @@
             <a href="{% url 'hub_admin_member_edit' member.pk %}" class="hub-btn hub-btn--sm hub-btn--ghost" hx-boost="false" style="font-size:0.75rem;padding:0.2rem 0.6rem;">Edit</a>
         </div>
         {% endif %}
-        {% if member.profile_photo %}
+        {% if member.profile_photo and member|is_public:"profile_photo" %}
         <div class="directory-card__name" style="margin-bottom:0.75rem;">{{ member.display_name }}</div>
         <div style="display:flex;justify-content:center;margin-bottom:0.75rem;">
             <img class="directory-card__avatar directory-card__avatar--photo"
@@ -49,7 +50,7 @@
             {% endif %}
             <div class="directory-card__meta" style="justify-content:center;">
                 <span class="directory-card__role">{{ member.get_member_type_display }}</span>
-                {% if member.pronouns and member.pronouns != "prefer not to share" %}
+                {% if member.pronouns and member.pronouns != "prefer not to share" and member|is_public:"pronouns" %}
                 <span class="directory-card__pronouns">{{ member.pronouns }}</span>
                 {% endif %}
                 {% if member.join_date %}
@@ -67,7 +68,7 @@
                 {% endif %}
                 <div class="directory-card__meta">
                     <span class="directory-card__role">{{ member.get_member_type_display }}</span>
-                    {% if member.pronouns and member.pronouns != "prefer not to share" %}
+                    {% if member.pronouns and member.pronouns != "prefer not to share" and member|is_public:"pronouns" %}
                     <span class="directory-card__pronouns">{{ member.pronouns }}</span>
                     {% endif %}
                     {% if member.join_date %}
@@ -77,30 +78,31 @@
             </div>
         </div>
         {% endif %}
-        {% if member.about_me %}
+        {% if member.about_me and member|is_public:"about_me" %}
         <p class="directory-card__about">{{ member.about_me }}</p>
         {% endif %}
-        {% if member.primary_email or member.phone or member.discord_handle or member.other_contact_info %}
+        {% with email_visible=member|is_public:"email" phone_visible=member|is_public:"phone" discord_visible=member|is_public:"discord_handle" other_visible=member|is_public:"other_contact_info" %}
+        {% if email_visible and member.primary_email or phone_visible and member.phone or discord_visible and member.discord_handle or other_visible and member.other_contact_info %}
         <div class="directory-card__contact">
-            {% if member.primary_email %}
+            {% if member.primary_email and email_visible %}
             <div class="directory-card__contact-row">
                 <span class="directory-card__contact-label">Email</span>
                 <a href="mailto:{{ member.primary_email }}">{{ member.primary_email }}</a>
             </div>
             {% endif %}
-            {% if member.phone %}
+            {% if member.phone and phone_visible %}
             <div class="directory-card__contact-row">
                 <span class="directory-card__contact-label">Phone</span>
                 <span>{{ member.phone }}</span>
             </div>
             {% endif %}
-            {% if member.discord_handle %}
+            {% if member.discord_handle and discord_visible %}
             <div class="directory-card__contact-row">
                 <span class="directory-card__contact-label">Discord</span>
                 <span>{{ member.discord_handle }}</span>
             </div>
             {% endif %}
-            {% if member.other_contact_info %}
+            {% if member.other_contact_info and other_visible %}
             <div class="directory-card__contact-row">
                 <span class="directory-card__contact-label">Other</span>
                 <span>{{ member.other_contact_info }}</span>
@@ -108,6 +110,7 @@
             {% endif %}
         </div>
         {% endif %}
+        {% endwith %}
 
     </div>
     {% endfor %}

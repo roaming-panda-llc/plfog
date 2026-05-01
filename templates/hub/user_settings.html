@@ -22,37 +22,231 @@
 
     {# -------- Profile tab -------- #}
     <div x-show="tab === 'profile'" x-cloak>
-        <div class="hub-card">
-            {% if member %}
-            <form method="post" enctype="multipart/form-data" class="hub-form">
-                {% csrf_token %}
-                <input type="hidden" name="form_id" value="profile">
-                <div class="hub-form-group">
-                    <label for="email">Email</label>
-                    <input type="email" id="email" value="{{ user.email }}" disabled>
-                    <span class="hub-field-hint">Manage your emails in the Emails tab.</span>
+        {% if member %}
+        <form method="post" enctype="multipart/form-data" class="hub-form pl-profile-edit"
+              x-data="{
+                listed: {% if profile_form.show_in_directory.value %}true{% else %}false{% endif %},
+                vis: {
+                  pronouns: {% if profile_form.show_pronouns.value %}true{% else %}false{% endif %},
+                  phone: {% if profile_form.show_phone.value %}true{% else %}false{% endif %},
+                  email: {% if profile_form.show_email.value %}true{% else %}false{% endif %},
+                  discord_handle: {% if profile_form.show_discord_handle.value %}true{% else %}false{% endif %},
+                  other_contact_info: {% if profile_form.show_other_contact_info.value %}true{% else %}false{% endif %},
+                  about_me: {% if profile_form.show_about_me.value %}true{% else %}false{% endif %},
+                  profile_photo: {% if profile_form.show_profile_photo.value %}true{% else %}false{% endif %},
+                },
+                fields: {
+                  preferred_name: '{{ profile_form.preferred_name.value|default_if_none:""|escapejs }}',
+                  pronouns: '{{ profile_form.pronouns.value|default_if_none:""|escapejs }}',
+                  phone: '{{ profile_form.phone.value|default_if_none:""|escapejs }}',
+                  email: '{{ user.email|escapejs }}',
+                  discord_handle: '{{ profile_form.discord_handle.value|default_if_none:""|escapejs }}',
+                  other_contact_info: '{{ profile_form.other_contact_info.value|default_if_none:""|escapejs }}',
+                  about_me: '{{ profile_form.about_me.value|default_if_none:""|escapejs }}',
+                },
+                photoUrl: '{% if member.profile_photo %}{{ member.profile_photo.url }}{% endif %}',
+                forceListed: {% if member.must_be_listed_in_directory %}true{% else %}false{% endif %},
+                isVisible(key) { return this.listed && this.vis[key]; },
+              }">
+            {% csrf_token %}
+            <input type="hidden" name="form_id" value="profile">
+
+            {# ── Master directory toggle ── #}
+            <div class="pl-profile-master">
+                <div class="pl-profile-master__copy">
+                    <h2 class="pl-profile-master__title">Member Directory</h2>
+                    <p class="pl-profile-master__sub">
+                        Decide what other members see when they look you up. Anything off stays private to staff.
+                    </p>
                 </div>
-                {% url 'hub_profile_photo_delete' as profile_photo_delete_url %}
-                {% for field in profile_form %}
-                    {% if field.name == "profile_photo" %}
-                        {% include "components/image_field.html" with field=field current_image=member.profile_photo delete_url=profile_photo_delete_url modal_id="delete-profile-photo" label="Profile photo" shape="circle" thumbnail_width="96px" delete_button_text="Delete photo" confirm_title="Delete profile photo?" confirm_message="Your profile photo will be removed from the member directory and from our storage. This can't be undone." hint_html="Optional. Shown next to your name in the member directory and in the navbar. Max 5 MB." %}
-                    {% else %}
-                        {% include "components/form_field.html" with field=field %}
-                    {% endif %}
-                {% endfor %}
-                {% if profile_form.non_field_errors %}
-                <ul class="hub-field-errors">
-                    {% for error in profile_form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
-                </ul>
+                <div class="pl-profile-master__seg"
+                     :class="{ 'pl-profile-master__seg--locked': forceListed }"
+                     role="radiogroup"
+                     aria-label="Member directory listing">
+                    <input type="checkbox"
+                           id="{{ profile_form.show_in_directory.id_for_label }}"
+                           name="{{ profile_form.show_in_directory.html_name }}"
+                           x-model="listed"
+                           :disabled="forceListed"
+                           class="pl-profile-master__seg-input">
+                    <button type="button"
+                            class="pl-profile-master__seg-btn"
+                            :class="{ 'pl-profile-master__seg-btn--active': !listed }"
+                            :disabled="forceListed"
+                            @click="if (!forceListed) listed = false"
+                            role="radio"
+                            :aria-checked="!listed">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                        Hidden
+                    </button>
+                    <button type="button"
+                            class="pl-profile-master__seg-btn"
+                            :class="{ 'pl-profile-master__seg-btn--active': listed }"
+                            @click="listed = true"
+                            role="radio"
+                            :aria-checked="listed">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        Listed
+                    </button>
+                </div>
+                {% if member.must_be_listed_in_directory %}
+                <p class="pl-profile-master__locked-note">
+                    Your role (admin, officer, guild lead, or instructor) requires a public profile. The toggle below is locked on, but you still control which fields appear on your card.
+                </p>
                 {% endif %}
-                <div style="margin-top: 1.5rem;">
-                    <button type="submit" class="hub-btn hub-btn--primary">Save Profile</button>
+            </div>
+
+            <div class="pl-profile-grid">
+                {# ── Left: edit fields ── #}
+                <div class="pl-profile-edit__col">
+                    {# Email (read-only) #}
+                    <div class="pl-profile-row">
+                        <div class="pl-profile-row__head">
+                            <label for="email" class="pl-profile-row__label">Email</label>
+                            <button type="button"
+                                    class="pl-vis-toggle"
+                                    :class="{ 'pl-vis-toggle--on': vis.email, 'pl-vis-toggle--off': !vis.email, 'pl-vis-toggle--disabled': !listed }"
+                                    :disabled="!listed"
+                                    @click="vis.email = !vis.email"
+                                    :title="vis.email ? 'Visible on your directory card — click to hide' : 'Hidden from your directory card — click to show'">
+                                <svg x-show="vis.email" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                <svg x-show="!vis.email" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                <span x-text="vis.email ? 'Public' : 'Hidden'"></span>
+                            </button>
+                            <input type="hidden" name="show_email" :value="vis.email ? 'on' : ''">
+                        </div>
+                        <input type="email" id="email" value="{{ user.email }}" disabled>
+                        <span class="hub-field-hint">Manage your emails in the Emails tab.</span>
+                    </div>
+
+                    {# Profile photo #}
+                    {% url 'hub_profile_photo_delete' as profile_photo_delete_url %}
+                    <div class="pl-profile-row">
+                        <div class="pl-profile-row__head">
+                            <span class="pl-profile-row__label">Profile photo</span>
+                            <button type="button"
+                                    class="pl-vis-toggle"
+                                    :class="{ 'pl-vis-toggle--on': vis.profile_photo, 'pl-vis-toggle--off': !vis.profile_photo, 'pl-vis-toggle--disabled': !listed }"
+                                    :disabled="!listed"
+                                    @click="vis.profile_photo = !vis.profile_photo">
+                                <svg x-show="vis.profile_photo" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                <svg x-show="!vis.profile_photo" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                <span x-text="vis.profile_photo ? 'Public' : 'Hidden'"></span>
+                            </button>
+                            <input type="hidden" name="show_profile_photo" :value="vis.profile_photo ? 'on' : ''">
+                        </div>
+                        {% include "components/image_field.html" with field=profile_form.profile_photo current_image=member.profile_photo delete_url=profile_photo_delete_url modal_id="delete-profile-photo" label="" shape="circle" thumbnail_width="96px" delete_button_text="Delete photo" confirm_title="Delete profile photo?" confirm_message="Your profile photo will be removed from the member directory and from our storage. This can't be undone." hint_html="Optional. Shown next to your name in the member directory and in the navbar. Max 5 MB." %}
+                    </div>
+
+                    {# Plain (no visibility) — preferred name #}
+                    <div class="pl-profile-row">
+                        <div class="pl-profile-row__head">
+                            <label for="{{ profile_form.preferred_name.id_for_label }}" class="pl-profile-row__label">Preferred name</label>
+                            <span class="pl-vis-static" title="Always shown on your card when you're listed">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                Always shown
+                            </span>
+                        </div>
+                        <div @input="fields.preferred_name = $event.target.value">
+                            {{ profile_form.preferred_name }}
+                        </div>
+                        {% for error in profile_form.preferred_name.errors %}<span class="hub-field-error">{{ error }}</span>{% endfor %}
+                    </div>
+
+                    {# Privacy-toggleable fields #}
+                    {% include "hub/partials/_profile_field_with_visibility.html" with field=profile_form.pronouns key="pronouns" label="Pronouns" %}
+                    {% include "hub/partials/_profile_field_with_visibility.html" with field=profile_form.phone key="phone" label="Phone" %}
+                    {% include "hub/partials/_profile_field_with_visibility.html" with field=profile_form.discord_handle key="discord_handle" label="Discord" %}
+                    {% include "hub/partials/_profile_field_with_visibility.html" with field=profile_form.other_contact_info key="other_contact_info" label="Other contact info" %}
+                    {% include "hub/partials/_profile_field_with_visibility.html" with field=profile_form.about_me key="about_me" label="About me" %}
+
+                    {% if profile_form.non_field_errors %}
+                    <ul class="hub-field-errors">
+                        {% for error in profile_form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+                    </ul>
+                    {% endif %}
+
+                    {# ── Reassurance: never shown ── #}
+                    <div class="pl-profile-never">
+                        <h3 class="pl-profile-never__title">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            Never shown to other members
+                        </h3>
+                        <ul class="pl-profile-never__list">
+                            <li>Full legal name</li>
+                            <li>Billing name &amp; payment info</li>
+                            <li>Emergency contact details</li>
+                            <li>Account status, role, internal notes</li>
+                        </ul>
+                    </div>
                 </div>
-            </form>
-            {% else %}
+
+                {# ── Right: live preview ── #}
+                <aside class="pl-profile-preview">
+                    <div class="pl-profile-preview__sticky">
+                        <p class="pl-profile-preview__heading">What other members see</p>
+                        <div class="pl-profile-preview__card" :class="{ 'pl-profile-preview__card--hidden': !listed }">
+                            <template x-if="!listed">
+                                <div class="pl-profile-preview__hidden">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                    <p>You won't appear in the member directory.</p>
+                                    <p class="pl-profile-preview__hidden-sub">Flip the switch above to share a card.</p>
+                                </div>
+                            </template>
+                            <template x-if="listed">
+                                <div>
+                                    <div class="pl-profile-preview__avatar-wrap">
+                                        <template x-if="isVisible('profile_photo') && photoUrl">
+                                            <img :src="photoUrl" class="pl-profile-preview__avatar pl-profile-preview__avatar--photo" alt="">
+                                        </template>
+                                        <template x-if="!(isVisible('profile_photo') && photoUrl)">
+                                            <div class="pl-profile-preview__avatar">{{ member.initials }}</div>
+                                        </template>
+                                    </div>
+                                    <div class="pl-profile-preview__name" x-text="fields.preferred_name || '{{ member.full_legal_name|escapejs }}'"></div>
+                                    <div class="pl-profile-preview__meta">
+                                        <span class="pl-profile-preview__pill">{{ member.get_member_type_display }}</span>
+                                        <template x-if="isVisible('pronouns') && fields.pronouns && fields.pronouns !== 'prefer not to share'">
+                                            <span class="pl-profile-preview__pill pl-profile-preview__pill--soft" x-text="fields.pronouns"></span>
+                                        </template>
+                                        {% if member.join_date %}
+                                        <span class="pl-profile-preview__pill pl-profile-preview__pill--soft">Joined {{ member.join_date|date:"N Y" }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <template x-if="isVisible('about_me') && fields.about_me">
+                                        <p class="pl-profile-preview__about" x-text="fields.about_me"></p>
+                                    </template>
+                                    <div class="pl-profile-preview__contact">
+                                        <template x-if="isVisible('email') && fields.email">
+                                            <div class="pl-profile-preview__contact-row"><span>Email</span><span x-text="fields.email"></span></div>
+                                        </template>
+                                        <template x-if="isVisible('phone') && fields.phone">
+                                            <div class="pl-profile-preview__contact-row"><span>Phone</span><span x-text="fields.phone"></span></div>
+                                        </template>
+                                        <template x-if="isVisible('discord_handle') && fields.discord_handle">
+                                            <div class="pl-profile-preview__contact-row"><span>Discord</span><span x-text="fields.discord_handle"></span></div>
+                                        </template>
+                                        <template x-if="isVisible('other_contact_info') && fields.other_contact_info">
+                                            <div class="pl-profile-preview__contact-row"><span>Other</span><span x-text="fields.other_contact_info"></span></div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                        <p class="pl-profile-preview__caption">Updates as you type.</p>
+                    </div>
+                </aside>
+            </div>
+
+            <div class="pl-profile-actionbar">
+                <button type="submit" class="hub-btn hub-btn--primary">Save Profile</button>
+            </div>
+        </form>
+        {% else %}
+        <div class="hub-card">
             <p class="hub-text-muted">Your account is not linked to a membership profile. Contact an admin for help.</p>
-            {% endif %}
         </div>
+        {% endif %}
     </div>
 
     {# -------- Emails tab -------- #}

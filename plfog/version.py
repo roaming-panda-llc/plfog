@@ -2,9 +2,21 @@
 
 from __future__ import annotations
 
-VERSION = "1.7.5.2"
+VERSION = "1.8.0"
 
 CHANGELOG: list[dict[str, str | list[str]]] = [
+    {
+        "version": "1.8.0",
+        "date": "2026-05-01",
+        "title": "Calendar QOL + a redesigned Profile page that lets you control what's public",
+        "changes": [
+            "The Calendar's month view used to show the calendar month you're in, which meant by the end of April you were staring at a near-empty grid. It now shows a rolling 4-week window starting from the current week, so you always see this week plus the next three. The Prev/Next arrows step the window forward or back by 4 weeks at a time.",
+            "Event titles are now visible right on the calendar grid in both Week and Month views — no more guessing which colored dot is which event. Click any title and the page jumps to that event in the list below and gives it a quick highlight. If the event lives on a different page, the list auto-flips to that page first.",
+            "Today's column on the calendar grid now has a thin red line across the top, and any event that's happening right now gets a red outline plus a pulsing 'Live now' pill on its card.",
+            "Profile settings got a new design with per-field privacy controls. Next to each field — phone, email, Discord, pronouns, photo, about-me, etc. — there's a small Public/Hidden eye-icon toggle so you can decide exactly what other members see when they look you up. A live preview on the side shows your directory card update in real time as you flip toggles or type. A panel at the bottom lists everything that's never shown to other members (legal name, billing, emergency contact, internal notes) so there's no ambiguity.",
+            "On mobile, the Feedback button used to live at the bottom of the sidebar where it could get cut off and was hard to find. There's now a yellow Feedback bubble pinned to the bottom-right corner of every page on mobile so it's one tap away. The mobile sidebar also handles short screens better and respects the device's safe area.",
+        ],
+    },
     {
         "version": "1.7.5.2",
         "date": "2026-04-27",

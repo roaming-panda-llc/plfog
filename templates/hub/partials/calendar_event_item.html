@@ -1,8 +1,10 @@
 {% load hub_tags %}
 {% with src=event.source_key %}
-<div class="pl-calendar-list__item"
+<div class="pl-calendar-list__item{% if event.is_in_progress %} pl-calendar-list__item--live{% endif %}"
+     data-event-pk="{{ event.pk }}"
      x-show="isActive('{{ src }}')"
      style="--event-color: {{ source_colors|get_item:src|default:'#888888' }};">
+    {% if event.is_in_progress %}<span class="pl-calendar-list__live-pill"><span class="pl-calendar-list__live-dot"></span>Live now</span>{% endif %}
     <div class="pl-calendar-list__time">
         {% if event.all_day %}
         <span class="pl-calendar-list__time-day">{{ event.start_dt|date:"D, M j" }}</span>
