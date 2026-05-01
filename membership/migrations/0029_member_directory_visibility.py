@@ -4,15 +4,18 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('membership', '0028_guild_banner_image_member_profile_photo_and_more'),
+        ("membership", "0028_guild_banner_image_member_profile_photo_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='member',
-            name='directory_visibility',
-            field=models.JSONField(blank=True, default=dict, help_text='Per-field public/hidden flags for the member directory card. Keys: pronouns, phone, email, discord_handle, other_contact_info, about_me, profile_photo. Missing key means public (default-on).'),
+            model_name="member",
+            name="directory_visibility",
+            field=models.JSONField(
+                blank=True,
+                default=dict,
+                help_text="Per-field public/hidden flags for the member directory card. Keys: pronouns, phone, email, discord_handle, other_contact_info, about_me, profile_photo. Missing key means public (default-on).",
+            ),
         ),
     ]
