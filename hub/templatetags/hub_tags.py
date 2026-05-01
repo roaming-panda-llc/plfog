@@ -47,6 +47,17 @@ def get_item(dictionary: dict, key: str) -> Any:
     return dictionary.get(str(key))
 
 
+@register.filter
+def is_public(member: Any, field_name: str) -> bool:
+    """Return whether a member has marked the given directory field as public.
+
+    Usage: ``{% if member|is_public:"phone" %}…{% endif %}``
+    """
+    if member is None:
+        return False
+    return bool(member.is_public(field_name))
+
+
 @register.simple_tag(takes_context=True)
 def has_active_guild(context: dict[str, Any], guilds: QuerySet[Guild]) -> bool:
     """Return True if the current page is a guild detail page."""

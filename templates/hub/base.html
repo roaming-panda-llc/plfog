@@ -271,6 +271,16 @@
             </a>
         </div>
     </aside>
+
+    {# Mobile-only floating feedback bubble — always reachable without opening the sidebar. #}
+    <a href="{% url 'hub_beta_feedback' %}"
+       class="hub-feedback-fab {% active_nav 'hub_beta_feedback' %}"
+       hx-boost="false"
+       aria-label="Send feedback">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+    </a>
     {% endif %}
 
     <div class="hub-main-wrapper {% if not user.is_authenticated or request.GET.public %}hub-main-wrapper--public hub-main-wrapper--expanded{% endif %}" {% if user.is_authenticated and not request.GET.public %}:class="{ 'hub-main-wrapper--expanded': !sidebarOpen }"{% endif %}>

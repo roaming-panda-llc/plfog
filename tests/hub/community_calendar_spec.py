@@ -432,12 +432,14 @@ def describe_calendar_events_partial_view():
         _logged_in_user(client, username="caluser_page")
         guild = GuildFactory(name="Pagination Guild", calendar_url="https://example.com/pag.ics")
         now = timezone.now()
-        # Place 15 events in the first 15 days of next month to avoid end-of-month spillover
-        next_month_first = (now.replace(day=1) + timedelta(days=32)).replace(
-            day=1, hour=10, minute=0, second=0, microsecond=0
-        )
+        today = now.date()
+        # month_offset=1 window starts 4 weeks from the current week's Monday.
+        current_week_start = today - timedelta(days=today.weekday())
+        next_window_start = current_week_start + timedelta(weeks=4)
         for i in range(15):
-            event_dt = next_month_first + timedelta(days=i)
+            event_dt = now.replace(hour=10, minute=0, second=0, microsecond=0).replace(
+                year=next_window_start.year, month=next_window_start.month, day=next_window_start.day
+            ) + timedelta(days=i)
             CalendarEvent.objects.create(
                 guild=guild,
                 uid=f"page-event-{i}",
@@ -455,11 +457,13 @@ def describe_calendar_events_partial_view():
         _logged_in_user(client, username="caluser_page2")
         guild = GuildFactory(name="Page2 Guild", calendar_url="https://example.com/pag2.ics")
         now = timezone.now()
-        next_month_first = (now.replace(day=1) + timedelta(days=32)).replace(
-            day=1, hour=10, minute=0, second=0, microsecond=0
-        )
+        today = now.date()
+        current_week_start = today - timedelta(days=today.weekday())
+        next_window_start = current_week_start + timedelta(weeks=4)
         for i in range(15):
-            event_dt = next_month_first + timedelta(days=i)
+            event_dt = now.replace(hour=10, minute=0, second=0, microsecond=0).replace(
+                year=next_window_start.year, month=next_window_start.month, day=next_window_start.day
+            ) + timedelta(days=i)
             CalendarEvent.objects.create(
                 guild=guild,
                 uid=f"p2-event-{i}",

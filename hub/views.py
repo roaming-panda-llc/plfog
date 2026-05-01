@@ -774,22 +774,20 @@ def _get_calendar_context(
 ) -> dict[str, Any]:
     """Build context for both the full calendar page and the HTMX partial.
 
+    The "month" view is a rolling 4-week window starting from the current week
+    (current week + 3 upcoming weeks). ``month_offset`` shifts that window in
+    4-week chunks, so members navigating forward see the next 4 weeks rather
+    than jumping to a calendar month boundary.
+
     Args:
         week_offset: Weeks relative to the current week (negative = past, positive = future).
-        month_offset: Months relative to the current month (negative = past, positive = future).
+        month_offset: 4-week chunks relative to the current window (negative = past, positive = future).
         event_page: 1-based page number for the event list (PAGE_SIZE events per page).
     """
-    import calendar as _cal
     from collections import defaultdict
-    from datetime import date as date_type
 
     from core.models import SiteConfiguration
     from membership.models import CalendarEvent, Guild
-
-    def _shift_month(d: date_type, months: int) -> date_type:
-        """Return the first day of the month shifted by `months`."""
-        m = d.month - 1 + months
-        return d.replace(year=d.year + m // 12, month=m % 12 + 1, day=1)
 
     now = dj_timezone.now()
     today = now.date()
@@ -799,14 +797,14 @@ def _get_calendar_context(
     week_start = current_week_start + timedelta(weeks=week_offset)
     week_end = week_start + timedelta(days=6)
 
-    # Navigated month
-    nav_month_first = _shift_month(today.replace(day=1), month_offset)
-    nav_month_last_day = _cal.monthrange(nav_month_first.year, nav_month_first.month)[1]
-    nav_month_last = nav_month_first.replace(day=nav_month_last_day)
+    # Rolling 4-week window: current week + 3 upcoming weeks (Mon–Sun rows).
+    # month_offset shifts the window by 4 weeks so navigation stays aligned to weeks.
+    window_start = current_week_start + timedelta(weeks=4 * month_offset)
+    window_end = window_start + timedelta(days=27)
 
-    # Fetch only events covering the navigated week and month ranges
-    fetch_from = min(week_start, nav_month_first)
-    fetch_to = max(week_end, nav_month_last)
+    # Fetch only events covering the navigated week and 4-week window
+    fetch_from = min(week_start, window_start)
+    fetch_to = max(week_end, window_end)
 
     all_events = list(
         CalendarEvent.objects.filter(start_dt__date__gte=fetch_from, start_dt__date__lte=fetch_to)
@@ -817,12 +815,18 @@ def _get_calendar_context(
     # Week event list: events whose start date falls within the navigated week
     week_events = [e for e in all_events if week_start <= e.start_dt.date() <= week_end]
 
-    # Month event list: events whose start date falls within the navigated month (paginated)
-    raw_month_events = [e for e in all_events if nav_month_first <= e.start_dt.date() <= nav_month_last]
+    # Month-view event list: events whose start date falls within the 4-week window (paginated)
+    raw_month_events = [e for e in all_events if window_start <= e.start_dt.date() <= window_end]
     total_pages = max(1, (len(raw_month_events) + _CALENDAR_PAGE_SIZE - 1) // _CALENDAR_PAGE_SIZE)
     event_page = max(1, min(event_page, total_pages))
     page_start = (event_page - 1) * _CALENDAR_PAGE_SIZE
     month_events = raw_month_events[page_start : page_start + _CALENDAR_PAGE_SIZE]
+
+    # Map every event in the 4-week window to its 1-based pagination page so chip
+    # clicks for events on a different page can hop pages before scrolling.
+    month_event_pages: dict[int, int] = {
+        evt.pk: (idx // _CALENDAR_PAGE_SIZE) + 1 for idx, evt in enumerate(raw_month_events)
+    }
 
     guilds_with_calendars = list(Guild.objects.filter(is_active=True, calendar_url__gt="").order_by("name"))
 
@@ -857,24 +861,20 @@ def _get_calendar_context(
         for i in range(7)
     ]
 
-    # Month label (e.g. "April 2026")
-    month_label = nav_month_first.strftime("%B %Y")
+    # Window label, e.g. "Apr 27 – May 24, 2026" or "Dec 28, 2025 – Jan 24, 2026"
+    if window_start.year != window_end.year:
+        month_label = f"{window_start.strftime('%b %-d, %Y')} – {window_end.strftime('%b %-d, %Y')}"
+    elif window_start.month == window_end.month:
+        month_label = f"{window_start.strftime('%b %-d')} – {window_end.strftime('%-d')}, {window_end.year}"
+    else:
+        month_label = f"{window_start.strftime('%b %-d')} – {window_end.strftime('%b %-d')}, {window_end.year}"
 
-    # Month grid: navigated month padded to complete 7-column rows (Mon–Sun)
+    # 4-week grid: 28 days (Mon–Sun, exactly 4 rows). Every cell is "in window".
     month_headers = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-    leading = nav_month_first.weekday()
-    trailing = (6 - nav_month_last.weekday()) % 7
-
     month_days = []
-    for i in range(leading):
-        d = nav_month_first - timedelta(days=leading - i)
-        month_days.append({"date": d, "is_today": d == today, "in_month": False, "events": events_by_date.get(d, [])})
-    for day_num in range(1, nav_month_last_day + 1):
-        d = nav_month_first.replace(day=day_num)
+    for i in range(28):
+        d = window_start + timedelta(days=i)
         month_days.append({"date": d, "is_today": d == today, "in_month": True, "events": events_by_date.get(d, [])})
-    for i in range(1, trailing + 1):
-        d = nav_month_last + timedelta(days=i)
-        month_days.append({"date": d, "is_today": d == today, "in_month": False, "events": events_by_date.get(d, [])})
 
     return {
         "week_events": week_events,
@@ -894,6 +894,7 @@ def _get_calendar_context(
         "month_headers": month_headers,
         "month_label": month_label,
         "month_offset": month_offset,
+        "month_event_pages_json": json.dumps(month_event_pages),
         "now": now,
     }
 

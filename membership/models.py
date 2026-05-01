@@ -201,6 +201,15 @@ class Member(models.Model):
     show_in_directory = models.BooleanField(
         default=False, help_text="Whether this member appears in the public member directory."
     )
+    directory_visibility = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "Per-field public/hidden flags for the member directory card. "
+            "Keys: pronouns, phone, email, discord_handle, other_contact_info, about_me, profile_photo. "
+            "Missing key means public (default-on)."
+        ),
+    )
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     leases = GenericRelation(
@@ -216,12 +225,30 @@ class Member(models.Model):
         verbose_name = "Member"
         verbose_name_plural = "Members"
 
+    DIRECTORY_TOGGLEABLE_FIELDS: tuple[str, ...] = (
+        "pronouns",
+        "phone",
+        "email",
+        "discord_handle",
+        "other_contact_info",
+        "about_me",
+        "profile_photo",
+    )
+
     def __str__(self) -> str:
         return self.display_name
 
     @property
     def display_name(self) -> str:
         return self.preferred_name if self.preferred_name else self.full_legal_name
+
+    def is_public(self, field_name: str) -> bool:
+        """Return True if a directory-toggleable field should appear on this member's card.
+
+        Defaults to True (public) when the key is missing — existing members aren't
+        accidentally hidden after this feature ships.
+        """
+        return bool(self.directory_visibility.get(field_name, True))
 
     @property
     def primary_email(self) -> str:
@@ -1081,3 +1108,13 @@ class CalendarEvent(models.Model):
         if self.source == self.Source.GUILD and self.guild_id:
             return str(self.guild_id)
         return self.source
+
+    @property
+    def is_in_progress(self) -> bool:
+        """True when the event is currently happening (start <= now < end)."""
+        from django.utils import timezone
+
+        if self.all_day:
+            return False
+        now = timezone.now()
+        return self.start_dt <= now < self.end_dt
